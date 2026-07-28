@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_app_name">ASA</string>
+    <string name="widget_streak_format">День %1$d</string>
+    <string name="widget_active_tasks_zero">Нет активных задач</string>
+    <string name="widget_active_tasks_one">1 активная задача</string>
+    <string name="widget_active_tasks_few">%1$d активные задачи</string>
+    <string name="widget_active_tasks_many">%1$d активных задач</string>
+</resources>

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
+import '../../../core/responsive_center.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../widgets/task_card.dart';
@@ -51,13 +52,21 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         if (v.isNotEmpty) {
           try {
             if (isTask) {
-              context.read<TaskProvider>().addTask(v, folderId: widget.folder.id);
+              context.read<TaskProvider>().addTask(
+                v,
+                folderId: widget.folder.id,
+              );
             } else {
-              context.read<TaskProvider>().addFolder(v, parentFolderId: widget.folder.id);
+              context.read<TaskProvider>().addFolder(
+                v,
+                parentFolderId: widget.folder.id,
+              );
             }
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+              ),
             );
           }
         }
@@ -71,62 +80,71 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Scaffold(
       backgroundColor: bg,
-      body: GestureDetector(
-        onHorizontalDragEnd: (details) {
-          if (details.primaryVelocity != null &&
-              (details.primaryVelocity! > 250 || details.primaryVelocity! < -250)) {
-            Navigator.pop(context);
-          }
-        },
-        child: SafeArea(
-          bottom: false,
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(12),
+      body: ResponsiveCenter(
+        child: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity != null &&
+                (details.primaryVelocity! > 250 ||
+                    details.primaryVelocity! < -250)) {
+              Navigator.pop(context);
+            }
+          },
+          child: SafeArea(
+            bottom: false,
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color:
+                                    isDark
+                                        ? AppColors.surfaceDark
+                                        : AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.arrow_back,
+                                color: textColor,
+                                size: 22,
+                              ),
                             ),
-                            child: Icon(Icons.arrow_back, color: textColor, size: 22),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _Breadcrumbs(
-                            folder: widget.folder,
-                            textColor: textColor,
-                            textSecondary: textSecondary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _Breadcrumbs(
+                              folder: widget.folder,
+                              textColor: textColor,
+                              textSecondary: textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _FolderContent(folder: widget.folder),
-                  ),
-                ],
-              ),
-              Positioned.fill(
-                child: _FolderFloatingMenu(
-                  onMenuClose: () {},
-                  showCreateSheet: _showCreateSheet,
-                  bottomOffset: AppTheme.navHeight,
+                    Expanded(child: _FolderContent(folder: widget.folder)),
+                  ],
                 ),
-              ),
-            ],
+                Positioned.fill(
+                  child: _FolderFloatingMenu(
+                    onMenuClose: () {},
+                    showCreateSheet: _showCreateSheet,
+                    bottomOffset: AppTheme.navHeight,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -166,52 +184,60 @@ class _Breadcrumbs extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: path.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final f = entry.value;
-          final isLast = idx == path.length - 1;
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (idx > 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                  child: Icon(Icons.chevron_right, color: textSecondary, size: 20),
-                ),
-              GestureDetector(
-                onTap: () {
-                  if (!isLast) {
-                    final pops = path.length - 1 - idx;
-                    for (int i = 0; i < pops; i++) {
-                      Navigator.pop(context);
-                    }
-                  }
-                },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isLast) ...[
-                      Icon(
-                        f.isSystemStreak ? Iconsax.calendar_1 : Iconsax.folder_minus,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      f.name,
-                      style: TextStyle(
-                        color: isLast ? textColor : textSecondary,
-                        fontSize: isLast ? 20 : 16,
-                        fontWeight: isLast ? FontWeight.bold : FontWeight.w400,
+        children:
+            path.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final f = entry.value;
+              final isLast = idx == path.length - 1;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (idx > 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                      child: Icon(
+                        Icons.chevron_right,
+                        color: textSecondary,
+                        size: 20,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }).toList(),
+                  GestureDetector(
+                    onTap: () {
+                      if (!isLast) {
+                        final pops = path.length - 1 - idx;
+                        for (int i = 0; i < pops; i++) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isLast) ...[
+                          Icon(
+                            f.isSystemStreak
+                                ? Iconsax.calendar_1
+                                : Iconsax.folder_minus,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          f.name,
+                          style: TextStyle(
+                            color: isLast ? textColor : textSecondary,
+                            fontSize: isLast ? 20 : 16,
+                            fontWeight:
+                                isLast ? FontWeight.bold : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
       ),
     );
   }
@@ -240,7 +266,10 @@ class _FolderContent extends StatelessWidget {
         child: Text(
           settings.tr('no_tasks_in_folder'),
           style: TextStyle(
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color:
+                isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
             fontSize: 16,
           ),
         ),
@@ -252,22 +281,27 @@ class _FolderContent extends StatelessWidget {
 
     return ReorderableListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.screenPad,
+        vertical: 12,
+      ),
       onReorderItem: (oldIndex, newIndex) {
         final sc = subfolders.length;
         if (oldIndex >= sc && newIndex >= sc) {
           final oldTaskIndex = oldIndex - sc;
           final newTaskIndex = newIndex - sc;
-          context.read<TaskProvider>().reorderFolderTasks(folder.id, oldTaskIndex, newTaskIndex);
+          context.read<TaskProvider>().reorderFolderTasks(
+            folder.id,
+            oldTaskIndex,
+            newTaskIndex,
+          );
         }
       },
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
           animation: animation,
-          builder: (context, child) => Transform.scale(
-            scale: 1.03,
-            child: child,
-          ),
+          builder:
+              (context, child) => Transform.scale(scale: 1.03, child: child),
           child: child,
         );
       },
@@ -335,7 +369,12 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
     if (!_isOpen) widget.onMenuClose();
   }
 
-  Widget _menuOption(SettingsProvider settings, {required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _menuOption(
+    SettingsProvider settings, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppTheme.menuRadius),
@@ -347,7 +386,15 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
           children: [
             Icon(icon, color: Colors.white, size: 24),
             const SizedBox(width: AppTheme.menuItemGapInner),
-            Text(label, textAlign: TextAlign.left, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400)),
+            Text(
+              label,
+              textAlign: TextAlign.left,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
           ],
         ),
       ),
@@ -373,11 +420,15 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
           ),
         Positioned(
           right: AppTheme.screenPad,
-          bottom: widget.bottomOffset + AppTheme.fabSize + AppTheme.screenPad + 12,
+          bottom:
+              widget.bottomOffset + AppTheme.fabSize + AppTheme.screenPad + 12,
           child: IgnorePointer(
             ignoring: !_isOpen,
             child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: _isOpen ? 0.0 : 1.0, end: _isOpen ? 1.0 : 0.0),
+              tween: Tween(
+                begin: _isOpen ? 0.0 : 1.0,
+                end: _isOpen ? 1.0 : 0.0,
+              ),
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutCubic,
               builder: (context, value, child) {
@@ -397,7 +448,11 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                     color: menuColor,
                     borderRadius: BorderRadius.circular(AppTheme.menuRadius),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
                   ),
                   child: IntrinsicWidth(
@@ -405,15 +460,25 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _menuOption(settings, icon: Iconsax.folder_minus, label: settings.tr('create_folder'), onTap: () {
-                          _toggleMenu();
-                          widget.showCreateSheet(context, isTask: false);
-                        }),
+                        _menuOption(
+                          settings,
+                          icon: Iconsax.folder_minus,
+                          label: settings.tr('create_folder'),
+                          onTap: () {
+                            _toggleMenu();
+                            widget.showCreateSheet(context, isTask: false);
+                          },
+                        ),
                         SizedBox(height: AppTheme.menuItemGap),
-                        _menuOption(settings, icon: Iconsax.clipboard_tick, label: settings.tr('create_task'), onTap: () {
-                          _toggleMenu();
-                          widget.showCreateSheet(context, isTask: true);
-                        }),
+                        _menuOption(
+                          settings,
+                          icon: Iconsax.clipboard_tick,
+                          label: settings.tr('create_task'),
+                          onTap: () {
+                            _toggleMenu();
+                            widget.showCreateSheet(context, isTask: true);
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -434,7 +499,11 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                 color: fabColor,
                 borderRadius: BorderRadius.circular(AppTheme.fabRadius),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 3)),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
                 ],
               ),
               child: Center(

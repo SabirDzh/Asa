@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task_model.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../core/home_widget_service.dart';
 
 enum TaskFilter { all, active, completed, foldersOnly }
 
@@ -10,6 +13,7 @@ class TaskProvider with ChangeNotifier {
   final _uuid = const Uuid();
   final List<TaskItem> _tasks = [];
   final List<FolderItem> _folders = [];
+  final _initCompleter = Completer<void>();
 
   String _searchQuery = '';
   TaskFilter _filter = TaskFilter.all;
@@ -20,9 +24,18 @@ class TaskProvider with ChangeNotifier {
     initData();
   }
 
+  /// Resolves once initial data loading (and streak recalculation) is done.
+  Future<void> get ready => _initCompleter.future;
+
   Future<void> initData() async {
-    await _loadFromPrefs();
-    await checkDailyStreak();
+    try {
+      await _loadFromPrefs();
+      await checkDailyStreak();
+    } finally {
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.complete();
+      }
+    }
   }
 
   List<TaskItem> get tasks => List.unmodifiable(_tasks);
@@ -50,6 +63,7 @@ class TaskProvider with ChangeNotifier {
       final foldersJson = jsonEncode(_folders.map((f) => f.toJson()).toList());
       await prefs.setString('saved_tasks', tasksJson);
       await prefs.setString('saved_folders', foldersJson);
+      HomeWidgetService.update(this);
     } catch (_) {}
   }
 
@@ -77,15 +91,20 @@ class TaskProvider with ChangeNotifier {
   Future<void> checkDailyStreak() async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
     final lastLoginStr = prefs.getString('lastLoginDate');
     int currentStreak = prefs.getInt('streakCount') ?? 1;
 
     if (lastLoginStr != null && lastLoginStr.isNotEmpty) {
       try {
         final parts = lastLoginStr.split('-');
-        final lastDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        final lastDate = DateTime(
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+          int.parse(parts[2]),
+        );
         final todayDate = DateTime(now.year, now.month, now.day);
         final daysDiff = todayDate.difference(lastDate).inDays;
 
@@ -126,8 +145,12 @@ class TaskProvider with ChangeNotifier {
   List<FolderItem> get filteredFolders {
     if (_filter == TaskFilter.completed) return [];
     return _folders.where((f) {
-      if (f.parentFolderId != null) return false;
-      if (_searchQuery.isEmpty) return true;
+      if (f.parentFolderId != null) {
+        return false;
+      }
+      if (_searchQuery.isEmpty) {
+        return true;
+      }
       return f.name.toLowerCase().contains(_searchQuery);
     }).toList();
   }
@@ -135,14 +158,19 @@ class TaskProvider with ChangeNotifier {
   // Subfolders inside a specific parent folder
   List<FolderItem> getSubfolders(String parentFolderId) {
     return _folders.where((f) {
-      if (f.parentFolderId != parentFolderId) return false;
-      if (_searchQuery.isEmpty) return true;
+      if (f.parentFolderId != parentFolderId) {
+        return false;
+      }
+      if (_searchQuery.isEmpty) {
+        return true;
+      }
       return f.name.toLowerCase().contains(_searchQuery);
     }).toList();
   }
 
   List<TaskItem> get filteredInProgressTasks {
-    if (_filter == TaskFilter.completed || _filter == TaskFilter.foldersOnly) return [];
+    if (_filter == TaskFilter.completed || _filter == TaskFilter.foldersOnly)
+      return [];
     return _tasks.where((t) {
       if (t.isCompleted) return false;
       if (_searchQuery.isEmpty) return true;
@@ -151,7 +179,8 @@ class TaskProvider with ChangeNotifier {
   }
 
   List<TaskItem> get filteredCompletedTasks {
-    if (_filter == TaskFilter.active || _filter == TaskFilter.foldersOnly) return [];
+    if (_filter == TaskFilter.active || _filter == TaskFilter.foldersOnly)
+      return [];
     return _tasks.where((t) {
       if (!t.isCompleted) return false;
       if (_searchQuery.isEmpty) return true;
@@ -188,7 +217,10 @@ class TaskProvider with ChangeNotifier {
 
   void reorderRootFolders(int oldIndex, int newIndex) {
     final rootList = filteredFolders;
-    if (oldIndex >= 0 && oldIndex < rootList.length && newIndex >= 0 && newIndex < rootList.length) {
+    if (oldIndex >= 0 &&
+        oldIndex < rootList.length &&
+        newIndex >= 0 &&
+        newIndex < rootList.length) {
       final item = rootList.removeAt(oldIndex);
       rootList.insert(newIndex, item);
 
@@ -204,7 +236,10 @@ class TaskProvider with ChangeNotifier {
 
   void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {
     final folderTasks = getFolderTasks(folderId);
-    if (oldIndex >= 0 && oldIndex < folderTasks.length && newIndex >= 0 && newIndex < folderTasks.length) {
+    if (oldIndex >= 0 &&
+        oldIndex < folderTasks.length &&
+        newIndex >= 0 &&
+        newIndex < folderTasks.length) {
       final item = folderTasks.removeAt(oldIndex);
       folderTasks.insert(newIndex, item);
 
@@ -230,7 +265,9 @@ class TaskProvider with ChangeNotifier {
   void toggleTask(String id) {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(isCompleted: !_tasks[index].isCompleted);
+      _tasks[index] = _tasks[index].copyWith(
+        isCompleted: !_tasks[index].isCompleted,
+      );
       notifyListeners();
       _saveToPrefs();
     }
@@ -241,7 +278,7 @@ class TaskProvider with ChangeNotifier {
     notifyListeners();
     _saveToPrefs();
   }
-  
+
   void updateTask(String id, String newTitle) {
     if (newTitle.length > 250) {
       throw Exception('Название длиннее 250 символов');
@@ -259,16 +296,14 @@ class TaskProvider with ChangeNotifier {
     if (name.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
-    _folders.add(FolderItem(
-      id: _uuid.v4(),
-      name: name,
-      parentFolderId: parentFolderId,
-    ));
+    _folders.add(
+      FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId),
+    );
     _foldersVersion++;
     notifyListeners();
     _saveToPrefs();
   }
-  
+
   void updateFolder(String id, String newName) {
     final index = _folders.indexWhere((f) => f.id == id);
     if (index != -1 && !_folders[index].isSystemStreak) {
@@ -285,7 +320,11 @@ class TaskProvider with ChangeNotifier {
   void removeFolder(String id) {
     final index = _folders.indexWhere((f) => f.id == id);
     if (index != -1 && !_folders[index].isSystemStreak) {
-      final childFolders = _folders.where((f) => f.parentFolderId == id).map((f) => f.id).toList();
+      final childFolders =
+          _folders
+              .where((f) => f.parentFolderId == id)
+              .map((f) => f.id)
+              .toList();
       for (final childId in childFolders) {
         removeFolder(childId);
       }

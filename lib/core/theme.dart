@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// App color system — 3 semantic colors, Material 3 compliant
 class AppColors {
@@ -72,6 +71,7 @@ class AppTheme {
     final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final onSurface = isDark ? AppColors.textDark : AppColors.textLight;
+    final baseTypography = Typography.material2021();
 
     return ThemeData(
       brightness: brightness,
@@ -88,15 +88,18 @@ class AppTheme {
         error: Colors.redAccent,
         onError: Colors.white,
       ),
-      textTheme: GoogleFonts.interTextTheme().apply(
-        bodyColor: onSurface,
-        displayColor: onSurface,
-      ),
+      textTheme: (isDark ? baseTypography.white : baseTypography.black)
+          .apply(
+            fontFamily: 'Inter',
+            bodyColor: onSurface,
+            displayColor: onSurface,
+          ),
       appBarTheme: AppBarTheme(
         backgroundColor: bg,
         elevation: 0,
         iconTheme: IconThemeData(color: onSurface),
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: TextStyle(
+          fontFamily: 'Inter',
           color: onSurface,
           fontSize: 16,
           fontWeight: FontWeight.w400,

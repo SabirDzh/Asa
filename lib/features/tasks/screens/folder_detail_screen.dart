@@ -443,10 +443,10 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
           bottom: widget.bottomOffset + AppTheme.fabSize + AppTheme.screenPad + 12,
           child: IgnorePointer(
             ignoring: !_isOpen,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: _isOpen ? 1.0 : 0.0),
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: _isOpen ? 0.0 : 1.0, end: _isOpen ? 1.0 : 0.0),
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
               builder: (context, value, child) {
                 return Opacity(
                   opacity: value,
@@ -527,7 +527,7 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
               child: Center(
                 child:                 AnimatedRotation(
                   turns: _isOpen ? 0.125 : 0.0,
-                  duration: const Duration(milliseconds: 250),
+                  duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
                   child: const Icon(
                     Icons.add,

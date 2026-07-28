@@ -13,42 +13,95 @@ class TaskRow extends StatelessWidget {
   final bool enableDrag;
   const TaskRow({super.key, required this.task, this.enableDrag = true});
 
-  void _showEditDialog(BuildContext context) {
+  void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
+    final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final controller = TextEditingController(text: task.title);
-    showDialog(
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(settings.tr('edit_task')),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            border: UnderlineInputBorder(),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.only(
+            top: AppTheme.sheetPadTop,
+            left: AppTheme.sheetPadH,
+            right: AppTheme.sheetPadH,
+            bottom: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppTheme.sheetGap),
+              Container(
+                height: AppTheme.rowHeight,
+                decoration: BoxDecoration(
+                  color: inputBg,
+                  borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.rowPadH,
+                  vertical: AppTheme.rowPadV,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
+                    const SizedBox(width: AppTheme.rowGap),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        decoration: InputDecoration(
+                          hintText: settings.tr('edit_task'),
+                          hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 16,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onSubmitted: (val) {
+                          final v = val.trim();
+                          if (v.isNotEmpty) {
+                            try {
+                              context.read<TaskProvider>().updateTask(task.id, v);
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                              );
+                            }
+                          }
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(settings.tr('cancel'), style: TextStyle(color: AppColors.textSecondaryLight)),
-          ),
-          TextButton(
-            onPressed: () {
-              final v = controller.text.trim();
-              if (v.isNotEmpty) {
-                try {
-                  context.read<TaskProvider>().updateTask(task.id, v);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-                  );
-                }
-              }
-              Navigator.pop(ctx);
-            },
-            child: Text(settings.tr('save'), style: TextStyle(color: AppColors.primary)),
-          ),
-        ],
       ),
     );
   }
@@ -106,7 +159,7 @@ class TaskRow extends StatelessWidget {
 
     if (!iconContext.mounted) return;
     if (value == 'edit') {
-      _showEditDialog(iconContext);
+      _showEditSheet(iconContext);
     } else if (value == 'delete') {
       final isDark = Theme.of(iconContext).brightness == Brightness.dark;
       final bg = isDark ? AppColors.navDark : AppColors.navLight;

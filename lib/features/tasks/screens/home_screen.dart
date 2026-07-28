@@ -295,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 4),
           itemCount: folders.length,
-          onReorder: (oldIndex, newIndex) => provider.reorderRootFolders(oldIndex, newIndex),
+          onReorderItem: (oldIndex, newIndex) => provider.reorderRootFolders(oldIndex, newIndex),
           proxyDecorator: (child, index, animation) {
             return AnimatedBuilder(
               animation: animation,

@@ -106,7 +106,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: isDark ? AppColors.surfaceDark : AppColors.bgLight,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),

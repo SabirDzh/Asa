@@ -238,7 +238,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 children: [
                   // Top bar with back button and folder title/breadcrumbs
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                     child: Row(
                       children: [
                         GestureDetector(
@@ -286,7 +286,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         return ReorderableListView(
                           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 12),
-                          onReorder: (oldIndex, newIndex) {
+                          onReorderItem: (oldIndex, newIndex) {
                             final subfolderCount = subfolders.length;
                             if (oldIndex >= subfolderCount && newIndex >= subfolderCount) {
                               final oldTaskIndex = oldIndex - subfolderCount;
@@ -441,15 +441,21 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
           bottom: widget.bottomOffset + AppTheme.fabSize + AppTheme.screenPad + 12,
           child: IgnorePointer(
             ignoring: !_isOpen,
-            child: AnimatedScale(
-              scale: _isOpen ? 1.0 : 0.0,
-              alignment: Alignment.bottomRight,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: _isOpen ? 1.0 : 0.0),
               duration: const Duration(milliseconds: 200),
-              curve: _isOpen ? Curves.easeOutBack : Curves.easeIn,
-              child: AnimatedOpacity(
-                opacity: _isOpen ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 150),
-                child: Material(
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.scale(
+                    scale: value,
+                    alignment: Alignment.bottomRight,
+                    child: child,
+                  ),
+                );
+              },
+              child: Material(
                   color: Colors.transparent,
                   child: Container(
                     decoration: BoxDecoration(
@@ -492,7 +498,6 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                     ),
                   ),
                 ),
-              ),
             ),
           ),
         ),
@@ -518,10 +523,10 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                 ],
               ),
               child: Center(
-                child: AnimatedRotation(
+                child:                 AnimatedRotation(
                   turns: _isOpen ? 0.125 : 0.0,
                   duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutBack,
+                  curve: Curves.easeOutCubic,
                   child: const Icon(
                     Icons.add,
                     color: Colors.white,

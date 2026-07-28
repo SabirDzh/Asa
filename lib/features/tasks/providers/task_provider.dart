@@ -185,9 +185,6 @@ class TaskProvider with ChangeNotifier {
   }
 
   void reorderRootFolders(int oldIndex, int newIndex) {
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
     final rootList = filteredFolders;
     if (oldIndex >= 0 && oldIndex < rootList.length && newIndex >= 0 && newIndex < rootList.length) {
       final item = rootList.removeAt(oldIndex);
@@ -204,9 +201,6 @@ class TaskProvider with ChangeNotifier {
   }
 
   void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
     final folderTasks = getFolderTasks(folderId);
     if (oldIndex >= 0 && oldIndex < folderTasks.length && newIndex >= 0 && newIndex < folderTasks.length) {
       final item = folderTasks.removeAt(oldIndex);

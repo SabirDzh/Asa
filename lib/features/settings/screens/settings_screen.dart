@@ -433,7 +433,7 @@ class SettingsScreen extends StatelessWidget {
                     trailing: Switch(
                       value: settings.notificationsEnabled,
                       onChanged: settings.toggleNotifications,
-                      activeColor: AppColors.primary,
+                      activeThumbColor: AppColors.primary,
                       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                     ),
                   ),
@@ -463,7 +463,7 @@ class SettingsScreen extends StatelessWidget {
                               animationSpeed: settings.animationSpeed,
                             );
                           },
-                          activeColor: AppColors.primary,
+                          activeThumbColor: AppColors.primary,
                           trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                         );
                       },

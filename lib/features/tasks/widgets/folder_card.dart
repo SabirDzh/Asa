@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
+import '../../../core/bottom_sheet.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../screens/folder_detail_screen.dart';
@@ -24,97 +25,25 @@ class _FolderRowState extends State<FolderRow> {
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
-    final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final controller = TextEditingController(text: widget.folder.name);
-
-    showModalBottomSheet(
+    showInputSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => AnimatedPadding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        child: Container(
-          decoration: BoxDecoration(
-            color: sheetBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.only(
-            top: AppTheme.sheetPadTop,
-            left: AppTheme.sheetPadH,
-            right: AppTheme.sheetPadH,
-            bottom: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppTheme.sheetGap),
-              Container(
-                height: AppTheme.rowHeight,
-                decoration: BoxDecoration(
-                  color: inputBg,
-                  borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.rowPadH,
-                  vertical: AppTheme.rowPadV,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Iconsax.folder_minus, color: textSecondary, size: 24),
-                    const SizedBox(width: AppTheme.rowGap),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        inputFormatters: [textInputFormatter()],
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                        decoration: InputDecoration(
-                          hintText: settings.tr('edit_folder'),
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 16,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onSubmitted: (val) {
-                          final v = sanitizeText(val);
-                          if (v.isNotEmpty) {
-                            try {
-                              context.read<TaskProvider>().updateFolder(widget.folder.id, v);
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-                              );
-                            }
-                          }
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      icon: Iconsax.folder_minus,
+      hintText: settings.tr('edit_folder'),
+      controller: controller,
+      onSubmit: (val, sheetCtx) {
+        final v = sanitizeText(val);
+        if (v.isNotEmpty) {
+          try {
+            context.read<TaskProvider>().updateFolder(widget.folder.id, v);
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+            );
+          }
+        }
+        Navigator.pop(sheetCtx);
+      },
     );
   }
 
@@ -122,7 +51,8 @@ class _FolderRowState extends State<FolderRow> {
     final settings = Provider.of<SettingsProvider>(iconContext, listen: false);
     final isDark = Theme.of(iconContext).brightness == Brightness.dark;
     
-    final RenderBox renderBox = iconContext.findRenderObject() as RenderBox;
+    final RenderBox? renderBox = iconContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
     final Offset offset = renderBox.localToGlobal(Offset.zero);
     final Rect positionRect = offset & renderBox.size;
     final RelativeRect position = RelativeRect.fromLTRB(
@@ -211,30 +141,33 @@ class _FolderRowState extends State<FolderRow> {
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    final rowChild = GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => FolderDetailScreen(folder: widget.folder),
+    final rowChild = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FolderDetailScreen(folder: widget.folder),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: AppTheme.rowHeight,
+          decoration: BoxDecoration(
+            color: _isDragHovered ? AppColors.primary.withValues(alpha: 0.25) : surface,
+            borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+            border: Border.all(
+              color: _isDragHovered ? AppColors.primary : Colors.transparent,
+              width: 2,
+            ),
           ),
-        );
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: AppTheme.rowHeight,
-        decoration: BoxDecoration(
-          color: _isDragHovered ? AppColors.primary.withValues(alpha: 0.25) : surface,
-          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-          border: Border.all(
-            color: _isDragHovered ? AppColors.primary : Colors.transparent,
-            width: 2,
+          padding: const EdgeInsets.only(
+            left: AppTheme.rowPadH,
           ),
-        ),
-        padding: const EdgeInsets.only(
-          left: AppTheme.rowPadH,
-        ),
-        child: Row(
+          child: Row(
           children: [
             Icon(
               widget.folder.isSystemStreak ? Iconsax.calendar_1 : Iconsax.folder_minus,
@@ -274,6 +207,7 @@ class _FolderRowState extends State<FolderRow> {
           ],
         ),
       ),
+      ),
     );
 
     // Wrap as DragTarget to receive tasks or subfolders dropped into this folder
@@ -293,17 +227,19 @@ class _FolderRowState extends State<FolderRow> {
         final provider = context.read<TaskProvider>();
         if (data is TaskItem) {
           provider.moveTaskToFolder(data.id, widget.folder.id);
+          final settings = context.read<SettingsProvider>();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Задача перенесена в ${widget.folder.name}'),
+              content: Text('${settings.tr('task_moved')} ${widget.folder.name}'),
               duration: const Duration(seconds: 2),
             ),
           );
         } else if (data is FolderItem) {
           provider.moveFolderToFolder(data.id, widget.folder.id);
+          final settings = context.read<SettingsProvider>();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Папка перенесена в ${widget.folder.name}'),
+              content: Text('${settings.tr('folder_moved')} ${widget.folder.name}'),
               duration: const Duration(seconds: 2),
             ),
           );

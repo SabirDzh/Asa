@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
+import '../../../core/bottom_sheet.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -64,97 +65,25 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
-    final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final controller = TextEditingController(text: widget.task.title);
-
-    showModalBottomSheet(
+    showInputSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => AnimatedPadding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        child: Container(
-          decoration: BoxDecoration(
-            color: sheetBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.only(
-            top: AppTheme.sheetPadTop,
-            left: AppTheme.sheetPadH,
-            right: AppTheme.sheetPadH,
-            bottom: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppTheme.sheetGap),
-              Container(
-                height: AppTheme.rowHeight,
-                decoration: BoxDecoration(
-                  color: inputBg,
-                  borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.rowPadH,
-                  vertical: AppTheme.rowPadV,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
-                    const SizedBox(width: AppTheme.rowGap),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        inputFormatters: [textInputFormatter()],
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                        decoration: InputDecoration(
-                          hintText: settings.tr('edit_task'),
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 16,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onSubmitted: (val) {
-                          final v = sanitizeText(val);
-                          if (v.isNotEmpty) {
-                            try {
-                              context.read<TaskProvider>().updateTask(widget.task.id, v);
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-                              );
-                            }
-                          }
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      icon: Iconsax.clipboard_tick,
+      hintText: settings.tr('edit_task'),
+      controller: controller,
+      onSubmit: (val, sheetCtx) {
+        final v = sanitizeText(val);
+        if (v.isNotEmpty) {
+          try {
+            context.read<TaskProvider>().updateTask(widget.task.id, v);
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+            );
+          }
+        }
+        Navigator.pop(sheetCtx);
+      },
     );
   }
 
@@ -162,7 +91,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final settings = Provider.of<SettingsProvider>(iconContext, listen: false);
     final isDark = Theme.of(iconContext).brightness == Brightness.dark;
     
-    final RenderBox renderBox = iconContext.findRenderObject() as RenderBox;
+    final RenderBox? renderBox = iconContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
     final Offset offset = renderBox.localToGlobal(Offset.zero);
     final Rect positionRect = offset & renderBox.size;
     final RelativeRect position = RelativeRect.fromLTRB(
@@ -313,17 +243,17 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
 
     Widget animatedChild;
     if (_isExiting) {
-      animatedChild = AnimatedBuilder(
-        animation: _exitController,
-        builder: (context, child) => Opacity(
-          opacity: 1.0 - _exitController.value,
-          child: Transform.scale(
+      animatedChild = FadeTransition(
+        opacity: Tween(begin: 1.0, end: 0.0).animate(_exitController),
+        child: AnimatedBuilder(
+          animation: _exitController,
+          builder: (context, child) => Transform.scale(
             scale: 1.0 - 0.08 * _exitController.value,
             alignment: Alignment.centerRight,
             child: child,
           ),
+          child: cardChild,
         ),
-        child: cardChild,
       );
     } else {
       animatedChild = TweenAnimationBuilder<double>(

@@ -18,10 +18,11 @@ class ThemeSwitcher {
     }
 
     final pixelRatio = View.of(context).devicePixelRatio;
+    final captureRatio = pixelRatio > 2.0 ? 2.0 : pixelRatio;
     final overlayState = Overlay.of(context);
 
     // Capture the current screen state as an image
-    final image = await boundary.toImage(pixelRatio: pixelRatio);
+    final image = await boundary.toImage(pixelRatio: captureRatio);
 
     late OverlayEntry overlayEntry;
 
@@ -92,14 +93,15 @@ class _ThemeTransitionOverlayState extends State<_ThemeTransitionOverlay> with S
         builder: (context, child) {
           return ClipPath(
             clipper: _HoleClipper(center: widget.center, progress: _controller.value),
-            child: RawImage(
-              image: widget.image,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            ),
+            child: child!,
           );
         },
+        child: RawImage(
+          image: widget.image,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+        ),
       ),
     );
   }

@@ -1,8 +1,5 @@
 import 'package:flutter/services.dart';
 
-const double _speedMin = 0.1;
-const double _speedMax = 5.0;
-
 TextInputFormatter numericInputFormatter() => TextInputFormatter.withFunction((oldValue, newValue) {
       final text = newValue.text;
       if (text.isEmpty) return newValue;
@@ -20,14 +17,6 @@ TextInputFormatter numericInputFormatter() => TextInputFormatter.withFunction((o
         selection: TextSelection.collapsed(offset: result.length),
       );
     });
-
-double? parseAndClampSpeed(String raw) {
-  final v = raw.trim();
-  if (v.isEmpty) return null;
-  final parsed = double.tryParse(v);
-  if (parsed == null) return null;
-  return parsed.clamp(_speedMin, _speedMax);
-}
 
 String sanitizeText(String value) {
   return value

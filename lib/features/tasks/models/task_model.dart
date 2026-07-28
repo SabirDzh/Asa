@@ -80,4 +80,20 @@ class FolderItem {
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
       );
+
+  FolderItem copyWith({
+    String? id,
+    String? name,
+    bool? isSystemStreak,
+    String? parentFolderId,
+    DateTime? createdAt,
+  }) {
+    return FolderItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      isSystemStreak: isSystemStreak ?? this.isSystemStreak,
+      parentFolderId: parentFolderId ?? this.parentFolderId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

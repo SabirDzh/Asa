@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'core/theme.dart';
 import 'core/notification_service.dart';
+import 'core/scale_utils.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/tasks/providers/task_provider.dart';
 import 'features/splash/splash_screen.dart';
@@ -62,14 +63,13 @@ class _ScaledApp extends StatelessWidget {
   const _ScaledApp({required this.scale, required this.child});
 
   final double scale;
-  final Widget child;
-
-  @override
+  final Widget child;  @override
   Widget build(BuildContext context) {
-      final data = MediaQuery.of(context);
+    final data = MediaQuery.of(context);
+    final effectiveScale = scale.clamp(kMinAppScale, getAdaptiveMaxScale(context));
 
     // No scaling needed: avoid the extra layer and preserve exact layout.
-    if ((scale - 1.0).abs() < 0.001) {
+    if ((effectiveScale - 1.0).abs() < 0.001) {
       return GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         behavior: HitTestBehavior.translucent,
@@ -81,15 +81,15 @@ class _ScaledApp extends StatelessWidget {
     }
 
     final scaledSize = Size(
-      data.size.width / scale,
-      data.size.height / scale,
+      data.size.width / effectiveScale,
+      data.size.height / effectiveScale,
     );
 
     final scaledMediaQuery = data.copyWith(
       size: scaledSize,
-      padding: data.padding / scale,
-      viewPadding: data.viewPadding / scale,
-      viewInsets: data.viewInsets / scale,
+      padding: data.padding / effectiveScale,
+      viewPadding: data.viewPadding / effectiveScale,
+      viewInsets: data.viewInsets / effectiveScale,
       // The system text scale is preserved. The [Transform.scale] below
       // scales the rendered output (including text) uniformly, so the final
       // text size equals `scale * systemTextScale`.
@@ -102,7 +102,7 @@ class _ScaledApp extends StatelessWidget {
       minHeight: scaledSize.height,
       maxHeight: scaledSize.height,
       child: Transform.scale(
-        scale: scale,
+        scale: effectiveScale,
         child: MediaQuery(
           data: scaledMediaQuery,
           child: GestureDetector(

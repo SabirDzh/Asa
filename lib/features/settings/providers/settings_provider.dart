@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/app_strings.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/notification_service.dart';
+import '../../../core/scale_utils.dart';
 
 enum WidgetDisplayMode { streak, activeTasks, lastFolder }
 
@@ -50,7 +51,7 @@ class SettingsProvider with ChangeNotifier {
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
-      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(_kMinAppScale, _kMaxAppScale);
+      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kMinAppScale, kAbsoluteMaxAppScale);
       _avatarPath = prefs.getString('avatarPath');
       _showInWidget = prefs.getBool('showInWidget') ?? true;
       _widgetDisplayMode = WidgetDisplayMode.values[
@@ -113,11 +114,8 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setDouble('animationSpeed', speed);
   }
 
-  static const double _kMinAppScale = 0.8;
-  static const double _kMaxAppScale = 1.3;
-
   Future<void> setAppScale(double scale) async {
-    final clamped = scale.clamp(_kMinAppScale, _kMaxAppScale);
+    final clamped = scale.clamp(kMinAppScale, kAbsoluteMaxAppScale);
     _appScale = clamped;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();

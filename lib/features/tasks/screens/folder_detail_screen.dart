@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/input_utils.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../widgets/task_card.dart';
@@ -175,6 +176,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       child: TextField(
                         controller: controller,
                         autofocus: true,
+                        inputFormatters: [textInputFormatter()],
                         style: const TextStyle(color: Colors.white, fontSize: 16),
                         decoration: InputDecoration(
                           hintText: isTask ? settings.tr('new_task') : settings.tr('new_folder'),
@@ -187,7 +189,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           contentPadding: EdgeInsets.zero,
                         ),
                         onSubmitted: (val) {
-                          final v = val.trim();
+                          final v = sanitizeText(val);
                           if (v.isNotEmpty) {
                             try {
                               if (isTask) {

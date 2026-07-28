@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/theme_switcher.dart';
+import '../../../core/input_utils.dart';
 import '../providers/settings_provider.dart';
 import '../../tasks/providers/task_provider.dart';
 
@@ -120,8 +121,9 @@ class SettingsScreen extends StatelessWidget {
   // ── Bottom sheet: Animation Speed ────────────────────────────
   String _getAnimationSpeedLabel(SettingsProvider settings) {
     if (settings.animationSpeed == 0.5) return settings.tr('speed_fast');
+    if (settings.animationSpeed == 1.0) return settings.tr('speed_normal');
     if (settings.animationSpeed == 2.0) return settings.tr('speed_slow');
-    return settings.tr('speed_normal');
+    return '${settings.tr('speed_custom')} (${settings.animationSpeed})';
   }
 
   void _showAnimationSpeedSheet(BuildContext context) {
@@ -177,7 +179,146 @@ class SettingsScreen extends StatelessWidget {
                 Navigator.pop(ctx);
               },
             ),
+            ListTile(
+              title: Text(settings.tr('speed_custom'), style: const TextStyle(color: Colors.white, fontSize: 16)),
+              trailing: settings.animationSpeed != 0.5 && settings.animationSpeed != 1.0 && settings.animationSpeed != 2.0
+                  ? const Icon(Icons.check, color: AppColors.primary)
+                  : null,
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCustomSpeedSheet(context);
+              },
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ── Bottom sheet: Custom Speed ──────────────────────────────
+  void _showCustomSpeedSheet(BuildContext context) {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
+    final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final controller = TextEditingController(text: settings.animationSpeed.toString());
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => AnimatedPadding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        child: Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.only(
+            top: AppTheme.sheetPadTop,
+            left: AppTheme.sheetPadH,
+            right: AppTheme.sheetPadH,
+            bottom: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppTheme.sheetGap),
+              Container(
+                height: AppTheme.rowHeight,
+                decoration: BoxDecoration(
+                  color: inputBg,
+                  borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.rowPadH,
+                  vertical: AppTheme.rowPadV,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Iconsax.timer_1, color: Colors.white, size: 24),
+                    const SizedBox(width: AppTheme.rowGap),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        autofocus: true,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [numericInputFormatter()],
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        decoration: InputDecoration(
+                          hintText: '1.0',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 16,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onSubmitted: (val) {
+                          final v = val.trim();
+                          final parsed = double.tryParse(v);
+                          if (parsed == null || parsed < 0.1 || parsed > 5.0) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: const Text('Значение должно быть от 0.1 до 5.0')),
+                            );
+                            return;
+                          }
+                          context.read<SettingsProvider>().setAnimationSpeed(parsed);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  'от 0.1 до 5.0',
+                  style: TextStyle(color: textSecondary, fontSize: 14),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: ElevatedButton(
+                  onPressed: () {
+                    final v = controller.text.trim();
+                    final parsed = double.tryParse(v);
+                    if (parsed == null || parsed < 0.1 || parsed > 5.0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(content: const Text('Значение должно быть от 0.1 до 5.0')),
+                      );
+                      return;
+                    }
+                    context.read<SettingsProvider>().setAnimationSpeed(parsed);
+                    Navigator.pop(ctx);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                    ),
+                  ),
+                  child: const Text('Сохранить'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

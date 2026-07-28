@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/input_utils.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -120,6 +121,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                       child: TextField(
                         controller: controller,
                         autofocus: true,
+                        inputFormatters: [textInputFormatter()],
                         style: const TextStyle(color: Colors.white, fontSize: 16),
                         decoration: InputDecoration(
                           hintText: settings.tr('edit_task'),
@@ -132,7 +134,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                           contentPadding: EdgeInsets.zero,
                         ),
                         onSubmitted: (val) {
-                          final v = val.trim();
+                          final v = sanitizeText(val);
                           if (v.isNotEmpty) {
                             try {
                               context.read<TaskProvider>().updateTask(widget.task.id, v);

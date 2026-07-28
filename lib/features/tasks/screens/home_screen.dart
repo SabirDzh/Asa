@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/input_utils.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -240,7 +241,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => provider.setSearchQuery(val),
+                inputFormatters: [textInputFormatter()],
+                onChanged: (val) => provider.setSearchQuery(sanitizeText(val)),
                 style: TextStyle(color: textSecondary, fontSize: 16),
                 decoration: InputDecoration(
                   hintText: settings.tr('search'),
@@ -382,6 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: TextField(
                         controller: controller,
                         autofocus: true,
+                        inputFormatters: [textInputFormatter()],
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -398,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           contentPadding: EdgeInsets.zero,
                         ),
                         onSubmitted: (val) {
-                          final v = val.trim();
+                          final v = sanitizeText(val);
                           if (v.isNotEmpty) {
                             try {
                               context.read<TaskProvider>().addFolder(v);

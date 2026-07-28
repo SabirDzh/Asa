@@ -1,0 +1,2 @@
+-keep class com.example.asa.** { *; }
+-keep class io.flutter.** { *; }

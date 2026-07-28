@@ -23,7 +23,8 @@ void showAnimationSpeedSheet(BuildContext context) {
 
   showModalBottomSheet(
     context: context,
-    backgroundColor: Colors.transparent,      builder: (ctx) => Container(
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Container(
       decoration: BoxDecoration(
         color: sheetBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -32,56 +33,84 @@ void showAnimationSpeedSheet(BuildContext context) {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              settings.tr('animation_speed'),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        children: [
+          Text(
+            settings.tr('animation_speed'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            Material(color: Colors.transparent, child: ListTile(
-              title: Text(settings.tr('speed_fast'), style: const TextStyle(color: Colors.white, fontSize: 16)),
-              trailing: settings.animationSpeed == 0.5
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () {
-                settings.setAnimationSpeed(0.5);
-                Navigator.pop(ctx);
-              },
-            )),
-            Material(color: Colors.transparent, child: ListTile(
-              title: Text(settings.tr('speed_normal'), style: const TextStyle(color: Colors.white, fontSize: 16)),
-              trailing: settings.animationSpeed == 1.0
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () {
-                settings.setAnimationSpeed(1.0);
-                Navigator.pop(ctx);
-              },
-            )),
-            Material(color: Colors.transparent, child: ListTile(
-              title: Text(settings.tr('speed_slow'), style: const TextStyle(color: Colors.white, fontSize: 16)),
-              trailing: settings.animationSpeed == 2.0
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () {
-                settings.setAnimationSpeed(2.0);
-                Navigator.pop(ctx);
-              },
-            )),
-            Material(color: Colors.transparent, child: ListTile(
-              title: Text(settings.tr('speed_custom'), style: const TextStyle(color: Colors.white, fontSize: 16)),
-              trailing: settings.animationSpeed != 0.5 && settings.animationSpeed != 1.0 && settings.animationSpeed != 2.0
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
+          ),
+          const SizedBox(height: 16),
+          _speedTile(ctx, settings, 0.5, 'speed_fast'),
+          _speedTile(ctx, settings, 1.0, 'speed_normal'),
+          _speedTile(ctx, settings, 2.0, 'speed_slow'),
+          if (settings.customAnimationSpeeds.isNotEmpty) ...[
+            const Divider(color: Colors.white24, height: 16),
+            for (final speed in settings.customAnimationSpeeds)
+              _speedTile(
+                ctx,
+                settings,
+                speed,
+                'speed_custom',
+                suffix: _formatSpeed(speed),
+              ),
+          ],
+          const Divider(color: Colors.white24, height: 16),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: const Icon(Iconsax.add, color: Colors.white, size: 24),
+              title: Text(
+                settings.tr('speed_custom'),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 showCustomSpeedSheet(context);
               },
-            )),
-          ],
+            ),
+          ),
+        ],
       ),
     ),
   );
+}
+
+Widget _speedTile(
+  BuildContext ctx,
+  SettingsProvider settings,
+  double value,
+  String labelKey, {
+  String? suffix,
+}) {
+  final isSelected = (settings.animationSpeed - value).abs() < 0.01;
+  final label = suffix != null
+      ? '${settings.tr(labelKey)} ($suffix)'
+      : settings.tr(labelKey);
+  return Material(
+    color: Colors.transparent,
+    child: ListTile(
+      title: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 16),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check, color: AppColors.primary)
+          : null,
+      onTap: () {
+        settings.setAnimationSpeed(value);
+        Navigator.pop(ctx);
+      },
+    ),
+  );
+}
+
+String _formatSpeed(double speed) {
+  return speed == speed.truncateToDouble()
+      ? speed.toInt().toString()
+      : speed.toStringAsFixed(1);
 }
 
 void showCustomSpeedSheet(BuildContext context) {
@@ -155,18 +184,7 @@ void showCustomSpeedSheet(BuildContext context) {
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
-                      onSubmitted: (val) {
-                        final v = val.trim();
-                        final parsed = double.tryParse(v);
-                        if (parsed == null || parsed < 0.1 || parsed > 5.0) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text(settings.tr('speed_error'))),
-                          );
-                          return;
-                        }
-                        context.read<SettingsProvider>().setAnimationSpeed(parsed);
-                        Navigator.pop(ctx);
-                      },
+                      onSubmitted: (val) => _trySaveCustom(ctx, controller, settings),
                     ),
                   ),
                 ],
@@ -182,18 +200,7 @@ void showCustomSpeedSheet(BuildContext context) {
             const SizedBox(height: 8),
             Center(
               child: ElevatedButton(
-                onPressed: () {
-                  final v = controller.text.trim();
-                  final parsed = double.tryParse(v);
-                  if (parsed == null || parsed < 0.1 || parsed > 5.0) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text(settings.tr('speed_error'))),
-                    );
-                    return;
-                  }
-                  context.read<SettingsProvider>().setAnimationSpeed(parsed);
-                  Navigator.pop(ctx);
-                },
+                onPressed: () => _trySaveCustom(ctx, controller, settings),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -209,4 +216,21 @@ void showCustomSpeedSheet(BuildContext context) {
       ),
     ),
   );
+}
+
+void _trySaveCustom(
+  BuildContext ctx,
+  TextEditingController controller,
+  SettingsProvider settings,
+) {
+  final v = controller.text.trim();
+  final parsed = double.tryParse(v);
+  if (parsed == null || parsed < 0.1 || parsed > 5.0) {
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(content: Text(settings.tr('speed_error'))),
+    );
+    return;
+  }
+  settings.addCustomAnimationSpeed(parsed);
+  Navigator.pop(ctx);
 }

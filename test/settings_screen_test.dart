@@ -31,7 +31,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Уведомления'), findsOneWidget);
-    expect(find.text('Тема приложения'), findsOneWidget);
+    expect(find.textContaining('Тема приложения'), findsOneWidget);
     expect(find.text('Показывать задачи в виджете'), findsOneWidget);
     expect(find.textContaining('Что отображать'), findsOneWidget);
     expect(find.textContaining('Масштаб интерфейса'), findsOneWidget);

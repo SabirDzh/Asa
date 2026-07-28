@@ -13,13 +13,15 @@ import 'theme.dart';
 /// The dialog is shown at most once every 24 hours after the user presses
 /// "Postpone".
 class VersionService {
-  // TODO: Replace with your GitHub owner and repository name before shipping.
-  static const String owner = '';
-  static const String repo = '';
+  static const String owner = 'SabirDzh';
+  static const String repo = 'Asa';
   static const String currentVersion = '1.1.0';
 
   static const String _lastPromptKey = 'update_last_prompted_at';
-  static const Duration _reminderInterval = Duration(hours: 24);
+  /// Default interval between automatic update checks.
+  static const Duration _checkInterval = Duration(hours: 12);
+  /// Interval after the user postpones/reminds-later an update.
+  static const Duration _postponeInterval = Duration(hours: 24);
 
   /// Fetches the latest GitHub release and, if it is newer than the current
   /// version and enough time has passed since the last prompt, shows an update
@@ -31,13 +33,21 @@ class VersionService {
     final prefs = await SharedPreferences.getInstance();
     final lastPrompted = prefs.getInt(_lastPromptKey) ?? 0;
     final lastPromptedAt = DateTime.fromMillisecondsSinceEpoch(lastPrompted);
-    if (DateTime.now().difference(lastPromptedAt) < _reminderInterval) {
+    final interval = (prefs.getBool('update_postponed') ?? false)
+        ? _postponeInterval
+        : _checkInterval;
+    if (DateTime.now().difference(lastPromptedAt) < interval) {
       return;
     }
 
     final info = await _fetchLatest();
-    if (info == null) return;
-    if (!_isNewer(info.version, currentVersion)) return;
+    if (info == null || !_isNewer(info.version, currentVersion)) {
+      // No newer version: record the check so the next one happens
+      // after the normal 12-hour interval.
+      await prefs.setInt(_lastPromptKey, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setBool('update_postponed', false);
+      return;
+    }
 
     if (!context.mounted) return;
     _showUpdateDialog(context, settings, info);
@@ -142,6 +152,7 @@ class VersionService {
                 _lastPromptKey,
                 DateTime.now().millisecondsSinceEpoch,
               );
+              await prefs.setBool('update_postponed', true);
               if (!ctx.mounted) return;
               Navigator.of(ctx).pop();
             },
@@ -157,6 +168,7 @@ class VersionService {
                 _lastPromptKey,
                 DateTime.now().millisecondsSinceEpoch,
               );
+              await prefs.setBool('update_postponed', false);
               final uri = Uri.parse(info.url);
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);

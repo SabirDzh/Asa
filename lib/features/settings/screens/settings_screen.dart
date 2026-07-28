@@ -3,7 +3,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
-import '../../../core/theme_switcher.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/setting_row.dart';
 import '../widgets/avatar_section.dart';
@@ -13,6 +12,7 @@ import '../widgets/data_management_bottom_sheet.dart';
 import '../widgets/about_bottom_sheet.dart';
 import '../widgets/widget_mode_bottom_sheet.dart';
 import '../widgets/app_scale_bottom_sheet.dart';
+import '../widgets/theme_mode_bottom_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   final bool standalone;
@@ -56,32 +56,10 @@ class SettingsScreen extends StatelessWidget {
                   SettingRow(
                     surface: surface,
                     icon: Iconsax.sun_1,
-                    label: settings.tr('theme'),
+                    label: '${settings.tr('theme')}: ${themeModeLabel(settings)}',
                     textColor: textSecondary,
-                    trailing: Builder(
-                      builder: (switchCtx) {
-                        return Switch(
-                          value: settings.isDarkMode,
-                          onChanged: (_) {
-                            final box = switchCtx.findRenderObject() as RenderBox?;
-                            final center = box != null
-                                ? box.localToGlobal(box.size.center(Offset.zero))
-                                : Offset(
-                                    MediaQuery.of(switchCtx).size.width / 2,
-                                    MediaQuery.of(switchCtx).size.height / 2,
-                                  );
-                            ThemeSwitcher.switchTheme(
-                              context: switchCtx,
-                              center: center,
-                              onToggle: () => settings.toggleTheme(),
-                              animationSpeed: settings.animationSpeed,
-                            );
-                          },
-                          activeThumbColor: AppColors.primary,
-                          trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                        );
-                      },
-                    ),
+                    onTap: () => showThemeModeSheet(context),
+                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
                   ),
                   const SizedBox(height: 8),
                   SettingRow(

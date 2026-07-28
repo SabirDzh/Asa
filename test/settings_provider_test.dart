@@ -13,9 +13,8 @@ void main() {
       provider = SettingsProvider();
     });
 
-    test('uses dark mode by default', () {
-      expect(provider.isDarkMode, true);
-      expect(provider.themeMode, ThemeMode.dark);
+    test('uses system theme by default', () {
+      expect(provider.themeMode, ThemeMode.system);
     });
 
     test('uses Russian locale by default', () {
@@ -30,12 +29,17 @@ void main() {
       expect(provider.avatarPath, isNull);
     });
 
-    test('toggleTheme switches between dark and light', () {
-      provider.toggleTheme();
+    test('setThemeMode switches between light, dark and system', () {
+      provider.setThemeMode(ThemeMode.light);
+      expect(provider.themeMode, ThemeMode.light);
       expect(provider.isDarkMode, false);
 
-      provider.toggleTheme();
+      provider.setThemeMode(ThemeMode.dark);
+      expect(provider.themeMode, ThemeMode.dark);
       expect(provider.isDarkMode, true);
+
+      provider.setThemeMode(ThemeMode.system);
+      expect(provider.themeMode, ThemeMode.system);
     });
 
     test('toggleNotifications updates value', () {

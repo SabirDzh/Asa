@@ -12,11 +12,13 @@ import '../../../core/scale_utils.dart';
 enum WidgetDisplayMode { streak, activeTasks, lastFolder }
 
 class SettingsProvider with ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.dark;
+  ThemeMode _themeMode = ThemeMode.system;
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
   double _appScale = 1.0;
+  List<double> _customAnimationSpeeds = [];
+  List<double> _customAppScales = [];
   String? _avatarPath;
   bool _showInWidget = true;
   WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
@@ -35,23 +37,30 @@ class SettingsProvider with ChangeNotifier {
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
   double get appScale => _appScale;
+  List<double> get customAnimationSpeeds => _customAnimationSpeeds;
+  List<double> get customAppScales => _customAppScales;
   String? get avatarPath => _avatarPath;
   bool get showInWidget => _showInWidget;
   WidgetDisplayMode get widgetDisplayMode => _widgetDisplayMode;
 
-  bool get isDarkMode => _themeMode == ThemeMode.dark;
+  bool get isDarkMode => _themeMode == ThemeMode.dark ||
+      (_themeMode == ThemeMode.system &&
+          SchedulerBinding.instance.platformDispatcher.platformBrightness ==
+              Brightness.dark);
 
   String tr(String key) => AppStrings.get(key, _languageCode);
 
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final isDark = prefs.getBool('isDarkMode') ?? true;
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+      final themeIndex = prefs.getInt('themeMode') ?? ThemeMode.system.index;
+      _themeMode = ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
       _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
+      _customAnimationSpeeds = _loadDoubleList(prefs, 'customAnimationSpeeds');
+      _customAppScales = _loadDoubleList(prefs, 'customAppScales');
       _avatarPath = prefs.getString('avatarPath');
       _showInWidget = prefs.getBool('showInWidget') ?? true;
       _widgetDisplayMode = WidgetDisplayMode.values[
@@ -68,12 +77,11 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
-  Future<void> toggleTheme() async {
-    _themeMode =
-        _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', isDarkMode);
+    await prefs.setInt('themeMode', mode.index);
   }
 
   Future<void> toggleNotifications(bool value) async {
@@ -114,12 +122,51 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setDouble('animationSpeed', speed);
   }
 
+  /// Saves a custom animation speed to the history (max 3 entries, LRU),
+  /// then sets it as the active speed.
+  Future<void> addCustomAnimationSpeed(double speed) async {
+    final clamped = speed.clamp(0.1, 5.0);
+    _animationSpeed = clamped;
+    _customAnimationSpeeds = _addToCustomHistory(
+      _customAnimationSpeeds,
+      clamped,
+      const [0.5, 1.0, 2.0],
+    );
+    timeDilation = clamped;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('animationSpeed', clamped);
+    await prefs.setStringList(
+      'customAnimationSpeeds',
+      _customAnimationSpeeds.map((v) => v.toString()).toList(),
+    );
+  }
+
   Future<void> setAppScale(double scale) async {
     final clamped = scale.clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
     _appScale = clamped;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('appScale', clamped);
+  }
+
+  /// Saves a custom app scale to the history (max 3 entries, LRU), then
+  /// sets it as the active scale.
+  Future<void> addCustomAppScale(double scale, double min, double max) async {
+    final clamped = scale.clamp(min, max);
+    _appScale = clamped;
+    _customAppScales = _addToCustomHistory(
+      _customAppScales,
+      clamped,
+      const [0.8, 1.0, 1.2],
+    );
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('appScale', clamped);
+    await prefs.setStringList(
+      'customAppScales',
+      _customAppScales.map((v) => v.toString()).toList(),
+    );
   }
 
   Future<void> setShowInWidget(bool value) async {
@@ -165,5 +212,35 @@ class SettingsProvider with ChangeNotifier {
     } else {
       await prefs.setString('avatarPath', path);
     }
+  }
+
+  /// Loads a list of doubles from [prefs] under [key].
+  static List<double> _loadDoubleList(SharedPreferences prefs, String key) {
+    final raw = prefs.getStringList(key);
+    if (raw == null) return [];
+    return raw
+        .map((v) => double.tryParse(v))
+        .whereType<double>()
+        .toList();
+  }
+
+  /// Adds [value] to [history] at the front, removes duplicates, and keeps
+  /// only the most recent [maxItems] entries. Values matching a built-in
+  /// preset are not added to the history.
+  static List<double> _addToCustomHistory(
+    List<double> history,
+    double value,
+    List<double> builtInPresets, {
+    int maxItems = 3,
+  }) {
+    final isPreset = builtInPresets.any(
+      (preset) => (preset - value).abs() < 0.01,
+    );
+    if (isPreset) return history;
+
+    final updated = [value, ...history.where((v) => (v - value).abs() >= 0.01)]
+        .take(maxItems)
+        .toList();
+    return updated;
   }
 }

@@ -54,8 +54,32 @@ void showAppScaleSheet(BuildContext context) {
             _scaleTile(ctx, settings, value: _kDefaultPreset, labelKey: 'scale_default'),
           if (_kLargePreset >= range.min && _kLargePreset <= range.max)
             _scaleTile(ctx, settings, value: _kLargePreset, labelKey: 'scale_large'),
-          _customTile(ctx, settings, range),
-          const SizedBox(height: 8),
+          if (settings.customAppScales.isNotEmpty) ...[
+            const Divider(color: Colors.white24, height: 16),
+            for (final scale in settings.customAppScales)
+              _scaleTile(
+                ctx,
+                settings,
+                value: scale,
+                labelKey: 'scale_custom',
+                suffix: scale.toStringAsFixed(2),
+              ),
+          ],
+          const Divider(color: Colors.white24, height: 16),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: const Icon(Iconsax.add, color: Colors.white, size: 24),
+              title: Text(
+                settings.tr('scale_custom'),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCustomScaleSheet(context, settings, range);
+              },
+            ),
+          ),
         ],
       ),
     ),
@@ -67,13 +91,17 @@ Widget _scaleTile(
   SettingsProvider settings, {
   required double value,
   required String labelKey,
+  String? suffix,
 }) {
   final isSelected = (settings.appScale - value).abs() < _kStep / 2;
+  final label = suffix != null
+      ? '${settings.tr(labelKey)} ($suffix)'
+      : settings.tr(labelKey);
   return Material(
     color: Colors.transparent,
     child: ListTile(
       title: Text(
-        settings.tr(labelKey),
+        label,
         style: const TextStyle(color: Colors.white, fontSize: 16),
       ),
       trailing: isSelected
@@ -82,28 +110,6 @@ Widget _scaleTile(
       onTap: () {
         settings.setAppScale(value);
         Navigator.pop(ctx);
-      },
-    ),
-  );
-}
-
-Widget _customTile(BuildContext ctx, SettingsProvider settings, AdaptiveAppScaleRange range) {
-  final isCustom = !((settings.appScale - _kSmallPreset).abs() < _kStep / 2) &&
-      !((settings.appScale - _kDefaultPreset).abs() < _kStep / 2) &&
-      !((settings.appScale - _kLargePreset).abs() < _kStep / 2);
-  return Material(
-    color: Colors.transparent,
-    child: ListTile(
-      title: Text(
-        '${settings.tr('scale_custom')} (${settings.appScale.toStringAsFixed(2)})',
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-      ),
-      trailing: isCustom
-          ? const Icon(Icons.check, color: AppColors.primary)
-          : null,
-      onTap: () {
-        Navigator.pop(ctx);
-        _showCustomScaleSheet(ctx, settings, range);
       },
     ),
   );
@@ -205,7 +211,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                 onPressed: () {
                   final parsed = double.tryParse(controller.text.trim());
                   if (parsed == null) return;
-                  settings.setAppScale(parsed.clamp(range.min, range.max));
+                  settings.addCustomAppScale(parsed, range.min, range.max);
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(

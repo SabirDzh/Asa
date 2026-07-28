@@ -6,7 +6,6 @@ import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
 import '../../../core/responsive_center.dart';
-import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -350,12 +349,9 @@ class _HomeFolderList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final folders = context.select<TaskProvider, List<FolderItem>>(
-      (p) => p.filteredFolders,
-    );
-    final searchQuery = context.select<TaskProvider, String>(
-      (p) => p.searchQuery,
-    );
+    final provider = context.watch<TaskProvider>();
+    final folders = provider.filteredFolders;
+    final searchQuery = provider.searchQuery;
 
     if (folders.isEmpty) {
       final emptyText = context.select<SettingsProvider, String>(

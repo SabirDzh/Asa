@@ -13,20 +13,37 @@ import '../features/tasks/providers/task_provider.dart';
 /// startup when both settings and task data are ready) are batched into a
 /// single platform call.
 class HomeWidgetService {
-  static int _lastStreak = -1;
-  static int _lastActive = -1;
-  static String? _lastFolder;
-  static bool _lastEnabled = true;
-  static WidgetDisplayMode _lastMode = WidgetDisplayMode.streak;
+  HomeWidgetService._();
+  static final HomeWidgetService instance = HomeWidgetService._();
 
-  static Timer? _debounce;
+  int _lastStreak = -1;
+  int _lastActive = -1;
+  String? _lastFolder;
+  bool _lastEnabled = true;
+  WidgetDisplayMode _lastMode = WidgetDisplayMode.streak;
+
+  Timer? _debounce;
 
   /// Debounce duration. Can be set to [Duration.zero] in tests to avoid
   /// leaking timers across test cases.
-  static Duration debounceDelay = const Duration(milliseconds: 300);
+  Duration debounceDelay = const Duration(milliseconds: 300);
 
   /// Saves the current task data and refreshes the widget.
-  static void updateData(TaskProvider provider) {
+  static void updateData(TaskProvider provider) =>
+      instance._updateData(provider);
+
+  /// Saves the current widget settings and refreshes the widget.
+  static void updateSettings({
+    required bool enabled,
+    required WidgetDisplayMode mode,
+  }) =>
+      instance._updateSettings(enabled: enabled, mode: mode);
+
+  /// Cancels any pending widget update. Useful in tests to avoid leaking
+  /// timers between test cases.
+  static void cancelPendingUpdate() => instance._cancelPendingUpdate();
+
+  void _updateData(TaskProvider provider) {
     final active = provider.tasks.where((t) => !t.isCompleted).length;
     final streak = provider.streakCount;
     final folder = provider.lastViewedFolderName;
@@ -43,8 +60,7 @@ class HomeWidgetService {
     _scheduleUpdate();
   }
 
-  /// Saves the current widget settings and refreshes the widget.
-  static void updateSettings({
+  void _updateSettings({
     required bool enabled,
     required WidgetDisplayMode mode,
   }) {
@@ -55,19 +71,17 @@ class HomeWidgetService {
     _scheduleUpdate();
   }
 
-  static void _scheduleUpdate() {
+  void _scheduleUpdate() {
     _debounce?.cancel();
     _debounce = Timer(debounceDelay, _performUpdate);
   }
 
-  /// Cancels any pending widget update. Useful in tests to avoid leaking
-  /// timers between test cases.
-  static void cancelPendingUpdate() {
+  void _cancelPendingUpdate() {
     _debounce?.cancel();
     _debounce = null;
   }
 
-  static Future<void> _performUpdate() async {
+  Future<void> _performUpdate() async {
     _debounce?.cancel();
     _debounce = null;
     try {

@@ -69,7 +69,9 @@ class SettingsProvider with ChangeNotifier {
       timeDilation = _animationSpeed;
       _initialized = true;
       _syncWidgetSettings();
-      notifyListeners();
+      // Defer the notification so it only fires after the provider is attached
+      // to the widget tree, avoiding exceptions or unnecessary early rebuilds.
+      Future.microtask(() => notifyListeners());
     } finally {
       if (!_initCompleter.isCompleted) {
         _initCompleter.complete();

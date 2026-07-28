@@ -122,16 +122,14 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
   );
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
-  final inputBg = AppColors.surfaceSecondaryDark;
+  final inputBg = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => AnimatedPadding(
+    builder: (ctx) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
       child: Container(
         decoration: BoxDecoration(
           color: sheetBg,
@@ -151,7 +149,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                 width: 48,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : Colors.black26,
                   borderRadius:
                       BorderRadius.circular(AppTheme.sheetHandleRadius),
                 ),
@@ -167,10 +165,9 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
               padding: const EdgeInsets.symmetric(
                 horizontal: AppTheme.rowPadH,
                 vertical: AppTheme.rowPadV,
-              ),
-              child: Row(
+              ),                child: Row(
                 children: [
-                  const Icon(Iconsax.maximize, color: Colors.white, size: 24),
+                  Icon(Iconsax.maximize, color: isDark ? Colors.white70 : Colors.black54, size: 24),
                   const SizedBox(width: AppTheme.rowGap),
                   Expanded(
                     child: TextField(
@@ -179,11 +176,11 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [numericInputFormatter()],
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 16),
                       decoration: InputDecoration(
                         hintText: '1.00',
                         hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black54,
                           fontSize: 16,
                         ),
                         border: InputBorder.none,
@@ -199,8 +196,8 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
             Center(
               child: Text(
                 '${range.min.toStringAsFixed(2)} – ${range.max.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black54,
                   fontSize: 14,
                 ),
               ),
@@ -210,7 +207,12 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
               child: ElevatedButton(
                 onPressed: () {
                   final parsed = double.tryParse(controller.text.trim());
-                  if (parsed == null) return;
+                  if (parsed == null || parsed < range.min || parsed > range.max) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text(settings.tr('scale_error'))),
+                    );
+                    return;
+                  }
                   settings.addCustomAppScale(parsed, range.min, range.max);
                   Navigator.pop(ctx);
                 },

@@ -206,7 +206,7 @@ class TaskProvider with ChangeNotifier {
   void moveTaskToFolder(String taskId, String? targetFolderId) {
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index != -1) {
-      _tasks[index].folderId = targetFolderId;
+      _tasks[index] = _tasks[index].copyWith(folderId: targetFolderId);
       notifyListeners();
       _saveToPrefs();
     }
@@ -216,7 +216,7 @@ class TaskProvider with ChangeNotifier {
     if (folderId == targetParentFolderId) return;
     final index = _folders.indexWhere((f) => f.id == folderId);
     if (index != -1 && !_folders[index].isSystemStreak) {
-      _folders[index].parentFolderId = targetParentFolderId;
+      _folders[index] = _folders[index].copyWith(parentFolderId: targetParentFolderId);
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
@@ -224,40 +224,54 @@ class TaskProvider with ChangeNotifier {
   }
 
   void reorderRootFolders(int oldIndex, int newIndex) {
-    final rootList = filteredFolders;
-    if (oldIndex >= 0 &&
-        oldIndex < rootList.length &&
-        newIndex >= 0 &&
-        newIndex < rootList.length) {
-      final item = rootList.removeAt(oldIndex);
-      rootList.insert(newIndex, item);
+    if (oldIndex < 0 || newIndex < 0) return;
+    // Reordering a filtered/searched list is ambiguous and can cause data
+    // loss, so only reorder when the full root list is visible.
+    if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
 
-      final nonRoots = _folders.where((f) => f.parentFolderId != null).toList();
-      _folders.clear();
-      _folders.addAll(rootList);
-      _folders.addAll(nonRoots);
-      _foldersVersion++;
-      notifyListeners();
-      _saveToPrefs();
-    }
+    final rootList = _folders.where((f) => f.parentFolderId == null).toList();
+    if (oldIndex >= rootList.length || newIndex >= rootList.length) return;
+
+    final item = rootList.removeAt(oldIndex);
+    rootList.insert(newIndex, item);
+
+    final rootIds = rootList.map((f) => f.id).toSet();
+    final newFolders = <FolderItem>[
+      ...rootList,
+      ..._folders.where((f) => !rootIds.contains(f.id)),
+    ];
+
+    _folders
+      ..clear()
+      ..addAll(newFolders);
+    _foldersVersion++;
+    notifyListeners();
+    _saveToPrefs();
   }
 
   void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {
-    final folderTasks = getFolderTasks(folderId);
-    if (oldIndex >= 0 &&
-        oldIndex < folderTasks.length &&
-        newIndex >= 0 &&
-        newIndex < folderTasks.length) {
-      final item = folderTasks.removeAt(oldIndex);
-      folderTasks.insert(newIndex, item);
-
-      final otherTasks = _tasks.where((t) => t.folderId != folderId).toList();
-      _tasks.clear();
-      _tasks.addAll(otherTasks);
-      _tasks.addAll(folderTasks);
-      notifyListeners();
-      _saveToPrefs();
+    final folderTasks = _tasks.where((t) => t.folderId == folderId).toList();
+    if (oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= folderTasks.length ||
+        newIndex >= folderTasks.length) {
+      return;
     }
+
+    final item = folderTasks.removeAt(oldIndex);
+    folderTasks.insert(newIndex, item);
+
+    final taskIdsInFolder = folderTasks.map((t) => t.id).toSet();
+    final newTasks = <TaskItem>[
+      ..._tasks.where((t) => !taskIdsInFolder.contains(t.id)),
+      ...folderTasks,
+    ];
+
+    _tasks
+      ..clear()
+      ..addAll(newTasks);
+    notifyListeners();
+    _saveToPrefs();
   }
 
   void addTask(String title, {String? folderId}) {

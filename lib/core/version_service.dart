@@ -41,7 +41,7 @@ class VersionService {
     }
 
     final info = await _fetchLatest();
-    if (info == null || !_isNewer(info.version, currentVersion)) {
+    if (info == null || info.version.trim().isEmpty || !_isNewer(info.version, currentVersion)) {
       // No newer version: record the check so the next one happens
       // after the normal 12-hour interval.
       await prefs.setInt(_lastPromptKey, DateTime.now().millisecondsSinceEpoch);

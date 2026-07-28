@@ -24,12 +24,12 @@ Widget createTestApp() {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    HomeWidgetService.debounceDelay = Duration.zero;
+    HomeWidgetService.instance.debounceDelay = Duration.zero;
   });
 
   tearDown(() {
     HomeWidgetService.cancelPendingUpdate();
-    HomeWidgetService.debounceDelay = const Duration(milliseconds: 300);
+    HomeWidgetService.instance.debounceDelay = const Duration(milliseconds: 300);
   });
 
   testWidgets('renders home screen with streak folder and search bar', (tester) async {

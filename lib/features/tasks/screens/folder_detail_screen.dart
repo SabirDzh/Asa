@@ -170,8 +170,7 @@ class _Breadcrumbs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    context.select<TaskProvider, int>((p) => p.foldersVersion);
-    final provider = context.read<TaskProvider>();
+    final provider = context.watch<TaskProvider>();
     final allFolders = provider.folders;
     List<FolderItem> path = [folder];
     String? currentParentId = folder.parentFolderId;
@@ -205,13 +204,14 @@ class _Breadcrumbs extends StatelessWidget {
                         color: textSecondary,
                         size: 20,
                       ),
-                    ),
-                  GestureDetector(
+                    ),                    GestureDetector(
                     onTap: () {
                       if (!isLast) {
                         final pops = path.length - 1 - idx;
                         for (int i = 0; i < pops; i++) {
-                          Navigator.pop(context);
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          }
                         }
                       }
                     },
@@ -257,12 +257,9 @@ class _FolderContent extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final subfolders = context.select<TaskProvider, List<FolderItem>>(
-      (p) => p.getSubfolders(folder.id),
-    );
-    final folderTasks = context.select<TaskProvider, List<TaskItem>>(
-      (p) => p.getFolderTasks(folder.id),
-    );
+    final provider = context.watch<TaskProvider>();
+    final subfolders = provider.getSubfolders(folder.id);
+    final folderTasks = provider.getFolderTasks(folder.id);
 
     final isEmpty = subfolders.isEmpty && folderTasks.isEmpty;
 

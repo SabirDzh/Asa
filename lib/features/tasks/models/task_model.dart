@@ -35,14 +35,14 @@ class TaskItem {
     String? id,
     String? title,
     bool? isCompleted,
-    String? folderId,
+    Object? folderId = const Object(),
     DateTime? createdAt,
   }) {
     return TaskItem(
       id: id ?? this.id,
       title: title ?? this.title,
       isCompleted: isCompleted ?? this.isCompleted,
-      folderId: folderId ?? this.folderId,
+      folderId: folderId == const Object() ? this.folderId : folderId as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -85,14 +85,16 @@ class FolderItem {
     String? id,
     String? name,
     bool? isSystemStreak,
-    String? parentFolderId,
+    Object? parentFolderId = const Object(),
     DateTime? createdAt,
   }) {
     return FolderItem(
       id: id ?? this.id,
       name: name ?? this.name,
       isSystemStreak: isSystemStreak ?? this.isSystemStreak,
-      parentFolderId: parentFolderId ?? this.parentFolderId,
+      parentFolderId: parentFolderId == const Object()
+          ? this.parentFolderId
+          : parentFolderId as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }

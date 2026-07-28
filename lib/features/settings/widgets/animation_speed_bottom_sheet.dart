@@ -117,17 +117,15 @@ void showCustomSpeedSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
-  final inputBg = AppColors.surfaceSecondaryDark;
+  final inputBg = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
   final controller = TextEditingController(text: settings.animationSpeed.toString());
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => AnimatedPadding(
+    builder: (ctx) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
       child: Container(
         decoration: BoxDecoration(
           color: sheetBg,
@@ -147,7 +145,7 @@ void showCustomSpeedSheet(BuildContext context) {
                 width: 48,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : Colors.black26,
                   borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
                 ),
               ),
@@ -165,7 +163,7 @@ void showCustomSpeedSheet(BuildContext context) {
               ),
               child: Row(
                 children: [
-                  const Icon(Iconsax.timer_1, color: Colors.white, size: 24),
+                  Icon(Iconsax.timer_1, color: isDark ? Colors.white70 : Colors.black54, size: 24),
                   const SizedBox(width: AppTheme.rowGap),
                   Expanded(
                     child: TextField(
@@ -173,11 +171,11 @@ void showCustomSpeedSheet(BuildContext context) {
                       autofocus: true,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [numericInputFormatter()],
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 16),
                       decoration: InputDecoration(
                         hintText: '1.0',
                         hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black54,
                           fontSize: 16,
                         ),
                         border: InputBorder.none,
@@ -194,7 +192,7 @@ void showCustomSpeedSheet(BuildContext context) {
             Center(
               child: Text(
                 settings.tr('speed_range'),
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 14),
               ),
             ),
             const SizedBox(height: 8),

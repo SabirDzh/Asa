@@ -32,6 +32,8 @@ void main() {
 
     expect(find.text('Уведомления'), findsOneWidget);
     expect(find.text('Тема приложения'), findsOneWidget);
+    expect(find.text('Показывать задачи в виджете'), findsOneWidget);
+    expect(find.textContaining('Что отображать'), findsOneWidget);
     expect(find.text('Управление данными'), findsOneWidget);
     expect(find.text('Язык: русский'), findsOneWidget);
     expect(find.textContaining('Плавность анимации'), findsOneWidget);
@@ -62,6 +64,8 @@ void main() {
     await tester.pumpWidget(createTestApp());
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('О приложении'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('О приложении'));
     await tester.pumpAndSettle();
 

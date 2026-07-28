@@ -5,7 +5,10 @@ import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_strings.dart';
+import '../../../core/home_widget_service.dart';
 import '../../../core/notification_service.dart';
+
+enum WidgetDisplayMode { streak, activeTasks, lastFolder }
 
 class SettingsProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
@@ -13,6 +16,8 @@ class SettingsProvider with ChangeNotifier {
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
   String? _avatarPath;
+  bool _showInWidget = true;
+  WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
   bool _initialized = false;
   final _initCompleter = Completer<void>();
 
@@ -28,6 +33,8 @@ class SettingsProvider with ChangeNotifier {
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
   String? get avatarPath => _avatarPath;
+  bool get showInWidget => _showInWidget;
+  WidgetDisplayMode get widgetDisplayMode => _widgetDisplayMode;
 
   bool get isDarkMode => _themeMode == ThemeMode.dark;
 
@@ -42,8 +49,13 @@ class SettingsProvider with ChangeNotifier {
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
       _avatarPath = prefs.getString('avatarPath');
+      _showInWidget = prefs.getBool('showInWidget') ?? true;
+      _widgetDisplayMode = WidgetDisplayMode.values[
+        (prefs.getInt('widgetDisplayMode') ?? 0).clamp(0, WidgetDisplayMode.values.length - 1)
+      ];
       timeDilation = _animationSpeed;
       _initialized = true;
+      _syncWidgetSettings();
       notifyListeners();
     } finally {
       if (!_initCompleter.isCompleted) {
@@ -96,6 +108,40 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('animationSpeed', speed);
+  }
+
+  Future<void> setShowInWidget(bool value) async {
+    _showInWidget = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('showInWidget', value);
+    _syncWidgetSettings();
+  }
+
+  Future<void> setWidgetDisplayMode(WidgetDisplayMode mode) async {
+    _widgetDisplayMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('widgetDisplayMode', mode.index);
+    _syncWidgetSettings();
+  }
+
+  String widgetModeLabel(WidgetDisplayMode mode) {
+    switch (mode) {
+      case WidgetDisplayMode.streak:
+        return tr('widget_mode_streak');
+      case WidgetDisplayMode.activeTasks:
+        return tr('widget_mode_active_tasks');
+      case WidgetDisplayMode.lastFolder:
+        return tr('widget_mode_last_folder');
+    }
+  }
+
+  void _syncWidgetSettings() {
+    HomeWidgetService.updateSettings(
+      enabled: _showInWidget,
+      mode: _widgetDisplayMode,
+    );
   }
 
   Future<void> setAvatarPath(String? path) async {

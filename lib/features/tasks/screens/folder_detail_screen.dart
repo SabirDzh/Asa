@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
+import '../../../core/home_widget_service.dart';
 import '../../../core/responsive_center.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
@@ -26,6 +27,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   @override
   void initState() {
     super.initState();
+    final provider = context.read<TaskProvider>();
+    provider.setLastViewedFolderName(widget.folder.name);
+    HomeWidgetService.updateData(provider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_breadcrumbScroll.hasClients) {
         _breadcrumbScroll.jumpTo(_breadcrumbScroll.position.maxScrollExtent);

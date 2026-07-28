@@ -11,6 +11,7 @@ import '../widgets/language_bottom_sheet.dart';
 import '../widgets/animation_speed_bottom_sheet.dart';
 import '../widgets/data_management_bottom_sheet.dart';
 import '../widgets/about_bottom_sheet.dart';
+import '../widgets/widget_mode_bottom_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   final bool standalone;
@@ -84,6 +85,28 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   SettingRow(
                     surface: surface,
+                    icon: Iconsax.category,
+                    label: settings.tr('show_in_widget'),
+                    textColor: textSecondary,
+                    trailing: Switch(
+                      value: settings.showInWidget,
+                      onChanged: settings.setShowInWidget,
+                      activeThumbColor: AppColors.primary,
+                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SettingRow(
+                    surface: surface,
+                    icon: Iconsax.candle,
+                    label: '${settings.tr('widget_mode')}: ${settings.widgetModeLabel(settings.widgetDisplayMode)}',
+                    textColor: textSecondary,
+                    onTap: settings.showInWidget ? () => showWidgetModeSheet(context) : null,
+                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  ),
+                  const SizedBox(height: 8),
+                  SettingRow(
+                    surface: surface,
                     icon: Iconsax.data,
                     label: settings.tr('data_management'),
                     textColor: textSecondary,
@@ -127,3 +150,4 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+

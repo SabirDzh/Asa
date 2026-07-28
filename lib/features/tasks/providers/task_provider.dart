@@ -19,6 +19,7 @@ class TaskProvider with ChangeNotifier {
   TaskFilter _filter = TaskFilter.all;
   int _streakCount = 1;
   int _foldersVersion = 0;
+  String? _lastViewedFolderName;
 
   TaskProvider() {
     initData();
@@ -44,6 +45,7 @@ class TaskProvider with ChangeNotifier {
   TaskFilter get filter => _filter;
   int get streakCount => _streakCount;
   int get foldersVersion => _foldersVersion;
+  String? get lastViewedFolderName => _lastViewedFolderName;
 
   void setSearchQuery(String query) {
     _searchQuery = query.trim().toLowerCase();
@@ -55,6 +57,10 @@ class TaskProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void setLastViewedFolderName(String? name) {
+    _lastViewedFolderName = name;
+  }
+
   // ── Persistence methods ─────────────────────────────────────
   Future<void> _saveToPrefs() async {
     try {
@@ -63,7 +69,7 @@ class TaskProvider with ChangeNotifier {
       final foldersJson = jsonEncode(_folders.map((f) => f.toJson()).toList());
       await prefs.setString('saved_tasks', tasksJson);
       await prefs.setString('saved_folders', foldersJson);
-      HomeWidgetService.update(this);
+      HomeWidgetService.updateData(this);
     } catch (_) {}
   }
 
@@ -169,8 +175,9 @@ class TaskProvider with ChangeNotifier {
   }
 
   List<TaskItem> get filteredInProgressTasks {
-    if (_filter == TaskFilter.completed || _filter == TaskFilter.foldersOnly)
+    if (_filter == TaskFilter.completed || _filter == TaskFilter.foldersOnly) {
       return [];
+    }
     return _tasks.where((t) {
       if (t.isCompleted) return false;
       if (_searchQuery.isEmpty) return true;
@@ -179,8 +186,9 @@ class TaskProvider with ChangeNotifier {
   }
 
   List<TaskItem> get filteredCompletedTasks {
-    if (_filter == TaskFilter.active || _filter == TaskFilter.foldersOnly)
+    if (_filter == TaskFilter.active || _filter == TaskFilter.foldersOnly) {
       return [];
+    }
     return _tasks.where((t) {
       if (!t.isCompleted) return false;
       if (_searchQuery.isEmpty) return true;

@@ -6,4 +6,6 @@
     <string name="widget_active_tasks_one">1 активная задача</string>
     <string name="widget_active_tasks_few">%1$d активные задачи</string>
     <string name="widget_active_tasks_many">%1$d активных задач</string>
+    <string name="widget_disabled">Виджет выключен</string>
+    <string name="widget_last_folder">Последняя папка</string>
 </resources>

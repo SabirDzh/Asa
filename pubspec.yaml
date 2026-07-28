@@ -1,7 +1,7 @@
 name: asa
 description: "ASA — modern task manager with folders and filtering."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.7.2
@@ -21,6 +21,8 @@ dependencies:
   path_provider: ^2.1.6
   flutter_local_notifications: ^17.1.2
   home_widget: ^0.9.3
+  http: ^1.2.0
+  url_launcher: ^6.2.0
 
 dev_dependencies:
   flutter_test:

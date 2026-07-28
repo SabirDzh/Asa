@@ -7,27 +7,31 @@ class AppColors {
   static const Color primary = Color(0xFF24AC09);
 
   // Color 2: Surface / neutral containers
-  // Light: warm gray  |  Dark: elevated surface
-  static const Color surfaceLight = Color(0xFFCAC8C8); // Figma #CAC8C8
+  // Light: clean white  |  Dark: elevated surface
+  static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color surfaceDark = Color(0xFF2C2C2E);  // iOS-style dark surface
 
   // Color 3: Background
-  static const Color bgLight = Color(0xFFFFFFFF);
+  static const Color bgLight = Color(0xFFF2F2F7);
   static const Color bgDark = Color(0xFF1C1C1E); // iOS dark bg
 
   // ── Derived ──────────────────────────────────────────────
   // Bottom nav & sheet background
-  static const Color navLight = Color(0xFF808080); // Figma nav
+  static const Color navLight = Color(0xFFFFFFFF); // white bottom bar
   static const Color navDark = Color(0xFF3A3A3C);
 
+  // Bottom sheets use a dark surface in both themes so white text is readable
+  static const Color sheetLight = Color(0xFF2C2C2E);
+  static const Color sheetDark = Color(0xFF3A3A3C);
+
   // Secondary surface (slightly lighter/darker)
-  static const Color surfaceSecondaryLight = Color(0xFFD9D9D9);
+  static const Color surfaceSecondaryLight = Color(0xFFE5E5EA);
   static const Color surfaceSecondaryDark = Color(0xFF3A3A3C);
 
   // Text
   static const Color textLight = Color(0xFF000000);
   static const Color textDark = Color(0xFFFFFFFF);
-  static const Color textSecondaryLight = Color(0xFF808080);
+  static const Color textSecondaryLight = Color(0xFF6B7280);
   static const Color textSecondaryDark = Color(0xFF8E8E93);
 }
 

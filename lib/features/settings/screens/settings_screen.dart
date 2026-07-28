@@ -12,6 +12,7 @@ import '../widgets/animation_speed_bottom_sheet.dart';
 import '../widgets/data_management_bottom_sheet.dart';
 import '../widgets/about_bottom_sheet.dart';
 import '../widgets/widget_mode_bottom_sheet.dart';
+import '../widgets/app_scale_bottom_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   final bool standalone;
@@ -129,6 +130,15 @@ class SettingsScreen extends StatelessWidget {
                     label: '${settings.tr('animation_speed')}: ${animationSpeedLabel(settings)}',
                     textColor: textSecondary,
                     onTap: () => showAnimationSpeedSheet(context),
+                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  ),
+                  const SizedBox(height: 8),
+                  SettingRow(
+                    surface: surface,
+                    icon: Iconsax.size,
+                    label: '${settings.tr('app_scale')}: ${appScaleLabel(settings)}',
+                    textColor: textSecondary,
+                    onTap: () => showAppScaleSheet(context),
                     trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
                   ),
                   const SizedBox(height: 8),

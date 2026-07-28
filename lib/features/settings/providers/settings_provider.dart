@@ -15,6 +15,7 @@ class SettingsProvider with ChangeNotifier {
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
+  double _appScale = 1.0;
   String? _avatarPath;
   bool _showInWidget = true;
   WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
@@ -32,6 +33,7 @@ class SettingsProvider with ChangeNotifier {
   bool get notificationsEnabled => _notificationsEnabled;
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
+  double get appScale => _appScale;
   String? get avatarPath => _avatarPath;
   bool get showInWidget => _showInWidget;
   WidgetDisplayMode get widgetDisplayMode => _widgetDisplayMode;
@@ -48,6 +50,7 @@ class SettingsProvider with ChangeNotifier {
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
+      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(_kMinAppScale, _kMaxAppScale);
       _avatarPath = prefs.getString('avatarPath');
       _showInWidget = prefs.getBool('showInWidget') ?? true;
       _widgetDisplayMode = WidgetDisplayMode.values[
@@ -108,6 +111,17 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('animationSpeed', speed);
+  }
+
+  static const double _kMinAppScale = 0.8;
+  static const double _kMaxAppScale = 1.3;
+
+  Future<void> setAppScale(double scale) async {
+    final clamped = scale.clamp(_kMinAppScale, _kMaxAppScale);
+    _appScale = clamped;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('appScale', clamped);
   }
 
   Future<void> setShowInWidget(bool value) async {

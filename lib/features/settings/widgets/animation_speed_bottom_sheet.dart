@@ -19,14 +19,13 @@ String animationSpeedLabel(SettingsProvider settings) {
 void showAnimationSpeedSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final navBg = isDark ? AppColors.navDark : AppColors.navLight;
+  final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
 
   showModalBottomSheet(
     context: context,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => Container(
+    backgroundColor: Colors.transparent,      builder: (ctx) => Container(
       decoration: BoxDecoration(
-        color: navBg,
+        color: sheetBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.all(20),
@@ -88,9 +87,8 @@ void showAnimationSpeedSheet(BuildContext context) {
 void showCustomSpeedSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
-  final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+  final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final inputBg = AppColors.surfaceSecondaryDark;
   final controller = TextEditingController(text: settings.animationSpeed.toString());
 
   showModalBottomSheet(
@@ -178,7 +176,7 @@ void showCustomSpeedSheet(BuildContext context) {
             Center(
               child: Text(
                 settings.tr('speed_range'),
-                style: TextStyle(color: textSecondary, fontSize: 14),
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
             ),
             const SizedBox(height: 8),

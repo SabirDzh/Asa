@@ -34,6 +34,7 @@ void main() {
     expect(find.text('Тема приложения'), findsOneWidget);
     expect(find.text('Показывать задачи в виджете'), findsOneWidget);
     expect(find.textContaining('Что отображать'), findsOneWidget);
+    expect(find.textContaining('Масштаб интерфейса'), findsOneWidget);
     expect(find.text('Управление данными'), findsOneWidget);
     expect(find.text('Язык: русский'), findsOneWidget);
     expect(find.textContaining('Плавность анимации'), findsOneWidget);
@@ -70,7 +71,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('О приложении ASA'), findsOneWidget);
-    expect(find.text('Версия 1.0.0'), findsOneWidget);
+    expect(find.text('Версия 1.1.0'), findsOneWidget);
   });
 
   testWidgets('shows data management sheet on tap', (tester) async {

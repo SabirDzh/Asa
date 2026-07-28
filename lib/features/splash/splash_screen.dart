@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/version_service.dart';
 import '../settings/providers/settings_provider.dart';
 import '../tasks/providers/task_provider.dart';
 import '../tasks/screens/home_screen.dart';
@@ -17,6 +18,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   late final Future<void> _readyFuture;
+  bool _updateChecked = false;
 
   @override
   void initState() {
@@ -35,6 +37,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
         if (!isReady) {
           return const _SplashBody();
+        }
+
+        if (!_updateChecked) {
+          _updateChecked = true;
+          final settings = context.read<SettingsProvider>();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            VersionService.checkAndPrompt(context, settings);
+          });
         }
 
         return const HomeScreen();

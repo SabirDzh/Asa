@@ -11,9 +11,8 @@ void showInputSheet({
   required void Function(String, BuildContext) onSubmit,
 }) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-  final navBg = isDark ? AppColors.navDark : AppColors.navLight;
+  final inputBg = AppColors.surfaceSecondaryDark;
+  final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
 
   showModalBottomSheet(
     context: context,
@@ -25,7 +24,7 @@ void showInputSheet({
       curve: Curves.easeOut,
       child: Container(
         decoration: BoxDecoration(
-          color: navBg,
+          color: sheetBg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.only(
@@ -44,7 +43,6 @@ void showInputSheet({
               hintText: hintText,
               controller: controller,
               inputBg: inputBg,
-              textSecondary: textSecondary,
               onSubmit: (val) => onSubmit(val, ctx),
             ),
           ],
@@ -72,7 +70,6 @@ Widget _inputRow({
   required String hintText,
   required TextEditingController controller,
   required Color inputBg,
-  required Color textSecondary,
   required ValueChanged<String> onSubmit,
 }) {
   return Container(
@@ -87,7 +84,7 @@ Widget _inputRow({
     ),
     child: Row(
       children: [
-        Icon(icon, color: textSecondary, size: 24),
+        Icon(icon, color: Colors.white70, size: 24),
         const SizedBox(width: AppTheme.rowGap),
         Expanded(
           child: TextField(
@@ -97,8 +94,8 @@ Widget _inputRow({
             style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+              hintStyle: const TextStyle(
+                color: Colors.white54,
                 fontSize: 16,
               ),
               border: InputBorder.none,

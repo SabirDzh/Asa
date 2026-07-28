@@ -8,14 +8,14 @@ import '../providers/settings_provider.dart';
 void showAboutSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final navBg = isDark ? AppColors.navDark : AppColors.navLight;
+  final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
 
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     builder: (ctx) => Container(
       decoration: BoxDecoration(
-        color: navBg,
+        color: sheetBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.all(24),

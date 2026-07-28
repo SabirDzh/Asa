@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/features/tasks/screens/home_screen.dart';
+import 'package:asa/core/home_widget_service.dart';
 
 Widget createTestApp() {
   return MultiProvider(
@@ -23,6 +24,12 @@ Widget createTestApp() {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    HomeWidgetService.debounceDelay = Duration.zero;
+  });
+
+  tearDown(() {
+    HomeWidgetService.cancelPendingUpdate();
+    HomeWidgetService.debounceDelay = const Duration(milliseconds: 300);
   });
 
   testWidgets('renders home screen with streak folder and search bar', (tester) async {

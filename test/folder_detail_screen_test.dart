@@ -1,0 +1,65 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:asa/features/settings/providers/settings_provider.dart';
+import 'package:asa/features/tasks/providers/task_provider.dart';
+import 'package:asa/features/tasks/models/task_model.dart';
+import 'package:asa/features/tasks/screens/folder_detail_screen.dart';
+
+Widget createTestApp(FolderItem folder) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(create: (_) => TaskProvider()),
+    ],
+    child: MaterialApp(
+      home: FolderDetailScreen(folder: folder),
+    ),
+  );
+}
+
+void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('renders empty folder state', (tester) async {
+    final folder = FolderItem(id: 'test', name: 'Test Folder');
+    await tester.pumpWidget(createTestApp(folder));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Test Folder'), findsOneWidget);
+    expect(find.text('В этой папке пока нет задач'), findsOneWidget);
+  });
+
+  testWidgets('shows streak folder icon', (tester) async {
+    final folder = FolderItem(id: 'streak_5', name: 'День 5', isSystemStreak: true);
+    await tester.pumpWidget(createTestApp(folder));
+    await tester.pumpAndSettle();
+
+    expect(find.text('День 5'), findsOneWidget);
+    expect(find.byIcon(Iconsax.calendar_1), findsOneWidget);
+  });
+
+  testWidgets('shows tasks inside folder', (tester) async {
+    final taskProvider = TaskProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider.value(value: taskProvider),
+        ],
+        child: MaterialApp(
+          home: FolderDetailScreen(folder: FolderItem(id: 'test_folder', name: 'Work')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('В этой папке пока нет задач'), findsOneWidget);
+  });
+}

@@ -12,16 +12,14 @@ void showInputSheet({
 }) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final inputBg = AppColors.surfaceSecondaryDark;
-  final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
-
-  showModalBottomSheet(
+  final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;    showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => AnimatedPadding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).size.height * 0.08,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: sheetBg,

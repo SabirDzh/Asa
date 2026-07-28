@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
+import '../../../core/bottom_sheet.dart';
+import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -17,7 +19,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _navIndex = 0; // 0=tasks/folders, 1=profile/settings
+  int _navIndex = 0;
   late final PageController _pageController;
   final TextEditingController _searchController = TextEditingController();
 
@@ -62,13 +64,10 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              settings.tr('filters'),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text(settings.tr('filters'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            _filterTile(ctx, settings.tr('filter_all'), TaskFilter.all, provider),
-            _filterTile(ctx, settings.tr('filter_folders'), TaskFilter.foldersOnly, provider),
+            Material(color: Colors.transparent, child: _filterTile(ctx, settings.tr('filter_all'), TaskFilter.all, provider)),
+            Material(color: Colors.transparent, child: _filterTile(ctx, settings.tr('filter_folders'), TaskFilter.foldersOnly, provider)),
           ],
         ),
       ),
@@ -93,9 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: PageView(
         controller: _pageController,
-        onPageChanged: (index) {
-          setState(() => _navIndex = index);
-        },
+        onPageChanged: (index) => setState(() => _navIndex = index),
         physics: const BouncingScrollPhysics(),
         children: [
           _buildTasksBody(),
@@ -118,32 +115,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.only(
-              top: AppTheme.navPadTop,
-              bottom: AppTheme.navPadBottom,
-            ),
+            padding: const EdgeInsets.only(top: AppTheme.navPadTop, bottom: AppTheme.navPadBottom),
             child: Row(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _onNavTap(0),
-                    child: _navIconBox(
-                      icon: Iconsax.task_square,
-                      selected: _navIndex == 0,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _onNavTap(1),
-                    child: _navIconBox(
-                      icon: Iconsax.profile_circle,
-                      selected: _navIndex == 1,
-                    ),
-                  ),
-                ),
+                Expanded(child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _onNavTap(0), child: _navIconBox(icon: Iconsax.task_square, selected: _navIndex == 0))),
+                Expanded(child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _onNavTap(1), child: _navIconBox(icon: Iconsax.profile_circle, selected: _navIndex == 1))),
               ],
             ),
           ),
@@ -170,16 +146,13 @@ class _HomeScreenState extends State<HomeScreen> {
       bottom: false,
       child: Stack(
         children: [
-          // ── Main content ──────────
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildSearchBar(),
-              Expanded(child: _buildList()),
+              const Expanded(child: _HomeFolderList()),
             ],
           ),
-
-          // ── FAB button (directly opens create folder sheet) ──
           Positioned(
             right: AppTheme.screenPad,
             bottom: AppTheme.screenPad,
@@ -191,17 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: fabColor,
                   borderRadius: BorderRadius.circular(AppTheme.fabRadius),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 3))],
                 ),
-                child: const Center(
-                  child: Icon(Icons.add, color: Colors.white, size: 28),
-                ),
+                child: const Center(child: Icon(Icons.add, color: Colors.white, size: 28)),
               ),
             ),
           ),
@@ -211,29 +176,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchBar() {
-    final settings = Provider.of<SettingsProvider>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final provider = Provider.of<TaskProvider>(context, listen: false);
+    final provider = context.read<TaskProvider>();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.screenPad,
-        AppTheme.screenPad,
-        AppTheme.screenPad,
-        36, // 36 + 4 (from list padding) = 40 gap
-      ),
+      padding: const EdgeInsets.fromLTRB(AppTheme.screenPad, AppTheme.screenPad, AppTheme.screenPad, 36),
       child: Container(
         height: AppTheme.rowHeight,
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.rowPadH,
-          vertical: AppTheme.rowPadV,
-        ),
+        decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(AppTheme.pillRadius)),
+        padding: const EdgeInsets.symmetric(horizontal: AppTheme.rowPadH, vertical: AppTheme.rowPadV),
         child: Row(
           children: [
             Icon(Iconsax.search_normal, color: textSecondary, size: 24),
@@ -245,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (val) => provider.setSearchQuery(sanitizeText(val)),
                 style: TextStyle(color: textSecondary, fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: settings.tr('search'),
+                  hintText: context.select<SettingsProvider, String>((s) => s.tr('search')),
                   hintStyle: TextStyle(color: textSecondary, fontSize: 16),
                   border: InputBorder.none,
                   isDense: true,
@@ -260,10 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   provider.setSearchQuery('');
                   setState(() {});
                 },
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(Icons.clear, color: textSecondary, size: 20),
-                ),
+                child: Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.clear, color: textSecondary, size: 20)),
               ),
             GestureDetector(
               onTap: () => _showFilterMenu(context),
@@ -275,155 +225,75 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildList() {
-    return Consumer2<TaskProvider, SettingsProvider>(
-      builder: (context, provider, settings, _) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final folders = provider.filteredFolders;
-
-        if (folders.isEmpty) {
-          return Center(
-            child: Text(
-              provider.searchQuery.isNotEmpty ? settings.tr('nothing_found') : settings.tr('empty_list'),
-              style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                fontSize: 16,
-              ),
-            ),
-          );
+  void _showCreateFolderSheet(BuildContext context) {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final controller = TextEditingController();
+    showInputSheet(
+      context: context,
+      icon: Iconsax.folder_minus,
+      hintText: settings.tr('new_folder'),
+      controller: controller,
+      onSubmit: (val, sheetCtx) {
+        final v = sanitizeText(val);
+        if (v.isNotEmpty) {
+          try {
+            context.read<TaskProvider>().addFolder(v);
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+            );
+          }
         }
-
-        return ReorderableListView.builder(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 4),
-          itemCount: folders.length,
-          onReorderItem: (oldIndex, newIndex) => provider.reorderRootFolders(oldIndex, newIndex),
-          proxyDecorator: (child, index, animation) {
-            return AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) => Transform.scale(
-                scale: 1.03,
-                child: child,
-              ),
-              child: child,
-            );
-          },
-          itemBuilder: (context, index) {
-            final f = folders[index];
-            return Padding(
-              key: ValueKey(f.id),
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FolderRow(folder: f),
-            );
-          },
-        );
+        Navigator.pop(sheetCtx);
       },
     );
   }
+}
 
-  void _showCreateFolderSheet(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
-    final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final controller = TextEditingController();
+class _HomeFolderList extends StatelessWidget {
+  const _HomeFolderList();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => AnimatedPadding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        child: Container(
-          decoration: BoxDecoration(
-            color: sheetBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.only(
-            top: AppTheme.sheetPadTop,
-            left: AppTheme.sheetPadH,
-            right: AppTheme.sheetPadH,
-            bottom: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppTheme.sheetGap),
-              Container(
-                height: AppTheme.rowHeight,
-                decoration: BoxDecoration(
-                  color: inputBg,
-                  borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.rowPadH,
-                  vertical: AppTheme.rowPadV,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Iconsax.folder_minus,
-                      color: textSecondary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: AppTheme.rowGap),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        inputFormatters: [textInputFormatter()],
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: settings.tr('new_folder'),
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 16,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onSubmitted: (val) {
-                          final v = sanitizeText(val);
-                          if (v.isNotEmpty) {
-                            try {
-                              context.read<TaskProvider>().addFolder(v);
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(e.toString().replaceAll('Exception: ', '')),
-                                ),
-                              );
-                            }
-                          }
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+  @override
+  Widget build(BuildContext context) {
+    final folders = context.select<TaskProvider, List<FolderItem>>((p) => p.filteredFolders);
+    final searchQuery = context.select<TaskProvider, String>((p) => p.searchQuery);
+
+    if (folders.isEmpty) {
+      final emptyText = context.select<SettingsProvider, String>((s) =>
+        searchQuery.isNotEmpty ? s.tr('nothing_found') : s.tr('empty_list'));
+      return Center(
+        child: Text(
+          emptyText,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+            fontSize: 16,
           ),
         ),
-      ),
+      );
+    }
+
+    return ReorderableListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 4),
+      itemCount: folders.length,
+      onReorderItem: (oldIndex, newIndex) => context.read<TaskProvider>().reorderRootFolders(oldIndex, newIndex),
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) => Transform.scale(scale: 1.03, child: child),
+          child: child,
+        );
+      },
+      itemBuilder: (context, index) {
+        final f = folders[index];
+        return Padding(
+          key: ValueKey(f.id),
+          padding: const EdgeInsets.only(bottom: 8),
+          child: FolderRow(folder: f),
+        );
+      },
     );
   }
 }

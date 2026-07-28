@@ -14,6 +14,7 @@ class TaskProvider with ChangeNotifier {
   String _searchQuery = '';
   TaskFilter _filter = TaskFilter.all;
   int _streakCount = 1;
+  int _foldersVersion = 0;
 
   TaskProvider() {
     initData();
@@ -24,11 +25,12 @@ class TaskProvider with ChangeNotifier {
     await checkDailyStreak();
   }
 
-  List<TaskItem> get tasks => _tasks;
-  List<FolderItem> get folders => _folders;
+  List<TaskItem> get tasks => List.unmodifiable(_tasks);
+  List<FolderItem> get folders => List.unmodifiable(_folders);
   String get searchQuery => _searchQuery;
   TaskFilter get filter => _filter;
   int get streakCount => _streakCount;
+  int get foldersVersion => _foldersVersion;
 
   void setSearchQuery(String query) {
     _searchQuery = query.trim().toLowerCase();
@@ -89,7 +91,6 @@ class TaskProvider with ChangeNotifier {
 
         if (daysDiff == 1) {
           currentStreak += 1;
-        } else if (daysDiff == 2) {
         } else if (daysDiff == 3) {
           currentStreak = (currentStreak - 1).clamp(1, 9999);
         } else if (daysDiff >= 4) {
@@ -104,22 +105,20 @@ class TaskProvider with ChangeNotifier {
     await prefs.setString('lastLoginDate', todayStr);
     await prefs.setInt('streakCount', _streakCount);
 
+    _folders.removeWhere((f) => f.isSystemStreak);
+
     final streakFolderName = 'День $_streakCount';
-    final hasStreakFolder = _folders.any((f) => f.name == streakFolderName && f.isSystemStreak);
-
-    if (!hasStreakFolder) {
-      _folders.insert(
-        0,
-        FolderItem(
-          id: 'streak_$_streakCount',
-          name: streakFolderName,
-          isSystemStreak: true,
-          parentFolderId: null,
-        ),
-      );
-      await _saveToPrefs();
-    }
-
+    _folders.insert(
+      0,
+      FolderItem(
+        id: 'streak_$_streakCount',
+        name: streakFolderName,
+        isSystemStreak: true,
+        parentFolderId: null,
+      ),
+    );
+    _foldersVersion++;
+    await _saveToPrefs();
     notifyListeners();
   }
 
@@ -164,6 +163,8 @@ class TaskProvider with ChangeNotifier {
     return _tasks.where((t) => t.folderId == folderId).toList();
   }
 
+  List<TaskItem> get allTasks => List.unmodifiable(_tasks);
+
   // ── Drag & Move methods ─────────────────────────────────────
   void moveTaskToFolder(String taskId, String? targetFolderId) {
     final index = _tasks.indexWhere((t) => t.id == taskId);
@@ -179,6 +180,7 @@ class TaskProvider with ChangeNotifier {
     final index = _folders.indexWhere((f) => f.id == folderId);
     if (index != -1 && !_folders[index].isSystemStreak) {
       _folders[index].parentFolderId = targetParentFolderId;
+      _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
     }
@@ -190,11 +192,11 @@ class TaskProvider with ChangeNotifier {
       final item = rootList.removeAt(oldIndex);
       rootList.insert(newIndex, item);
 
-      // Rebuild main list
       final nonRoots = _folders.where((f) => f.parentFolderId != null).toList();
       _folders.clear();
       _folders.addAll(rootList);
       _folders.addAll(nonRoots);
+      _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
     }
@@ -228,7 +230,7 @@ class TaskProvider with ChangeNotifier {
   void toggleTask(String id) {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _tasks[index].isCompleted = !_tasks[index].isCompleted;
+      _tasks[index] = _tasks[index].copyWith(isCompleted: !_tasks[index].isCompleted);
       notifyListeners();
       _saveToPrefs();
     }
@@ -246,7 +248,7 @@ class TaskProvider with ChangeNotifier {
     }
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _tasks[index].title = newTitle;
+      _tasks[index] = _tasks[index].copyWith(title: newTitle);
       notifyListeners();
       _saveToPrefs();
     }
@@ -262,6 +264,7 @@ class TaskProvider with ChangeNotifier {
       name: name,
       parentFolderId: parentFolderId,
     ));
+    _foldersVersion++;
     notifyListeners();
     _saveToPrefs();
   }
@@ -272,7 +275,8 @@ class TaskProvider with ChangeNotifier {
       if (newName.length > 250) {
         throw Exception('Название длиннее 250 символов');
       }
-      _folders[index].name = newName;
+      _folders[index] = _folders[index].copyWith(name: newName);
+      _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
     }
@@ -287,6 +291,7 @@ class TaskProvider with ChangeNotifier {
       }
       _folders.removeAt(index);
       _tasks.removeWhere((t) => t.folderId == id);
+      _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
     }
@@ -301,6 +306,7 @@ class TaskProvider with ChangeNotifier {
   void clearAllFolders() {
     _folders.removeWhere((f) => !f.isSystemStreak);
     _tasks.removeWhere((t) => t.folderId != null);
+    _foldersVersion++;
     notifyListeners();
     _saveToPrefs();
   }
@@ -308,6 +314,7 @@ class TaskProvider with ChangeNotifier {
   void clearAllData() {
     _tasks.clear();
     _folders.removeWhere((f) => !f.isSystemStreak);
+    _foldersVersion++;
     notifyListeners();
     _saveToPrefs();
   }

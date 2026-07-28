@@ -7,11 +7,59 @@ import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 
-/// Single task row with smooth animated checkbox and LongPressDraggable support
-class TaskRow extends StatelessWidget {
+/// Single task row with smooth animated checkbox, entrance/exit animations, and LongPressDraggable support
+class TaskRow extends StatefulWidget {
   final TaskItem task;
   final bool enableDrag;
   const TaskRow({super.key, required this.task, this.enableDrag = true});
+
+  @override
+  State<TaskRow> createState() => _TaskRowState();
+}
+
+class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
+  late final AnimationController _exitController;
+  int _entranceKey = 0;
+  bool _isExiting = false;
+  bool? _previousCompleted;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousCompleted = widget.task.isCompleted;
+    _exitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _exitController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        context.read<TaskProvider>().toggleTask(widget.task.id);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _exitController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(TaskRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.task.isCompleted != _previousCompleted) {
+      _entranceKey++;
+      _isExiting = false;
+      _exitController.value = 0.0;
+      _previousCompleted = widget.task.isCompleted;
+    }
+  }
+
+  void _handleToggle() {
+    if (_isExiting) return;
+    setState(() => _isExiting = true);
+    _exitController.forward(from: 0.0);
+  }
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -19,14 +67,16 @@ class TaskRow extends StatelessWidget {
     final sheetBg = isDark ? AppColors.navDark : AppColors.navLight;
     final inputBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final controller = TextEditingController(text: task.title);
+    final controller = TextEditingController(text: widget.task.title);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
+      builder: (ctx) => AnimatedPadding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
         child: Container(
           decoration: BoxDecoration(
             color: sheetBg,
@@ -85,7 +135,7 @@ class TaskRow extends StatelessWidget {
                           final v = val.trim();
                           if (v.isNotEmpty) {
                             try {
-                              context.read<TaskProvider>().updateTask(task.id, v);
+                              context.read<TaskProvider>().updateTask(widget.task.id, v);
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
@@ -188,7 +238,7 @@ class TaskRow extends StatelessWidget {
       );
 
       if (confirmed == true && iconContext.mounted) {
-        iconContext.read<TaskProvider>().removeTask(task.id);
+        iconContext.read<TaskProvider>().removeTask(widget.task.id);
       }
     }
   }
@@ -218,18 +268,18 @@ class TaskRow extends StatelessWidget {
           const SizedBox(width: AppTheme.rowGap),
           Expanded(
             child: Text(
-              task.title,
+              widget.task.title,
               style: TextStyle(
                 color: textSecondary,
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
-                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
                 decorationColor: textSecondary,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (!task.isCompleted)
+          if (!widget.task.isCompleted)
             Builder(
               builder: (iconCtx) => GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -245,8 +295,8 @@ class TaskRow extends StatelessWidget {
               ),
             ),
           AnimatedTaskCheckbox(
-            isCompleted: task.isCompleted,
-            onTap: () => context.read<TaskProvider>().toggleTask(task.id),
+            isCompleted: widget.task.isCompleted,
+            onTap: _handleToggle,
             textSecondary: textSecondary,
             padding: const EdgeInsets.only(
               left: AppTheme.rowGap,
@@ -259,10 +309,41 @@ class TaskRow extends StatelessWidget {
       ),
     );
 
-    if (!enableDrag) return cardChild;
+    Widget animatedChild;
+    if (_isExiting) {
+      animatedChild = AnimatedBuilder(
+        animation: _exitController,
+        builder: (context, child) => Opacity(
+          opacity: 1.0 - _exitController.value,
+          child: Transform.scale(
+            scale: 1.0 - 0.08 * _exitController.value,
+            alignment: Alignment.centerRight,
+            child: child,
+          ),
+        ),
+        child: cardChild,
+      );
+    } else {
+      animatedChild = TweenAnimationBuilder<double>(
+        key: ValueKey('entrance_$_entranceKey'),
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 20 * (1 - value)),
+            child: child,
+          ),
+        ),
+        child: cardChild,
+      );
+    }
+
+    if (!widget.enableDrag) return animatedChild;
 
     return LongPressDraggable<TaskItem>(
-      data: task,
+      data: widget.task,
       feedback: Material(
         color: Colors.transparent,
         child: SizedBox(
@@ -289,18 +370,18 @@ class TaskRow extends StatelessWidget {
                 const SizedBox(width: AppTheme.rowGap),
                 Expanded(
                   child: Text(
-                    task.title,
+                    widget.task.title,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
-                      decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                      decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
                       decorationColor: Colors.white,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (!task.isCompleted)
+                if (!widget.task.isCompleted)
                   Padding(
                     padding: const EdgeInsets.only(
                       left: AppTheme.rowGap,
@@ -310,7 +391,7 @@ class TaskRow extends StatelessWidget {
                     child: Icon(Iconsax.more_square, color: Colors.white, size: 24),
                   ),
                 AnimatedTaskCheckbox(
-                  isCompleted: task.isCompleted,
+                  isCompleted: widget.task.isCompleted,
                   onTap: () {},
                   textSecondary: Colors.white,
                   padding: const EdgeInsets.only(
@@ -327,9 +408,9 @@ class TaskRow extends StatelessWidget {
       ),
       childWhenDragging: Opacity(
         opacity: 0.4,
-        child: cardChild,
+        child: animatedChild,
       ),
-      child: cardChild,
+      child: animatedChild,
     );
   }
 }

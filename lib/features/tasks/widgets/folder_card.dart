@@ -33,8 +33,10 @@ class _FolderRowState extends State<FolderRow> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
+      builder: (ctx) => AnimatedPadding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
         child: Container(
           decoration: BoxDecoration(
             color: sheetBg,

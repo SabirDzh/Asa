@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -107,56 +106,47 @@ class AvatarSection extends StatelessWidget {
             },
             child: Hero(
               tag: 'avatar_hero',
-              child: ClipOval(
-                child: SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: hasAvatar
-                      ? Image.file(
-                          File(avatarPath),
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                          cacheWidth: 200,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: surface,
-                            child: Icon(Icons.person, size: 52, color: textSecondary),
-                          ),
-                        )
-                      : Container(
-                          color: surface,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? Colors.white12 : Colors.black12,
+                    width: 1,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: hasAvatar
+                    ? Image.file(
+                        File(avatarPath),
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        cacheWidth: 240,
+                        errorBuilder: (context, error, stackTrace) => Center(
                           child: Icon(Icons.person, size: 52, color: textSecondary),
                         ),
-                ),
+                      )
+                    : Center(
+                        child: Icon(Icons.person, size: 52, color: textSecondary),
+                      ),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Center(
-          child: GestureDetector(
-            onTap: () => _pickAvatar(context),
-            child: Container(
-              height: AppTheme.rowHeight,
-              decoration: BoxDecoration(
-                color: surface,
-                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.rowPadH,
-                vertical: AppTheme.rowPadV,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Iconsax.profile_circle, color: textSecondary, size: 24),
-                  const SizedBox(width: AppTheme.rowGap),
-                  Text(
-                    changeAvatarLabel,
-                    style: TextStyle(color: textSecondary, fontSize: 16, fontWeight: FontWeight.w400),
-                  ),
-                ],
-              ),
+          child: TextButton(
+            onPressed: () => _pickAvatar(context),
+            style: TextButton.styleFrom(
+              foregroundColor: textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: Text(
+              changeAvatarLabel,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
         ),

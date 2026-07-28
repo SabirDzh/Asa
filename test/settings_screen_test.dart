@@ -21,37 +21,50 @@ Widget createTestApp({bool standalone = true}) {
   );
 }
 
+Future<void> pumpAndInit(WidgetTester tester, Widget widget) async {
+  await tester.pumpWidget(widget);
+  final settings = Provider.of<SettingsProvider>(tester.element(find.byType(SettingsScreen)), listen: false);
+  await settings.ready;
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets('renders all setting rows', (tester) async {
-    await tester.pumpWidget(createTestApp());
-    await tester.pumpAndSettle();
+    await pumpAndInit(tester, createTestApp());
 
-    expect(find.text('Уведомления'), findsOneWidget);
-    expect(find.textContaining('Тема приложения'), findsOneWidget);
-    expect(find.text('Показывать задачи в виджете'), findsOneWidget);
-    expect(find.textContaining('Что отображать'), findsOneWidget);
-    expect(find.textContaining('Масштаб интерфейса'), findsOneWidget);
-    expect(find.text('Управление данными'), findsOneWidget);
-    expect(find.text('Язык: русский'), findsOneWidget);
-    expect(find.textContaining('Плавность анимации'), findsOneWidget);
-    expect(find.text('О приложении'), findsOneWidget);
+    final scrollable = find.byType(Scrollable).first;
+
+    Future<void> expectVisible(String text) async {
+      final finder = find.text(text);
+      await tester.scrollUntilVisible(finder, 80, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      expect(finder, findsOneWidget);
+    }
+
+    await expectVisible('Уведомления');
+    await expectVisible('Тема приложения: Системная');
+    await expectVisible('Показывать задачи в виджете');
+    await expectVisible('Что отображать: Стрик');
+    await expectVisible('Масштаб интерфейса: Стандарт');
+    await expectVisible('Управление данными');
+    await expectVisible('Язык: русский');
+    await expectVisible('Плавность анимации: Обычно');
+    await expectVisible('О приложении');
   });
 
   testWidgets('renders avatar section', (tester) async {
-    await tester.pumpWidget(createTestApp());
-    await tester.pumpAndSettle();
+    await pumpAndInit(tester, createTestApp());
 
     expect(find.text('Сменить аватар'), findsOneWidget);
     expect(find.byIcon(Icons.person), findsOneWidget);
   });
 
   testWidgets('shows language sheet on tap', (tester) async {
-    await tester.pumpWidget(createTestApp());
-    await tester.pumpAndSettle();
+    await pumpAndInit(tester, createTestApp());
 
     await tester.tap(find.text('Язык: русский'));
     await tester.pumpAndSettle();
@@ -62,12 +75,12 @@ void main() {
   });
 
   testWidgets('shows about sheet on tap', (tester) async {
-    await tester.pumpWidget(createTestApp());
-    await tester.pumpAndSettle();
+    await pumpAndInit(tester, createTestApp());
 
-    await tester.ensureVisible(find.text('О приложении'));
+    final aboutFinder = find.text('О приложении');
+    await tester.scrollUntilVisible(aboutFinder, 100, scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('О приложении'));
+    await tester.tap(aboutFinder);
     await tester.pumpAndSettle();
 
     expect(find.text('О приложении ASA'), findsOneWidget);
@@ -75,10 +88,12 @@ void main() {
   });
 
   testWidgets('shows data management sheet on tap', (tester) async {
-    await tester.pumpWidget(createTestApp());
-    await tester.pumpAndSettle();
+    await pumpAndInit(tester, createTestApp());
 
-    await tester.tap(find.text('Управление данными'));
+    final dataFinder = find.text('Управление данными');
+    await tester.scrollUntilVisible(dataFinder, 100, scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(dataFinder);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

@@ -97,6 +97,8 @@ class HomeWidgetService {
         _lastMode.name,
       );
       await HomeWidget.updateWidget(androidName: 'AsaWidgetProvider');
+      await HomeWidget.updateWidget(androidName: 'AsaWidgetStatsProvider');
+      await HomeWidget.updateWidget(androidName: 'AsaWidgetTasksProvider');
     } catch (_) {
       // Widget updates are best-effort; don't crash the app.
     }

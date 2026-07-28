@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/setting_row.dart';
+import '../widgets/setting_group.dart';
 import '../widgets/avatar_section.dart';
 import '../widgets/language_bottom_sheet.dart';
 import '../widgets/animation_speed_bottom_sheet.dart';
@@ -20,10 +21,9 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context);
+    final settings = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Scaffold(
@@ -31,111 +31,108 @@ class SettingsScreen extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 24),
           children: [
-            const SizedBox(height: 40),
-            const AvatarSection(),
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad),
-              child: Column(
-                children: [
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.notification,
-                    label: settings.tr('notifications'),
-                    textColor: textSecondary,
-                    trailing: Switch(
-                      value: settings.notificationsEnabled,
-                      onChanged: settings.toggleNotifications,
-                      activeThumbColor: AppColors.primary,
-                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.sun_1,
-                    label: '${settings.tr('theme')}: ${themeModeLabel(settings)}',
-                    textColor: textSecondary,
-                    onTap: () => showThemeModeSheet(context),
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.category,
-                    label: settings.tr('show_in_widget'),
-                    textColor: textSecondary,
-                    trailing: Switch(
-                      value: settings.showInWidget,
-                      onChanged: settings.setShowInWidget,
-                      activeThumbColor: AppColors.primary,
-                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.candle,
-                    label: '${settings.tr('widget_mode')}: ${settings.widgetModeLabel(settings.widgetDisplayMode)}',
-                    textColor: textSecondary,
-                    onTap: settings.showInWidget ? () => showWidgetModeSheet(context) : null,
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.data,
-                    label: settings.tr('data_management'),
-                    textColor: textSecondary,
-                    onTap: () => showDataManagementSheet(context),
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.language_square,
-                    label: '${settings.tr('language')}: ${settings.tr('lang_name')}',
-                    textColor: textSecondary,
-                    onTap: () => showLanguageSheet(context),
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.timer_1,
-                    label: '${settings.tr('animation_speed')}: ${animationSpeedLabel(settings)}',
-                    textColor: textSecondary,
-                    onTap: () => showAnimationSpeedSheet(context),
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.size,
-                    label: '${settings.tr('app_scale')}: ${appScaleLabel(context, settings)}',
-                    textColor: textSecondary,
-                    onTap: () => showAppScaleSheet(context),
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  SettingRow(
-                    surface: surface,
-                    icon: Iconsax.info_circle,
-                    label: settings.tr('about'),
-                    textColor: textSecondary,
-                    onTap: () => showAboutSheet(context),
-                    trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
-                  ),
-                  const SizedBox(height: 80),
-                ],
+            Text(
+              settings.tr('settings'),
+              style: TextStyle(
+                color: isDark ? AppColors.textDark : AppColors.textLight,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 24),
+            const AvatarSection(),
+            const SizedBox(height: 32),
+            SettingGroup(
+              title: settings.tr('appearance'),
+              children: [
+                SettingRow(
+                  icon: Iconsax.sun_1,
+                  label: '${settings.tr('theme')}: ${themeModeLabel(settings)}',
+                  onTap: () => showThemeModeSheet(context),
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+                SettingRow(
+                  icon: Iconsax.size,
+                  label: '${settings.tr('app_scale')}: ${appScaleLabel(context, settings)}',
+                  onTap: () => showAppScaleSheet(context),
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+                SettingRow(
+                  icon: Iconsax.timer_1,
+                  label: '${settings.tr('animation_speed')}: ${animationSpeedLabel(settings)}',
+                  onTap: () => showAnimationSpeedSheet(context),
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+                SettingRow(
+                  icon: Iconsax.language_square,
+                  label: '${settings.tr('language')}: ${settings.tr('lang_name')}',
+                  onTap: () => showLanguageSheet(context),
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SettingGroup(
+              title: settings.tr('widgets'),
+              children: [
+                SettingRow(
+                  icon: Iconsax.category,
+                  label: settings.tr('show_in_widget'),
+                  trailing: Switch(
+                    value: settings.showInWidget,
+                    onChanged: settings.setShowInWidget,
+                    activeThumbColor: AppColors.primary,
+                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                  ),
+                ),
+                SettingRow(
+                  icon: Iconsax.candle,
+                  label: '${settings.tr('widget_mode')}: ${settings.widgetModeLabel(settings.widgetDisplayMode)}',
+                  onTap: settings.showInWidget ? () => showWidgetModeSheet(context) : null,
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SettingGroup(
+              title: settings.tr('notifications_and_data'),
+              children: [
+                SettingRow(
+                  icon: Iconsax.notification,
+                  label: settings.tr('notifications'),
+                  trailing: Switch(
+                    value: settings.notificationsEnabled,
+                    onChanged: settings.toggleNotifications,
+                    activeThumbColor: AppColors.primary,
+                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                  ),
+                ),
+                SettingRow(
+                  icon: Iconsax.data,
+                  label: settings.tr('data_management'),
+                  onTap: () => showDataManagementSheet(context),
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SettingGroup(
+              title: settings.tr('other'),
+              children: [
+                SettingRow(
+                  icon: Iconsax.info_circle,
+                  label: settings.tr('about'),
+                  onTap: () => showAboutSheet(context),
+                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                ),
+              ],
+            ),
+            const SizedBox(height: 80),
           ],
         ),
       ),
     );
   }
 }
-

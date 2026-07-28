@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/theme_switcher.dart';
 import '../providers/settings_provider.dart';
 
 String themeModeLabel(SettingsProvider settings) {
@@ -73,7 +74,12 @@ Widget _themeTile(
           ? const Icon(Icons.check, color: AppColors.primary)
           : null,
       onTap: () {
-        settings.setThemeMode(mode);
+        if (settings.themeMode != mode) {
+          ThemeSwitcher.switchTheme(
+            context: ctx,
+            onToggle: () => settings.setThemeMode(mode),
+          );
+        }
         Navigator.pop(ctx);
       },
     ),

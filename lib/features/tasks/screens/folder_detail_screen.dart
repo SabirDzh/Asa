@@ -379,6 +379,7 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    required Color onSurface,
   }) {
     return InkWell(
       onTap: onTap,
@@ -389,13 +390,13 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
           mainAxisAlignment: MainAxisAlignment.start,
           mainAxisSize: MainAxisSize.max,
           children: [
-            Icon(icon, color: Colors.white, size: 24),
+            Icon(icon, color: onSurface, size: 24),
             const SizedBox(width: AppTheme.menuItemGapInner),
             Text(
               label,
               textAlign: TextAlign.left,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
               ),
@@ -459,8 +460,7 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                         offset: const Offset(0, 4),
                       ),
                     ],
-                  ),
-                  child: IntrinsicWidth(
+                  ),                    child: IntrinsicWidth(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -473,6 +473,7 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                             _toggleMenu();
                             widget.showCreateSheet(context, isTask: false);
                           },
+                          onSurface: Theme.of(context).colorScheme.onSurface,
                         ),
                         SizedBox(height: AppTheme.menuItemGap),
                         _menuOption(
@@ -483,6 +484,7 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                             _toggleMenu();
                             widget.showCreateSheet(context, isTask: true);
                           },
+                          onSurface: Theme.of(context).colorScheme.onSurface,
                         ),
                       ],
                     ),
@@ -516,7 +518,7 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                   turns: _isOpen ? 0.125 : 0.0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
-                  child: const Icon(Icons.add, color: Colors.white, size: 28),
+                  child: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface, size: 28),
                 ),
               ),
             ),

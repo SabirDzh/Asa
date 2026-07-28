@@ -51,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.read<TaskProvider>();
     final menuColor = isDark ? AppColors.navDark : AppColors.navLight;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     showModalBottomSheet(
       context: context,
@@ -70,8 +71,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   settings.tr('filters'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -84,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     settings.tr('filter_all'),
                     TaskFilter.all,
                     provider,
+                    onSurface,
                   ),
                 ),
                 Material(
@@ -93,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     settings.tr('filter_folders'),
                     TaskFilter.foldersOnly,
                     provider,
+                    onSurface,
                   ),
                 ),
               ],
@@ -106,15 +109,16 @@ class _HomeScreenState extends State<HomeScreen> {
     String label,
     TaskFilter filterOption,
     TaskProvider provider,
+    Color onSurface,
   ) {
     final isSelected = provider.filter == filterOption;
     return ListTile(
       title: Text(
         label,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: TextStyle(color: onSurface, fontSize: 16),
       ),
       trailing:
-          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+          isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         provider.setFilter(filterOption);
         Navigator.pop(ctx);
@@ -188,11 +192,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _navIconBox({required IconData icon, required bool selected}) {
+    final iconColor = Theme.of(context).colorScheme.onSurface;
     return Center(
       child: AnimatedOpacity(
         opacity: selected ? 1.0 : 0.55,
         duration: const Duration(milliseconds: 150),
-        child: Icon(icon, color: Colors.white, size: 28),
+        child: Icon(icon, color: iconColor, size: 28),
       ),
     );
   }
@@ -231,8 +236,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Icon(Icons.add, color: Colors.white, size: 28),
+                child: Center(
+                  child: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface, size: 28),
                 ),
               ),
             ),

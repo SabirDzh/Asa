@@ -94,14 +94,14 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final RenderBox? renderBox = iconContext.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
     final Offset offset = renderBox.localToGlobal(Offset.zero);
+    final size = MediaQuery.of(iconContext).size;
     final Rect positionRect = offset & renderBox.size;
-    final RelativeRect position = RelativeRect.fromLTRB(
-      positionRect.left,
-      positionRect.bottom + 8, // Directly below the icon
-      positionRect.right,
-      positionRect.bottom + 8,
+    final RelativeRect position = RelativeRect.fromRect(
+      positionRect.shift(const Offset(0, 8)),
+      Offset.zero & size,
     );
 
+    final menuIconColor = Theme.of(iconContext).colorScheme.onSurface;
     final String? value = await showMenu<String>(
       context: iconContext,
       position: position,
@@ -113,11 +113,11 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              const Icon(Iconsax.edit_2, color: Colors.white, size: 22),
+              Icon(Iconsax.edit_2, color: menuIconColor, size: 22),
               const SizedBox(width: 10),
               Text(
                 settings.tr('edit'),
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: menuIconColor, fontSize: 16),
               ),
             ],
           ),
@@ -127,11 +127,11 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              const Icon(Iconsax.trash, color: Colors.white, size: 22),
+              Icon(Iconsax.trash, color: menuIconColor, size: 22),
               const SizedBox(width: 10),
               Text(
                 settings.tr('delete'),
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: menuIconColor, fontSize: 16),
               ),
             ],
           ),

@@ -18,7 +18,7 @@ import 'input_utils.dart';void showInputSheet({
     backgroundColor: Colors.transparent,
     builder: (ctx) => Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).size.height * 0.08,
+        bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).size.height * 0.10,
       ),
       child: Container(
         decoration: BoxDecoration(

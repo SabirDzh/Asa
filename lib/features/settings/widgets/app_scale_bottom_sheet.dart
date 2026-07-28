@@ -8,12 +8,15 @@ import '../../../core/scale_utils.dart';
 import '../providers/settings_provider.dart';
 
 const double _kStep = 0.05;
+const double _kSmallPreset = 0.8;
+const double _kDefaultPreset = 1.0;
+const double _kLargePreset = 1.2;
 
-String appScaleLabel(SettingsProvider settings) {
-  final scale = settings.appScale;
-  if ((scale - kMinAppScale).abs() < _kStep / 2) return settings.tr('scale_small');
-  if ((scale - 1.0).abs() < _kStep / 2) return settings.tr('scale_default');
-  if ((scale - 1.2).abs() < _kStep / 2) return settings.tr('scale_large');
+String appScaleLabel(BuildContext context, SettingsProvider settings) {
+  final scale = effectiveAppScale(context, settings.appScale);
+  if ((scale - _kSmallPreset).abs() < _kStep / 2) return settings.tr('scale_small');
+  if ((scale - _kDefaultPreset).abs() < _kStep / 2) return settings.tr('scale_default');
+  if ((scale - _kLargePreset).abs() < _kStep / 2) return settings.tr('scale_large');
   return '${settings.tr('scale_custom')} (${scale.toStringAsFixed(2)})';
 }
 
@@ -21,7 +24,7 @@ void showAppScaleSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
-  final effectiveMax = getAdaptiveMaxScale(context);
+  final range = getAdaptiveScaleRange(context);
 
   showModalBottomSheet(
     context: context,
@@ -45,11 +48,13 @@ void showAppScaleSheet(BuildContext context) {
             ),
           ),
           const SizedBox(height: 16),
-          _scaleTile(ctx, settings, value: kMinAppScale, labelKey: 'scale_small'),
-          _scaleTile(ctx, settings, value: 1.0, labelKey: 'scale_default'),
-          if (effectiveMax >= 1.2)
-            _scaleTile(ctx, settings, value: 1.2, labelKey: 'scale_large'),
-          _customTile(ctx, settings, effectiveMax),
+          if (_kSmallPreset >= range.min && _kSmallPreset <= range.max)
+            _scaleTile(ctx, settings, value: _kSmallPreset, labelKey: 'scale_small'),
+          if (_kDefaultPreset >= range.min && _kDefaultPreset <= range.max)
+            _scaleTile(ctx, settings, value: _kDefaultPreset, labelKey: 'scale_default'),
+          if (_kLargePreset >= range.min && _kLargePreset <= range.max)
+            _scaleTile(ctx, settings, value: _kLargePreset, labelKey: 'scale_large'),
+          _customTile(ctx, settings, range),
           const SizedBox(height: 8),
         ],
       ),
@@ -82,10 +87,10 @@ Widget _scaleTile(
   );
 }
 
-Widget _customTile(BuildContext ctx, SettingsProvider settings, double effectiveMax) {
-  final isCustom = !((settings.appScale - kMinAppScale).abs() < _kStep / 2) &&
-      !((settings.appScale - 1.0).abs() < _kStep / 2) &&
-      !((settings.appScale - 1.2).abs() < _kStep / 2);
+Widget _customTile(BuildContext ctx, SettingsProvider settings, AdaptiveAppScaleRange range) {
+  final isCustom = !((settings.appScale - _kSmallPreset).abs() < _kStep / 2) &&
+      !((settings.appScale - _kDefaultPreset).abs() < _kStep / 2) &&
+      !((settings.appScale - _kLargePreset).abs() < _kStep / 2);
   return Material(
     color: Colors.transparent,
     child: ListTile(
@@ -98,15 +103,16 @@ Widget _customTile(BuildContext ctx, SettingsProvider settings, double effective
           : null,
       onTap: () {
         Navigator.pop(ctx);
-        _showCustomScaleSheet(ctx, settings, effectiveMax);
+        _showCustomScaleSheet(ctx, settings, range);
       },
     ),
   );
 }
 
-void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, double effectiveMax) {
+void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, AdaptiveAppScaleRange range) {
+  final clamped = settings.appScale.clamp(range.min, range.max);
   final controller = TextEditingController(
-    text: settings.appScale.toStringAsFixed(2),
+    text: clamped.toStringAsFixed(2),
   );
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
@@ -186,7 +192,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, doub
             const SizedBox(height: 12),
             Center(
               child: Text(
-                '$kMinAppScale – ${effectiveMax.toStringAsFixed(1)}',
+                '${range.min.toStringAsFixed(2)} – ${range.max.toStringAsFixed(2)}',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
@@ -199,7 +205,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, doub
                 onPressed: () {
                   final parsed = double.tryParse(controller.text.trim());
                   if (parsed == null) return;
-                  settings.setAppScale(parsed.clamp(kMinAppScale, effectiveMax));
+                  settings.setAppScale(parsed.clamp(range.min, range.max));
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(

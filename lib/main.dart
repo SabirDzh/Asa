@@ -66,7 +66,7 @@ class _ScaledApp extends StatelessWidget {
   final Widget child;  @override
   Widget build(BuildContext context) {
     final data = MediaQuery.of(context);
-    final effectiveScale = scale.clamp(kMinAppScale, getAdaptiveMaxScale(context));
+    final effectiveScale = effectiveAppScale(context, scale);
 
     // No scaling needed: avoid the extra layer and preserve exact layout.
     if ((effectiveScale - 1.0).abs() < 0.001) {

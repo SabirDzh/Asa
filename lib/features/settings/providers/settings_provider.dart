@@ -51,7 +51,7 @@ class SettingsProvider with ChangeNotifier {
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
-      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kMinAppScale, kAbsoluteMaxAppScale);
+      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
       _avatarPath = prefs.getString('avatarPath');
       _showInWidget = prefs.getBool('showInWidget') ?? true;
       _widgetDisplayMode = WidgetDisplayMode.values[
@@ -115,7 +115,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   Future<void> setAppScale(double scale) async {
-    final clamped = scale.clamp(kMinAppScale, kAbsoluteMaxAppScale);
+    final clamped = scale.clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
     _appScale = clamped;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();

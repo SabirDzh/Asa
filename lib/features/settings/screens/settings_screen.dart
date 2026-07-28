@@ -136,7 +136,7 @@ class SettingsScreen extends StatelessWidget {
                   SettingRow(
                     surface: surface,
                     icon: Iconsax.size,
-                    label: '${settings.tr('app_scale')}: ${appScaleLabel(settings)}',
+                    label: '${settings.tr('app_scale')}: ${appScaleLabel(context, settings)}',
                     textColor: textSecondary,
                     onTap: () => showAppScaleSheet(context),
                     trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),

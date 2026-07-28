@@ -91,6 +91,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       backgroundColor: bg,
       body: ResponsiveCenter(
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onHorizontalDragEnd: (details) {
             if (details.primaryVelocity != null &&
                 (details.primaryVelocity! > 250 ||

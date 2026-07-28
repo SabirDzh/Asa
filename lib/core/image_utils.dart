@@ -45,5 +45,3 @@ Future<ImageFormat?> detectImageFormat(String path) async {
     return null;
   }
 }
-
-String formatExtension(ImageFormat format) => format.extension;

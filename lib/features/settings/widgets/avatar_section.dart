@@ -30,7 +30,7 @@ class AvatarSection extends StatelessWidget {
     }
 
     final dir = await getApplicationDocumentsDirectory();
-    final ext = formatExtension(format);
+    final ext = format == ImageFormat.gif ? 'gif' : 'webp';
     final targetPath = '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
 
     String? resultPath;

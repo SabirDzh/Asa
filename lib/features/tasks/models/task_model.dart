@@ -4,6 +4,9 @@ class TaskItem {
   bool isCompleted;
   String? folderId;
   DateTime? dueDate;
+  DateTime? startTime;
+  DateTime? endTime;
+  int? expectedDuration;
   String? calendarId;
   String? calendarEventId;
   final DateTime createdAt;
@@ -16,6 +19,9 @@ class TaskItem {
     this.isCompleted = false,
     this.folderId,
     this.dueDate,
+    this.startTime,
+    this.endTime,
+    this.expectedDuration,
     this.calendarId,
     this.calendarEventId,
     DateTime? createdAt,
@@ -30,6 +36,9 @@ class TaskItem {
         'isCompleted': isCompleted,
         'folderId': folderId,
         'dueDate': dueDate?.toIso8601String(),
+        'startTime': startTime?.toIso8601String(),
+        'endTime': endTime?.toIso8601String(),
+        'expectedDuration': expectedDuration,
         'calendarId': calendarId,
         'calendarEventId': calendarEventId,
         'createdAt': createdAt.toIso8601String(),
@@ -43,6 +52,9 @@ class TaskItem {
         isCompleted: json['isCompleted'] ?? false,
         folderId: json['folderId'],
         dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
+        startTime: json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
+        endTime: json['endTime'] != null ? DateTime.parse(json['endTime']) : null,
+        expectedDuration: json['expectedDuration'],
         calendarId: json['calendarId'],
         calendarEventId: json['calendarEventId'],
         createdAt: json['createdAt'] != null
@@ -60,6 +72,9 @@ class TaskItem {
     bool? isCompleted,
     Object? folderId = const Object(),
     Object? dueDate = const Object(),
+    Object? startTime = const Object(),
+    Object? endTime = const Object(),
+    Object? expectedDuration = const Object(),
     Object? calendarId = const Object(),
     Object? calendarEventId = const Object(),
     DateTime? createdAt,
@@ -72,6 +87,9 @@ class TaskItem {
       isCompleted: isCompleted ?? this.isCompleted,
       folderId: folderId == const Object() ? this.folderId : folderId as String?,
       dueDate: dueDate == const Object() ? this.dueDate : dueDate as DateTime?,
+      startTime: startTime == const Object() ? this.startTime : startTime as DateTime?,
+      endTime: endTime == const Object() ? this.endTime : endTime as DateTime?,
+      expectedDuration: expectedDuration == const Object() ? this.expectedDuration : expectedDuration as int?,
       calendarId: calendarId == const Object() ? this.calendarId : calendarId as String?,
       calendarEventId: calendarEventId == const Object() ? this.calendarEventId : calendarEventId as String?,
       createdAt: createdAt ?? this.createdAt,

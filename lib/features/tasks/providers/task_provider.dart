@@ -278,12 +278,26 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
-  void addTask(String title, {String? folderId}) {
+  void addTask(
+    String title, {
+    String? folderId,
+    DateTime? startTime,
+    DateTime? endTime,
+    int? expectedDuration,
+  }) {
     if (title.isEmpty) return;
     if (title.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
-    _tasks.add(TaskItem(id: _uuid.v4(), title: title, folderId: folderId, updatedAt: DateTime.now()));
+    _tasks.add(TaskItem(
+      id: _uuid.v4(),
+      title: title,
+      folderId: folderId,
+      startTime: startTime,
+      endTime: endTime,
+      expectedDuration: expectedDuration,
+      updatedAt: DateTime.now(),
+    ));
     notifyListeners();
     _saveToPrefs();
   }
@@ -394,20 +408,72 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
-  /// Updates the calendar event title when the task title changes.
+  /// Updates the time fields of a task. Pass null to clear a field.
+  /// Also updates the linked calendar event if one exists.
+  void setTaskTime(
+    String id, {
+    DateTime? startTime,
+    DateTime? endTime,
+    int? expectedDuration,
+  }) {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index == -1) return;
+    _tasks[index] = _tasks[index].copyWith(
+      startTime: startTime,
+      endTime: endTime,
+      expectedDuration: expectedDuration,
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+    _saveToPrefs();
+    syncTaskCalendarEvent(id).catchError((_) {});
+  }
+
+  /// Updates the linked calendar event to reflect the current task title,
+  /// due date and time period. The date part is taken from [dueDate], while
+  /// the time part is taken from [startTime] / [endTime] when present.
   Future<void> syncTaskCalendarEvent(String id) async {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index == -1) return;
 
     final task = _tasks[index];
-    if (task.calendarId == null || task.calendarEventId == null || task.dueDate == null) return;
+    if (task.calendarId == null || task.calendarEventId == null) return;
+
+    final baseDate = task.dueDate;
+    if (baseDate == null) return;
+
+    DateTime start = baseDate;
+    if (task.startTime != null) {
+      start = DateTime(
+        baseDate.year,
+        baseDate.month,
+        baseDate.day,
+        task.startTime!.hour,
+        task.startTime!.minute,
+      );
+    }
+
+    DateTime? end;
+    if (task.endTime != null) {
+      end = DateTime(
+        baseDate.year,
+        baseDate.month,
+        baseDate.day,
+        task.endTime!.hour,
+        task.endTime!.minute,
+      );
+      if (end.isBefore(start)) {
+        end = end.add(const Duration(days: 1));
+      }
+    }
 
     await CalendarService.createOrUpdateEvent(
       calendarId: task.calendarId!,
       title: task.title,
-      date: task.dueDate!,
+      date: start,
       eventId: task.calendarEventId,
       description: 'Task from Asa',
+      endTime: end,
     );
   }
 

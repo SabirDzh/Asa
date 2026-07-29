@@ -97,6 +97,24 @@ void main() {
       expect(provider.tasks, isEmpty);
     });
 
+    test('setTaskTime updates start, end and expectedDuration', () {
+      final taskId = _addTask('Time task');
+      final start = DateTime(2025, 1, 1, 16, 0);
+      final end = DateTime(2025, 1, 1, 17, 0);
+
+      provider.setTaskTime(
+        taskId,
+        startTime: start,
+        endTime: end,
+        expectedDuration: 90,
+      );
+
+      final task = provider.tasks.first;
+      expect(task.startTime?.isAtSameMomentAs(start), true);
+      expect(task.endTime?.isAtSameMomentAs(end), true);
+      expect(task.expectedDuration, 90);
+    });
+
     test('setFilter changes filter', () {
       provider.setFilter(TaskFilter.foldersOnly);
       expect(provider.filter, TaskFilter.foldersOnly);

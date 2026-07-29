@@ -189,14 +189,17 @@ class _FolderRowState extends State<FolderRow> {
             _folderIcon(textSecondary),
             const SizedBox(width: AppTheme.rowGap),
             Expanded(
-              child: Text(
-                widget.folder.name,
-                style: TextStyle(
-                  color: textSecondary,
-                  fontSize: 16,
-                  fontWeight: widget.folder.isSystemStreak ? FontWeight.w600 : FontWeight.w400,
+              child: Padding(
+                padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                child: Text(
+                  widget.folder.name,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 16,
+                    fontWeight: widget.folder.isSystemStreak ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
             if (!widget.folder.isSystemStreak)
@@ -292,14 +295,17 @@ class _FolderRowState extends State<FolderRow> {
                 _dragIcon(),
                 const SizedBox(width: AppTheme.rowGap),
                 Expanded(
-                  child: Text(
-                    widget.folder.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                    child: Text(
+                      widget.folder.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (!widget.folder.isSystemStreak)

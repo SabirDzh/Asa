@@ -375,16 +375,19 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           ),
           const SizedBox(width: AppTheme.rowGap),
           Expanded(
-            child: Text(
-              widget.task.title,
-              style: TextStyle(
-                color: textSecondary,
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
-                decorationColor: textSecondary,
+            child: Padding(
+              padding: const EdgeInsets.only(right: AppTheme.rowGap),
+              child: Text(
+                widget.task.title,
+                style: TextStyle(
+                  color: textSecondary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
+                  decorationColor: textSecondary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (widget.task.calendarEventId != null)
@@ -483,16 +486,19 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                 const Icon(Iconsax.clipboard_tick, color: Colors.white, size: 24),
                 const SizedBox(width: AppTheme.rowGap),
                 Expanded(
-                  child: Text(
-                    widget.task.title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
-                      decorationColor: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                    child: Text(
+                      widget.task.title,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                        decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
+                        decorationColor: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (!widget.task.isCompleted)

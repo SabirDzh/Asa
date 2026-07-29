@@ -8,6 +8,7 @@ void showWidgetModeSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
 
   showModalBottomSheet(
     context: context,
@@ -24,16 +25,16 @@ void showWidgetModeSheet(BuildContext context) {
         children: [
           Text(
             settings.tr('widget_mode'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          _modeTile(ctx, settings, WidgetDisplayMode.streak),
-          _modeTile(ctx, settings, WidgetDisplayMode.activeTasks),
-          _modeTile(ctx, settings, WidgetDisplayMode.lastFolder),
+          _modeTile(ctx, settings, WidgetDisplayMode.streak, textColor),
+          _modeTile(ctx, settings, WidgetDisplayMode.activeTasks, textColor),
+          _modeTile(ctx, settings, WidgetDisplayMode.lastFolder, textColor),
           const SizedBox(height: 8),
         ],
       ),
@@ -45,6 +46,7 @@ Widget _modeTile(
   BuildContext ctx,
   SettingsProvider settings,
   WidgetDisplayMode mode,
+  Color textColor,
 ) {
   final isSelected = settings.widgetDisplayMode == mode;
   return Material(
@@ -52,7 +54,7 @@ Widget _modeTile(
     child: ListTile(
       title: Text(
         settings.widgetModeLabel(mode),
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: TextStyle(color: textColor, fontSize: 16),
       ),
       trailing: isSelected
           ? const Icon(Icons.check, color: AppColors.primary)

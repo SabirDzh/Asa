@@ -107,9 +107,9 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
               style: TextStyle(color: widget.textColor),
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'PIN / Shared secret',
+                labelText: widget.settings.tr('sync_secret'),
                 labelStyle: TextStyle(color: widget.textSecondary),
-                hintText: 'Leave empty for open network',
+                hintText: widget.settings.tr('sync_secret_hint'),
                 hintStyle: TextStyle(color: widget.textSecondary.withValues(alpha: 0.6)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -158,7 +158,13 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                             final ok = await SyncService.instance.sendToPeer(widget.taskProvider, peer);
                             if (!mounted) return;
                             scaffoldMessenger.showSnackBar(
-                              SnackBar(content: Text(ok ? 'Sent to ${peer.name}' : 'Send failed')),
+                              SnackBar(
+                                content: Text(
+                                  ok
+                                      ? '${widget.settings.tr('sync_send_success')} ${peer.name}'
+                                      : widget.settings.tr('sync_send_failed'),
+                                ),
+                              ),
                             );
                           },
                         ),

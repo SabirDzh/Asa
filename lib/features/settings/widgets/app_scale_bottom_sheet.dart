@@ -23,6 +23,7 @@ void showAppScaleSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
   final range = getAdaptiveScaleRange(context);
 
   showModalBottomSheet(
@@ -40,38 +41,39 @@ void showAppScaleSheet(BuildContext context) {
         children: [
           Text(
             settings.tr('app_scale'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
           if (_kSmallPreset >= range.min && _kSmallPreset <= range.max)
-            _scaleTile(ctx, settings, value: _kSmallPreset, labelKey: 'scale_small'),
+            _scaleTile(ctx, settings, value: _kSmallPreset, labelKey: 'scale_small', textColor: textColor),
           if (_kDefaultPreset >= range.min && _kDefaultPreset <= range.max)
-            _scaleTile(ctx, settings, value: _kDefaultPreset, labelKey: 'scale_default'),
+            _scaleTile(ctx, settings, value: _kDefaultPreset, labelKey: 'scale_default', textColor: textColor),
           if (_kLargePreset >= range.min && _kLargePreset <= range.max)
-            _scaleTile(ctx, settings, value: _kLargePreset, labelKey: 'scale_large'),
+            _scaleTile(ctx, settings, value: _kLargePreset, labelKey: 'scale_large', textColor: textColor),
           if (settings.customAppScales.isNotEmpty) ...[
-            const Divider(color: Colors.white24, height: 16),
+            Divider(color: textColor.withValues(alpha: 0.15), height: 16),
             for (final scale in settings.customAppScales)
               _scaleTile(
                 ctx,
                 settings,
                 value: scale,
                 labelKey: 'scale_custom',
+                textColor: textColor,
                 suffix: scale.toStringAsFixed(2),
               ),
           ],
-          const Divider(color: Colors.white24, height: 16),
+          Divider(color: textColor.withValues(alpha: 0.15), height: 16),
           Material(
             color: Colors.transparent,
             child: ListTile(
-              leading: const Icon(Iconsax.add, color: Colors.white, size: 24),
+              leading: Icon(Iconsax.add, color: textColor, size: 24),
               title: Text(
                 settings.tr('scale_custom'),
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: textColor, fontSize: 16),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -90,6 +92,7 @@ Widget _scaleTile(
   SettingsProvider settings, {
   required double value,
   required String labelKey,
+  required Color textColor,
   String? suffix,
 }) {
   final isSelected = (settings.appScale - value).abs() < _kStep / 2;
@@ -101,7 +104,7 @@ Widget _scaleTile(
     child: ListTile(
       title: Text(
         label,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: TextStyle(color: textColor, fontSize: 16),
       ),
       trailing: isSelected
           ? const Icon(Icons.check, color: AppColors.primary)
@@ -117,6 +120,8 @@ Widget _scaleTile(
 void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, AdaptiveAppScaleRange range) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
+  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
   final divisions = ((range.max - range.min) / _kStep).round();
 
   showModalBottomSheet(
@@ -148,7 +153,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                       width: 48,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white : Colors.black26,
+                        color: textSecondary,
                         borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
                       ),
                     ),
@@ -157,7 +162,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                   Text(
                     settings.tr('app_scale'),
                     style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
+                      color: textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -166,7 +171,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                   Text(
                     value.toStringAsFixed(2),
                     style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
+                      color: textColor,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                     ),
@@ -175,7 +180,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                   Text(
                     '${range.min.toStringAsFixed(2)} – ${range.max.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: isDark ? Colors.white70 : Colors.black54,
+                      color: textSecondary,
                       fontSize: 14,
                     ),
                   ),

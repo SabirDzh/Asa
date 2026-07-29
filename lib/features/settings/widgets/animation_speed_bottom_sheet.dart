@@ -19,6 +19,7 @@ void showAnimationSpeedSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
 
   showModalBottomSheet(
     context: context,
@@ -35,35 +36,35 @@ void showAnimationSpeedSheet(BuildContext context) {
         children: [
           Text(
             settings.tr('animation_speed'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          _speedTile(ctx, settings, 0.5, 'speed_fast'),
-          _speedTile(ctx, settings, 1.0, 'speed_normal'),
-          _speedTile(ctx, settings, 2.0, 'speed_slow'),
-          if (settings.customAnimationSpeeds.isNotEmpty) ...[
-            const Divider(color: Colors.white24, height: 16),
+          _speedTile(ctx, settings, 0.5, 'speed_fast', textColor),
+          _speedTile(ctx, settings, 1.0, 'speed_normal', textColor),
+          _speedTile(ctx, settings, 2.0, 'speed_slow', textColor),              if (settings.customAnimationSpeeds.isNotEmpty) ...[
+            Divider(color: textColor.withValues(alpha: 0.15), height: 16),
             for (final speed in settings.customAnimationSpeeds)
               _speedTile(
                 ctx,
                 settings,
                 speed,
                 'speed_custom',
+                textColor,
                 suffix: _formatSpeed(speed),
               ),
           ],
-          const Divider(color: Colors.white24, height: 16),
+          Divider(color: textColor.withValues(alpha: 0.15), height: 16),
           Material(
             color: Colors.transparent,
             child: ListTile(
-              leading: const Icon(Iconsax.add, color: Colors.white, size: 24),
+              leading: Icon(Iconsax.add, color: textColor, size: 24),
               title: Text(
                 settings.tr('speed_custom'),
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: textColor, fontSize: 16),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -81,7 +82,8 @@ Widget _speedTile(
   BuildContext ctx,
   SettingsProvider settings,
   double value,
-  String labelKey, {
+  String labelKey,
+  Color textColor, {
   String? suffix,
 }) {
   final isSelected = (settings.animationSpeed - value).abs() < 0.01;
@@ -93,7 +95,7 @@ Widget _speedTile(
     child: ListTile(
       title: Text(
         label,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: TextStyle(color: textColor, fontSize: 16),
       ),
       trailing: isSelected
           ? const Icon(Icons.check, color: AppColors.primary)
@@ -119,6 +121,9 @@ void showCustomSpeedSheet(BuildContext context) {
 
   const minSpeed = 0.1;
   const maxSpeed = 5.0;
+
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
+  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
   showModalBottomSheet(
     context: context,
@@ -149,7 +154,7 @@ void showCustomSpeedSheet(BuildContext context) {
                       width: 48,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white : Colors.black26,
+                        color: textSecondary,
                         borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
                       ),
                     ),
@@ -158,7 +163,7 @@ void showCustomSpeedSheet(BuildContext context) {
                   Text(
                     settings.tr('animation_speed'),
                     style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
+                      color: textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -167,7 +172,7 @@ void showCustomSpeedSheet(BuildContext context) {
                   Text(
                     '${_formatSpeed(value)}x',
                     style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
+                      color: textColor,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                     ),
@@ -176,7 +181,7 @@ void showCustomSpeedSheet(BuildContext context) {
                   Text(
                     settings.tr('speed_range'),
                     style: TextStyle(
-                      color: isDark ? Colors.white70 : Colors.black54,
+                      color: textSecondary,
                       fontSize: 14,
                     ),
                   ),

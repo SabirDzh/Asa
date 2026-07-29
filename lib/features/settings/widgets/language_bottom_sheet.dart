@@ -8,6 +8,7 @@ void showLanguageSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
 
   showModalBottomSheet(
     context: context,
@@ -24,13 +25,13 @@ void showLanguageSheet(BuildContext context) {
           children: [
             Text(
               settings.tr('language'),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Material(
               color: Colors.transparent,
               child: ListTile(
-                title: const Text('Русский', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: Text('Русский', style: TextStyle(color: textColor, fontSize: 16)),
                 trailing: settings.languageCode == 'ru'
                     ? const Icon(Icons.check, color: AppColors.primary)
                     : null,
@@ -43,7 +44,7 @@ void showLanguageSheet(BuildContext context) {
             Material(
               color: Colors.transparent,
               child: ListTile(
-                title: const Text('English', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: Text('English', style: TextStyle(color: textColor, fontSize: 16)),
                 trailing: settings.languageCode == 'en'
                     ? const Icon(Icons.check, color: AppColors.primary)
                     : null,

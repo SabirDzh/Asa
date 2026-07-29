@@ -9,6 +9,8 @@ void showAboutSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
+  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
   showModalBottomSheet(
     context: context,
@@ -36,17 +38,17 @@ void showAboutSheet(BuildContext context) {
           const SizedBox(height: 16),
           Text(
             settings.tr('about_title'),
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             settings.tr('version'),
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+            style: TextStyle(color: textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 16),
           Text(
             settings.tr('about_desc'),
-            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+            style: TextStyle(color: textColor, fontSize: 15, height: 1.4),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),

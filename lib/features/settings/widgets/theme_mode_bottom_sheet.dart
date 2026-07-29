@@ -22,6 +22,8 @@ void showThemeModeSheet(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
 
+  final textColor = isDark ? AppColors.textDark : AppColors.textLight;
+
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
@@ -37,16 +39,16 @@ void showThemeModeSheet(BuildContext context) {
         children: [
           Text(
             settings.tr('theme'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          _themeTile(ctx, settings, ThemeMode.light, 'theme_light', Iconsax.sun_1),
-          _themeTile(ctx, settings, ThemeMode.dark, 'theme_dark', Iconsax.moon),
-          _themeTile(ctx, settings, ThemeMode.system, 'theme_system', Iconsax.magicpen),
+          _themeTile(ctx, settings, ThemeMode.light, 'theme_light', Iconsax.sun_1, textColor),
+          _themeTile(ctx, settings, ThemeMode.dark, 'theme_dark', Iconsax.moon, textColor),
+          _themeTile(ctx, settings, ThemeMode.system, 'theme_system', Iconsax.magicpen, textColor),
           const SizedBox(height: 8),
         ],
       ),
@@ -60,15 +62,16 @@ Widget _themeTile(
   ThemeMode mode,
   String labelKey,
   IconData icon,
+  Color textColor,
 ) {
   final isSelected = settings.themeMode == mode;
   return Material(
     color: Colors.transparent,
     child: ListTile(
-      leading: Icon(icon, color: Colors.white, size: 24),
+      leading: Icon(icon, color: textColor, size: 24),
       title: Text(
         settings.tr(labelKey),
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: TextStyle(color: textColor, fontSize: 16),
       ),
       trailing: isSelected
           ? const Icon(Icons.check, color: AppColors.primary)

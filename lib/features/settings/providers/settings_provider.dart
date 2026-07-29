@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/app_strings.dart';
+import '../../../core/device_info.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/scale_utils.dart';
@@ -13,6 +14,8 @@ import '../../../core/scale_utils.dart';
 enum WidgetDisplayMode { streak, activeTasks, lastFolder }
 
 class SettingsProvider with ChangeNotifier {
+  final Future<String> Function() _deviceNameProvider;
+
   ThemeMode _themeMode = ThemeMode.system;
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
@@ -31,7 +34,8 @@ class SettingsProvider with ChangeNotifier {
   bool _initialized = false;
   final _initCompleter = Completer<void>();
 
-  SettingsProvider() {
+  SettingsProvider({Future<String> Function() deviceNameProvider = getDefaultDeviceName})
+      : _deviceNameProvider = deviceNameProvider {
     init();
   }
 
@@ -77,7 +81,10 @@ class SettingsProvider with ChangeNotifier {
         (prefs.getInt('widgetDisplayMode') ?? 0).clamp(0, WidgetDisplayMode.values.length - 1)
       ];
       _syncEnabled = prefs.getBool('syncEnabled') ?? false;
-      _syncDeviceName = prefs.getString('syncDeviceName') ?? 'ASA Device';
+      final savedName = prefs.getString('syncDeviceName');
+      _syncDeviceName = savedName != null && savedName.trim().isNotEmpty
+          ? savedName.trim()
+          : await _deviceNameProvider();
       _syncSecret = prefs.getString('syncSecret');
       if (_syncSecret != null && _syncSecret!.trim().isEmpty) _syncSecret = null;
       timeDilation = _animationSpeed;
@@ -213,10 +220,17 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> setSyncDeviceName(String name) async {
     final trimmed = name.trim();
-    _syncDeviceName = trimmed.isEmpty ? 'ASA Device' : trimmed;
-    notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('syncDeviceName', _syncDeviceName);
+    if (trimmed.isEmpty) {
+      // When the user clears the custom name, fall back to the device name
+      // and remove the saved override so the name stays dynamic.
+      _syncDeviceName = await _deviceNameProvider();
+      await prefs.remove('syncDeviceName');
+    } else {
+      _syncDeviceName = trimmed;
+      await prefs.setString('syncDeviceName', _syncDeviceName);
+    }
+    notifyListeners();
   }
 
   /// Returns the stable device ID used to identify this device during sync.

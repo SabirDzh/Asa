@@ -26,6 +26,8 @@ void showImportPreviewBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    showDragHandle: true,
+    enableDrag: true,
     builder: (ctx) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
       child: Container(

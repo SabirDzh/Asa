@@ -27,6 +27,7 @@ dependencies:
   file_picker: ^10.1.2
   bonsoir: ^5.1.10
   device_calendar: ^4.3.0
+  device_info_plus: ^11.1.2
   timezone: ^0.9.4
   flutter_svg: ^2.0.10
 

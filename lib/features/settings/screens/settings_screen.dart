@@ -18,6 +18,17 @@ import '../widgets/theme_mode_bottom_sheet.dart';
 import '../../../core/sync_service.dart';
 import '../widgets/sync_bottom_sheet.dart' show showSyncBottomSheet;
 
+IconData _themeModeIcon(ThemeMode mode) {
+  switch (mode) {
+    case ThemeMode.light:
+      return Iconsax.sun_1;
+    case ThemeMode.dark:
+      return Iconsax.moon;
+    case ThemeMode.system:
+      return Iconsax.magicpen;
+  }
+}
+
 class SettingsScreen extends StatelessWidget {
   final bool standalone;
   const SettingsScreen({super.key, this.standalone = true});
@@ -44,7 +55,7 @@ class SettingsScreen extends StatelessWidget {
               title: settings.tr('appearance'),
               children: [
                 SettingRow(
-                  icon: Iconsax.sun_1,
+                  icon: _themeModeIcon(settings.themeMode),
                   label: '${settings.tr('theme')}: ${themeModeLabel(settings)}',
                   onTap: () => showThemeModeSheet(context),
                   trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
@@ -87,6 +98,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Iconsax.candle,
                   label: '${settings.tr('widget_mode')}: ${settings.widgetModeLabel(settings.widgetDisplayMode)}',
                   onTap: settings.showInWidget ? () => showWidgetModeSheet(context) : null,
+                  enabled: settings.showInWidget,
                   trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
                 ),
               ],
@@ -122,6 +134,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Iconsax.profile_2user,
                   label: '${settings.tr('sync_device_name')}: ${settings.syncDeviceName}',
                   onTap: settings.syncEnabled ? () => showSyncBottomSheet(context) : null,
+                  enabled: settings.syncEnabled,
                   trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
                 ),
 

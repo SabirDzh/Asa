@@ -329,12 +329,15 @@ class _FolderContent extends StatelessWidget {
     final completedWidgets = <Widget>[];
     for (var i = 0; i < completed.length; i++) {
       final t = completed[i];
+      final bool hasDivider = inProgress.isNotEmpty && i == 0;
       Widget taskWidget = Padding(
         key: ValueKey(t.id),
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: hasDivider
+            ? const EdgeInsets.only(top: 8, bottom: 8)
+            : const EdgeInsets.only(bottom: 8),
         child: TaskRow(task: t),
       );
-      if (inProgress.isNotEmpty && i == 0) {
+      if (hasDivider) {
         taskWidget = Column(
           key: ValueKey('completed_${t.id}'),
           mainAxisSize: MainAxisSize.min,

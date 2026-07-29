@@ -111,8 +111,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom +
-            MediaQuery.of(context).size.height * 0.02,
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -120,7 +119,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.only(
-          top: AppTheme.sheetPadTop,
+          top: 12,
           left: AppTheme.sheetPadH,
           right: AppTheme.sheetPadH,
           bottom: 12,
@@ -129,7 +128,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _handleBar(isDark: Theme.of(context).brightness == Brightness.dark),
-            const SizedBox(height: AppTheme.sheetGap),
+            const SizedBox(height: 36),
             _inputRow(),
             if (widget.folderIconAssets != null && widget.folderIconAssets!.isNotEmpty) ...[
               const SizedBox(height: 16),

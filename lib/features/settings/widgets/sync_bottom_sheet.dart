@@ -20,6 +20,8 @@ void showSyncBottomSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    showDragHandle: true,
+    enableDrag: true,
     builder: (ctx) => _SyncBottomSheet(
       settings: settings,
       taskProvider: taskProvider,

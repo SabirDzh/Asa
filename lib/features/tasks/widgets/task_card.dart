@@ -103,12 +103,12 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final Offset offset = renderBox.localToGlobal(Offset.zero);
     final size = MediaQuery.of(iconContext).size;
     final Rect positionRect = offset & renderBox.size;
-    // Anchor the menu to the bottom-right of the ... button so it always
-    // appears below the icon and scales with the row.
+    // Anchor the menu below the visible icon (excluding the touch padding)
+    // so the gap stays correct at any UI scale.
     final RelativeRect position = RelativeRect.fromRect(
       Rect.fromLTWH(
         positionRect.right - 4,
-        positionRect.bottom + 4,
+        positionRect.bottom - AppTheme.rowPadV + AppTheme.popupMenuGap,
         4,
         0,
       ),
@@ -411,6 +411,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                 child: Padding(
                   padding: const EdgeInsets.only(
                     left: AppTheme.rowGap,
+                    right: AppTheme.rowGap,
                     top: AppTheme.rowPadV,
                     bottom: AppTheme.rowPadV,
                   ),
@@ -425,8 +426,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
             padding: const EdgeInsets.only(
               left: AppTheme.rowGap,
               right: AppTheme.rowPadH,
-              top: 16,
-              bottom: 16,
+              top: AppTheme.rowPadV,
+              bottom: AppTheme.rowPadV,
             ),
           ),
         ],
@@ -512,6 +513,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                   Padding(
                     padding: const EdgeInsets.only(
                       left: AppTheme.rowGap,
+                      right: AppTheme.rowGap,
                       top: AppTheme.rowPadV,
                       bottom: AppTheme.rowPadV,
                     ),
@@ -524,8 +526,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                   padding: const EdgeInsets.only(
                     left: AppTheme.rowGap,
                     right: AppTheme.rowPadH,
-                    top: 16,
-                    bottom: 16,
+                    top: AppTheme.rowPadV,
+                    bottom: AppTheme.rowPadV,
                   ),
                 ),
               ],

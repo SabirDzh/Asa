@@ -20,8 +20,8 @@ class AppColors {
   static const Color navLight = Color(0xFFFFFFFF); // white bottom bar
   static const Color navDark = Color(0xFF3A3A3C);
 
-  // Bottom sheets use a dark surface in both themes so white text is readable
-  static const Color sheetLight = Color(0xFF2C2C2E);
+  // Bottom sheets follow the theme surface so they adapt to light/dark mode.
+  static const Color sheetLight = Color(0xFFFFFFFF);
   static const Color sheetDark = Color(0xFF3A3A3C);
 
   // Secondary surface (slightly lighter/darker)
@@ -66,6 +66,7 @@ class AppTheme {
   static const double menuItemGap = 6.0;  // gap between menu items
   static const double menuItemPad = 10.0; // padding inside menu item
   static const double menuItemGapInner = 10.0; // gap icon–label in menu item
+  static const double popupMenuGap = 8.0; // gap between icon and popup menu
 
   // ── Themes ────────────────────────────────────────────────
   static ThemeData get lightTheme => _build(Brightness.light);

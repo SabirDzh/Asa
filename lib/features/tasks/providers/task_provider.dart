@@ -134,18 +134,24 @@ class TaskProvider with ChangeNotifier {
     await prefs.setString('lastLoginDate', todayStr);
     await prefs.setInt('streakCount', _streakCount);
 
-    _folders.removeWhere((f) => f.isSystemStreak);
-
     final streakFolderName = 'День $_streakCount';
-    _folders.insert(
-      0,
-      FolderItem(
-        id: 'streak_$_streakCount',
-        name: streakFolderName,
-        isSystemStreak: true,
-        parentFolderId: null,
-      ),
-    );
+    final existingIndex = _folders.indexWhere((f) => f.isSystemStreak);
+
+    if (existingIndex != -1) {
+      // Update in place so the streak keeps its ID, position, and any
+      // tasks that were dropped into it. Recreating it would orphan tasks.
+      _folders[existingIndex] = _folders[existingIndex].copyWith(name: streakFolderName);
+    } else {
+      _folders.insert(
+        0,
+        FolderItem(
+          id: 'system_streak_folder',
+          name: streakFolderName,
+          isSystemStreak: true,
+          parentFolderId: null,
+        ),
+      );
+    }
     _foldersVersion++;
     await _saveToPrefs();
     notifyListeners();

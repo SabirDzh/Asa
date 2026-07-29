@@ -7,6 +7,7 @@ class SettingRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final Color? iconColor;
+  final bool enabled;
 
   const SettingRow({
     super.key,
@@ -15,6 +16,7 @@ class SettingRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.iconColor,
+    this.enabled = true,
   });
 
   @override
@@ -23,36 +25,42 @@ class SettingRow extends StatelessWidget {
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
     final defaultIconColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
+    Widget content = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 14,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor ?? defaultIconColor, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+
+    if (!enabled) {
+      content = Opacity(opacity: 0.55, child: content);
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: iconColor ?? defaultIconColor, size: 24),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ),
-              ),
-              if (trailing != null) trailing!,
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }

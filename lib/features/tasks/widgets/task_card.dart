@@ -1,7 +1,9 @@
+import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/calendar_service.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
@@ -127,6 +129,22 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           ),
         ),
         PopupMenuItem<String>(
+          value: 'calendar',
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Icon(Iconsax.calendar, color: menuIconColor, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                widget.task.calendarEventId != null
+                    ? settings.tr('remove_from_calendar')
+                    : settings.tr('add_to_calendar'),
+                style: TextStyle(color: menuIconColor, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
           value: 'delete',
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
@@ -146,6 +164,12 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     if (!iconContext.mounted) return;
     if (value == 'edit') {
       _showEditSheet(iconContext);
+    } else if (value == 'calendar') {
+      if (widget.task.calendarEventId != null) {
+        await iconContext.read<TaskProvider>().unlinkTaskFromCalendar(widget.task.id);
+      } else {
+        await _linkToCalendar(iconContext);
+      }
     } else if (value == 'delete') {
       final isDark = Theme.of(iconContext).brightness == Brightness.dark;
       final bg = isDark ? AppColors.navDark : AppColors.navLight;
@@ -177,6 +201,66 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         iconContext.read<TaskProvider>().removeTask(widget.task.id);
       }
     }
+  }
+
+  Future<void> _linkToCalendar(BuildContext context) async {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365 * 5)),
+    );
+    if (date == null || !context.mounted) return;
+
+    final calendars = (await CalendarService.getCalendars()).where((c) => c.id != null && c.id!.isNotEmpty).toList();
+    if (calendars.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(settings.tr('calendar_no_calendars'))),
+      );
+      return;
+    }
+
+    Calendar? selected;
+    if (calendars.length == 1) {
+      selected = calendars.first;
+    } else if (context.mounted) {
+      selected = await showDialog<Calendar>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? AppColors.navDark : AppColors.navLight,
+            title: Text(
+              settings.tr('calendar_select'),
+              style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: calendars.length,
+                itemBuilder: (context, index) {
+                  final calendar = calendars[index];
+                  return ListTile(
+                    title: Text(
+                      calendar.name ?? '',
+                      style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight),
+                    ),
+                    onTap: () => Navigator.pop(context, calendar),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    if (selected == null || !context.mounted) return;
+    await context.read<TaskProvider>().linkTaskToCalendar(widget.task.id, selected.id!, date);
   }
 
   @override
@@ -215,6 +299,11 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (widget.task.calendarEventId != null)
+            Padding(
+              padding: const EdgeInsets.only(left: AppTheme.rowGap, top: 16, bottom: 16),
+              child: Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
+            ),
           if (!widget.task.isCompleted)
             Builder(
               builder: (iconCtx) => GestureDetector(

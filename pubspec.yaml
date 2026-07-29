@@ -26,6 +26,8 @@ dependencies:
   share_plus: ^10.1.4
   file_picker: ^10.1.2
   bonsoir: ^5.1.10
+  device_calendar: ^4.3.0
+  timezone: ^0.9.4
 
 dev_dependencies:
   flutter_test:

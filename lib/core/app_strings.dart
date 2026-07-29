@@ -90,6 +90,11 @@ class AppStrings {
       'send_logs': 'Отправить логи разработчику',
       'paste': 'Вставить',
       'paste_error': 'Буфер обмена пуст или не содержит текста',
+      'add_to_calendar': 'Добавить в календарь',
+      'remove_from_calendar': 'Убрать из календаря',
+      'calendar_no_permission': 'Нет разрешения на работу с календарём',
+      'calendar_select': 'Выберите календарь',
+      'calendar_no_calendars': 'Календари не найдены',
     },
     'en': {
       'search': 'Search',
@@ -181,6 +186,11 @@ class AppStrings {
       'send_logs': 'Send logs to developer',
       'paste': 'Paste',
       'paste_error': 'Clipboard is empty or does not contain text',
+      'add_to_calendar': 'Add to calendar',
+      'remove_from_calendar': 'Remove from calendar',
+      'calendar_no_permission': 'Calendar permission denied',
+      'calendar_select': 'Select calendar',
+      'calendar_no_calendars': 'No calendars found',
     },
   };
 

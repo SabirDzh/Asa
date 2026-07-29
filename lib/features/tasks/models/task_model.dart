@@ -3,6 +3,9 @@ class TaskItem {
   String title;
   bool isCompleted;
   String? folderId;
+  DateTime? dueDate;
+  String? calendarId;
+  String? calendarEventId;
   final DateTime createdAt;
   final DateTime updatedAt;
   bool isDeleted;
@@ -12,6 +15,9 @@ class TaskItem {
     required this.title,
     this.isCompleted = false,
     this.folderId,
+    this.dueDate,
+    this.calendarId,
+    this.calendarEventId,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isDeleted = false,
@@ -23,6 +29,9 @@ class TaskItem {
         'title': title,
         'isCompleted': isCompleted,
         'folderId': folderId,
+        'dueDate': dueDate?.toIso8601String(),
+        'calendarId': calendarId,
+        'calendarEventId': calendarEventId,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'isDeleted': isDeleted,
@@ -33,6 +42,9 @@ class TaskItem {
         title: json['title'],
         isCompleted: json['isCompleted'] ?? false,
         folderId: json['folderId'],
+        dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
+        calendarId: json['calendarId'],
+        calendarEventId: json['calendarEventId'],
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
@@ -47,6 +59,9 @@ class TaskItem {
     String? title,
     bool? isCompleted,
     Object? folderId = const Object(),
+    Object? dueDate = const Object(),
+    Object? calendarId = const Object(),
+    Object? calendarEventId = const Object(),
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isDeleted,
@@ -56,6 +71,9 @@ class TaskItem {
       title: title ?? this.title,
       isCompleted: isCompleted ?? this.isCompleted,
       folderId: folderId == const Object() ? this.folderId : folderId as String?,
+      dueDate: dueDate == const Object() ? this.dueDate : dueDate as DateTime?,
+      calendarId: calendarId == const Object() ? this.calendarId : calendarId as String?,
+      calendarEventId: calendarEventId == const Object() ? this.calendarEventId : calendarEventId as String?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,

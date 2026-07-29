@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task_model.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/calendar_service.dart';
 import '../../../core/home_widget_service.dart';
 
 enum TaskFilter { all, active, completed, foldersOnly }
@@ -324,9 +325,13 @@ class TaskProvider with ChangeNotifier {
   void removeTask(String id) {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(isDeleted: true, updatedAt: DateTime.now());
+      final task = _tasks[index];
+      _tasks[index] = task.copyWith(isDeleted: true, updatedAt: DateTime.now());
       notifyListeners();
       _saveToPrefs();
+      if (task.calendarId != null && task.calendarEventId != null) {
+        CalendarService.deleteEvent(task.calendarId!, task.calendarEventId!).catchError((_) {});
+      }
     }
   }
 
@@ -339,7 +344,71 @@ class TaskProvider with ChangeNotifier {
       _tasks[index] = _tasks[index].copyWith(title: newTitle, updatedAt: DateTime.now());
       notifyListeners();
       _saveToPrefs();
+      syncTaskCalendarEvent(id).catchError((_) {});
     }
+  }
+
+  /// Links the task to a calendar event on [calendarId] at [date].
+  /// Updates the existing event if [task.calendarEventId] is already set.
+  Future<void> linkTaskToCalendar(String id, String calendarId, DateTime date) async {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index == -1) return;
+
+    final task = _tasks[index];
+    final eventId = await CalendarService.createOrUpdateEvent(
+      calendarId: calendarId,
+      title: task.title,
+      date: date,
+      eventId: task.calendarEventId,
+      description: 'Task from Asa',
+    );
+
+    if (eventId != null) {
+      _tasks[index] = task.copyWith(
+        dueDate: date,
+        calendarId: calendarId,
+        calendarEventId: eventId,
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+      _saveToPrefs();
+    }
+  }
+
+  /// Unlinks the task from its calendar event without deleting the task.
+  Future<void> unlinkTaskFromCalendar(String id) async {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index == -1) return;
+
+    final task = _tasks[index];
+    if (task.calendarId != null && task.calendarEventId != null) {
+      await CalendarService.deleteEvent(task.calendarId!, task.calendarEventId!);
+    }
+
+    _tasks[index] = task.copyWith(
+      calendarId: null,
+      calendarEventId: null,
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+    _saveToPrefs();
+  }
+
+  /// Updates the calendar event title when the task title changes.
+  Future<void> syncTaskCalendarEvent(String id) async {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index == -1) return;
+
+    final task = _tasks[index];
+    if (task.calendarId == null || task.calendarEventId == null || task.dueDate == null) return;
+
+    await CalendarService.createOrUpdateEvent(
+      calendarId: task.calendarId!,
+      title: task.title,
+      date: task.dueDate!,
+      eventId: task.calendarEventId,
+      description: 'Task from Asa',
+    );
   }
 
   void addFolder(String name, {String? parentFolderId}) {

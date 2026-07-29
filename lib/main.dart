@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'core/theme.dart';
 import 'core/notification_service.dart';
@@ -13,6 +15,13 @@ import 'core/theme_switcher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tz_data.initializeTimeZones();
+  try {
+    tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
+  } catch (_) {
+    // Fall back to UTC if the platform timezone name is not in the IANA database.
+    tz.setLocalLocation(tz.UTC);
+  }
   LoggerService.listenToFlutterErrors();
 
   try {

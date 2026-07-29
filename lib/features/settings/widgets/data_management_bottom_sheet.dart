@@ -13,6 +13,7 @@ void showDataManagementSheet(BuildContext context) {
   final taskProvider = Provider.of<TaskProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
+  final textColor = _sheetTextColor(sheetBg);
 
   showModalBottomSheet(
     context: context,
@@ -33,8 +34,8 @@ void showDataManagementSheet(BuildContext context) {
           children: [
             Text(
               settings.tr('data_management'),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textColor,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -43,15 +44,18 @@ void showDataManagementSheet(BuildContext context) {
             _buildTile(
               icon: Iconsax.export,
               title: settings.tr('export_data'),
+              defaultColor: textColor,
               onTap: () async {
                 Navigator.pop(ctx);
                 final result = await ExportImportService.exportAndShare(taskProvider);
                 if (context.mounted) {
-                  final message = result.success
-                      ? settings.tr('export_success')
-                      : result.error != null
-                          ? '${settings.tr('export_failed')}: ${result.error}'
-                          : settings.tr('export_failed');
+                  final message = _formatResultMessage(
+                    success: result.success,
+                    error: result.error,
+                    successKey: 'export_success',
+                    failedKey: 'export_failed',
+                    settings: settings,
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(message)),
                   );
@@ -61,15 +65,18 @@ void showDataManagementSheet(BuildContext context) {
             _buildTile(
               icon: Iconsax.import,
               title: settings.tr('import_data'),
+              defaultColor: textColor,
               onTap: () async {
                 Navigator.pop(ctx);
                 final result = await ExportImportService.importFromFile(taskProvider);
                 if (context.mounted) {
-                  final message = result.success
-                      ? settings.tr('import_success')
-                      : result.error != null
-                          ? '${settings.tr('import_failed')}: ${result.error}'
-                          : settings.tr('import_failed');
+                  final message = _formatResultMessage(
+                    success: result.success,
+                    error: result.error,
+                    successKey: 'import_success',
+                    failedKey: 'import_failed',
+                    settings: settings,
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(message)),
                   );
@@ -79,6 +86,7 @@ void showDataManagementSheet(BuildContext context) {
             _buildTile(
               icon: Iconsax.send_2,
               title: settings.tr('send_logs'),
+              defaultColor: textColor,
               onTap: () async {
                 Navigator.pop(ctx);
                 final ok = await LoggerService.instance.sendToTelegram();
@@ -93,10 +101,11 @@ void showDataManagementSheet(BuildContext context) {
                 }
               },
             ),
-            const Divider(color: Colors.white24, height: 16),
+            Divider(color: textColor.withAlpha(24), height: 16),
             _buildTile(
               icon: Iconsax.trash,
               title: settings.tr('clear_tasks'),
+              defaultColor: textColor,
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmAction(context, settings.tr('clear_tasks'), () {
@@ -107,6 +116,7 @@ void showDataManagementSheet(BuildContext context) {
             _buildTile(
               icon: Iconsax.folder_minus,
               title: settings.tr('clear_folders'),
+              defaultColor: textColor,
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmAction(context, settings.tr('clear_folders'), () {
@@ -117,6 +127,7 @@ void showDataManagementSheet(BuildContext context) {
             _buildTile(
               icon: Iconsax.refresh,
               title: settings.tr('clear_all'),
+              defaultColor: textColor,
               titleColor: Colors.redAccent,
               onTap: () {
                 Navigator.pop(ctx);
@@ -132,20 +143,40 @@ void showDataManagementSheet(BuildContext context) {
   );
 }
 
+/// Returns a text color that is readable against the given sheet background.
+Color _sheetTextColor(Color background) {
+  return background.computeLuminance() > 0.5 ? AppColors.textLight : AppColors.textDark;
+}
+
+/// Formats a success/failure message for export/import operations.
+String _formatResultMessage({
+  required bool success,
+  required String? error,
+  required String successKey,
+  required String failedKey,
+  required SettingsProvider settings,
+}) {
+  if (success) return settings.tr(successKey);
+  final base = settings.tr(failedKey);
+  if (error == null || error.isEmpty) return base;
+  return '$base: $error';
+}
+
 Widget _buildTile({
   required IconData icon,
   required String title,
   required VoidCallback onTap,
+  required Color defaultColor,
   Color? titleColor,
 }) {
   return Material(
     color: Colors.transparent,
     child: ListTile(
-      leading: Icon(icon, color: titleColor ?? Colors.white),
+      leading: Icon(icon, color: titleColor ?? defaultColor),
       title: Text(
         title,
         style: TextStyle(
-          color: titleColor ?? Colors.white,
+          color: titleColor ?? defaultColor,
           fontSize: 16,
         ),
       ),

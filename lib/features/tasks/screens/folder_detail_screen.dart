@@ -9,6 +9,7 @@ import '../../../core/bottom_sheet.dart';
 import '../../../core/folder_icons.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/responsive_center.dart';
+import '../../../core/scroll_hide_mixin.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../widgets/task_card.dart';
@@ -23,9 +24,8 @@ class FolderDetailScreen extends StatefulWidget {
   State<FolderDetailScreen> createState() => _FolderDetailScreenState();
 }
 
-class _FolderDetailScreenState extends State<FolderDetailScreen> {
+class _FolderDetailScreenState extends State<FolderDetailScreen> with ScrollHideMixin<FolderDetailScreen> {
   final ScrollController _breadcrumbScroll = ScrollController();
-  bool _fabVisible = true;
 
   @override
   void initState() {
@@ -44,17 +44,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   void dispose() {
     _breadcrumbScroll.dispose();
     super.dispose();
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is! ScrollUpdateNotification) return false;
-    final delta = notification.scrollDelta ?? 0;
-    if (delta > AppTheme.scrollHideThreshold) {
-      if (_fabVisible) setState(() => _fabVisible = false);
-    } else if (delta < -AppTheme.scrollHideThreshold) {
-      if (!_fabVisible) setState(() => _fabVisible = true);
-    }
-    return false;
   }
 
   void _showCreateSheet(BuildContext context, {required bool isTask}) {
@@ -165,7 +154,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     ),
                     Expanded(
                   child: NotificationListener<ScrollNotification>(
-                    onNotification: _handleScrollNotification,
+                    onNotification: handleScrollNotification,
                     child: _FolderContent(folder: widget.folder),
                   ),
                 ),
@@ -173,16 +162,16 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             ),
             Positioned.fill(
               child: AnimatedOpacity(
-                opacity: _fabVisible ? 1.0 : 0.0,
+                opacity: fabVisible ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
                 child: IgnorePointer(
-                  ignoring: !_fabVisible,
+                  ignoring: !fabVisible,
                   child: _FolderFloatingMenu(
                     onMenuClose: () {},
                     showCreateSheet: _showCreateSheet,
                     bottomOffset: AppTheme.navHeight,
-                    isVisible: _fabVisible,
+                    isVisible: fabVisible,
                   ),
                 ),
               ),

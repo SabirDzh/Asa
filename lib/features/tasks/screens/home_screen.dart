@@ -7,6 +7,7 @@ import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
 import '../../../core/folder_icons.dart';
 import '../../../core/responsive_center.dart';
+import '../../../core/scroll_hide_mixin.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -19,11 +20,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen> {
   int _navIndex = 0;
   late final PageController _pageController;
   final TextEditingController _searchController = TextEditingController();
-  bool _fabVisible = true;
 
   @override
   void initState() {
@@ -212,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Stack(
         children: [
           NotificationListener<ScrollNotification>(
-            onNotification: _handleScrollNotification,
+            onNotification: handleScrollNotification,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
             right: AppTheme.screenPad,
-            bottom: _fabVisible ? AppTheme.screenPad : -AppTheme.fabSize - AppTheme.screenPad,
+            bottom: fabVisible ? AppTheme.screenPad : -AppTheme.fabSize - AppTheme.screenPad,
             child: GestureDetector(
               onTap: () => _showCreateFolderSheet(context),
               child: Container(
@@ -322,17 +322,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is! ScrollUpdateNotification) return false;
-    final delta = notification.scrollDelta ?? 0;
-    if (delta > AppTheme.scrollHideThreshold) {
-      if (_fabVisible) setState(() => _fabVisible = false);
-    } else if (delta < -AppTheme.scrollHideThreshold) {
-      if (!_fabVisible) setState(() => _fabVisible = true);
-    }
-    return false;
   }
 
   void _showCreateFolderSheet(BuildContext context) {

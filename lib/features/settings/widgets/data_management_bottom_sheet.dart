@@ -69,7 +69,7 @@ void showDataManagementSheet(BuildContext context) {
               onTap: () async {
                 Navigator.pop(ctx);
                 final result = await ExportImportService.importFromFile(taskProvider);
-                if (context.mounted) {
+                if (context.mounted && !result.cancelled) {
                   final message = _formatResultMessage(
                     success: result.success,
                     error: result.error,

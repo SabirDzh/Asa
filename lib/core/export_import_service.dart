@@ -22,12 +22,14 @@ class ImportResult {
   final int tasksImported;
   final int foldersImported;
   final String? error;
-  bool get success => error == null;
+  final bool cancelled;
+  bool get success => error == null && !cancelled;
 
   const ImportResult({
     this.tasksImported = 0,
     this.foldersImported = 0,
     this.error,
+    this.cancelled = false,
   });
 }
 
@@ -143,7 +145,7 @@ class ExportImportService {
       );
 
       if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
-        return const ImportResult(error: 'No file selected');
+        return const ImportResult(cancelled: true);
       }
 
       final bytes = result.files.single.bytes!;

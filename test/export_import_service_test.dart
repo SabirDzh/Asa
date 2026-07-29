@@ -27,6 +27,13 @@ void main() {
       expect(snapshot.folders.first['name'], 'Work');
     });
 
+    test('importFromFile reports cancelled when no file is picked', () {
+      const result = ImportResult(cancelled: true);
+      expect(result.cancelled, true);
+      expect(result.success, false);
+      expect(result.error, isNull);
+    });
+
     test('importFromBytes adds new tasks and folders', () async {
       final snapshot = AsaDataSnapshot(
         version: '1.1.0',

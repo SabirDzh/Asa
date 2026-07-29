@@ -160,7 +160,7 @@ void main() {
         );
 
         expect(result.success, false);
-        expect(result.error, 'Invalid sync secret');
+        expect(result.error, 'error_invalid_secret');
       });
 
       test('rejects plain payload when secret expected', () async {
@@ -179,7 +179,7 @@ void main() {
         );
 
         expect(result.success, false);
-        expect(result.error, 'Missing sync secret');
+        expect(result.error, 'error_missing_secret');
       });
 
       test('accepts plain payload when no secret expected', () async {
@@ -214,6 +214,56 @@ void main() {
 
       expect(decoded['secret'], '1234');
       expect(decoded['payload'], isA<String>());
+    });
+
+    test('importFromBytes rejects non-UTF8 bytes', () async {
+      final result = await ExportImportService.importFromBytes(provider, [0x80, 0x81, 0x82]);
+      expect(result.success, false);
+      expect(result.error, 'error_not_utf8');
+    });
+
+    test('importFromBytes rejects invalid JSON', () async {
+      final result = await ExportImportService.importFromBytes(provider, utf8.encode('not json'));
+      expect(result.success, false);
+      expect(result.error, 'error_invalid_json');
+    });
+
+    test('importFromBytes rejects non-object JSON', () async {
+      final result = await ExportImportService.importFromBytes(provider, utf8.encode('[1, 2, 3]'));
+      expect(result.success, false);
+      expect(result.error, 'error_invalid_format');
+    });
+
+    test('importFromBytes rejects missing required keys', () async {
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        utf8.encode(jsonEncode({'version': '1.1.0'})),
+      );
+      expect(result.success, false);
+      expect(result.error, 'error_missing_keys');
+    });
+
+    test('importFromBytes rejects non-list tasks/folders', () async {
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        utf8.encode(jsonEncode({
+          'version': '1.1.0',
+          'exportedAt': 0,
+          'tasks': 'not-a-list',
+          'folders': [],
+        })),
+      );
+      expect(result.success, false);
+      expect(result.error, 'error_invalid_lists');
+    });
+
+    test('importFromBytes rejects envelope without string payload', () async {
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        utf8.encode(jsonEncode({'payload': 123})),
+      );
+      expect(result.success, false);
+      expect(result.error, 'error_invalid_format');
     });
   });
 }

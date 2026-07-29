@@ -149,6 +149,7 @@ Color _sheetTextColor(Color background) {
 }
 
 /// Formats a success/failure message for export/import operations.
+/// [error] may be a localization key or a raw exception string.
 String _formatResultMessage({
   required bool success,
   required String? error,
@@ -159,6 +160,8 @@ String _formatResultMessage({
   if (success) return settings.tr(successKey);
   final base = settings.tr(failedKey);
   if (error == null || error.isEmpty) return base;
+  final translated = settings.tr(error);
+  if (translated != error) return '$base: $translated';
   return '$base: $error';
 }
 

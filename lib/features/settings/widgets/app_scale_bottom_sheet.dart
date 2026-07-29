@@ -12,11 +12,25 @@ const double _kDefaultPreset = 1.0;
 const double _kLargePreset = 1.2;
 
 String appScaleLabel(BuildContext context, SettingsProvider settings) {
-  final scale = effectiveAppScale(context, settings.appScale);
-  if ((scale - _kSmallPreset).abs() < _kStep / 2) return settings.tr('scale_small');
-  if ((scale - _kDefaultPreset).abs() < _kStep / 2) return settings.tr('scale_default');
-  if ((scale - _kLargePreset).abs() < _kStep / 2) return settings.tr('scale_large');
-  return '${settings.tr('scale_custom')} (${scale.toStringAsFixed(2)})';
+  final storedScale = settings.appScale;
+  final effectiveScale = effectiveAppScale(context, storedScale);
+
+  String? presetLabel;
+  if ((storedScale - _kSmallPreset).abs() < _kStep / 2) {
+    presetLabel = settings.tr('scale_small');
+  } else if ((storedScale - _kDefaultPreset).abs() < _kStep / 2) {
+    presetLabel = settings.tr('scale_default');
+  } else if ((storedScale - _kLargePreset).abs() < _kStep / 2) {
+    presetLabel = settings.tr('scale_large');
+  }
+
+  if (presetLabel != null) {
+    if ((storedScale - effectiveScale).abs() > 0.01) {
+      return '$presetLabel (${effectiveScale.toStringAsFixed(2)})';
+    }
+    return presetLabel;
+  }
+  return '${settings.tr('scale_custom')} (${effectiveScale.toStringAsFixed(2)})';
 }
 
 void showAppScaleSheet(BuildContext context) {

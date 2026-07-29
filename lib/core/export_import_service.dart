@@ -8,6 +8,9 @@ import '../features/tasks/models/task_model.dart';
 import '../features/tasks/providers/task_provider.dart';
 import 'logger_service.dart';
 
+/// Maximum allowed import file size (10 MB).
+const _kMaxImportFileSize = 10 * 1024 * 1024;
+
 /// Result of an export operation.
 class ExportResult {
   final File? file;
@@ -144,38 +147,105 @@ class ExportImportService {
         withData: true,
       );
 
-      if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
+      if (result == null || result.files.isEmpty) {
         return const ImportResult(cancelled: true);
       }
 
-      final bytes = result.files.single.bytes!;
-      return importFromBytes(provider, bytes);
+      final file = result.files.single;
+      if (file.bytes == null) {
+        return const ImportResult(error: 'error_import_failed');
+      }
+
+      final ext = file.extension?.toLowerCase();
+      if (ext != 'json' && ext != 'asa') {
+        return const ImportResult(error: 'error_invalid_extension');
+      }
+
+      if (file.size > _kMaxImportFileSize) {
+        return const ImportResult(error: 'error_file_too_large');
+      }
+
+      return importFromBytes(provider, file.bytes!);
     } on Exception catch (error, stackTrace) {
       LoggerService.instance.e('Import failed', error: error, stackTrace: stackTrace);
-      return ImportResult(error: error.toString());
+      return const ImportResult(error: 'error_import_failed');
     }
   }
 
   /// Imports/merges raw bytes using a last-write-wins (LWW) strategy.
   static Future<ImportResult> importFromBytes(TaskProvider provider, List<int> bytes, {String? expectedSecret}) async {
+    String? jsonString;
     try {
-      final jsonString = utf8.decode(bytes);
-      final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+      jsonString = utf8.decode(bytes);
+    } on Exception {
+      return const ImportResult(error: 'error_not_utf8');
+    }
 
-      String payloadJson;
-      if (decoded.containsKey('payload')) {
-        final envelope = SyncEnvelope.fromJson(decoded);
-        if (expectedSecret != null && envelope.secret != expectedSecret) {
-          return const ImportResult(error: 'Invalid sync secret');
-        }
-        payloadJson = envelope.payload;
-      } else if (expectedSecret != null) {
-        return const ImportResult(error: 'Missing sync secret');
-      } else {
-        payloadJson = jsonString;
+    // Basic magic bytes / JSON sanity check: first non-whitespace character
+    // must be the start of an object or array.
+    final firstChar = jsonString.trimLeft().isNotEmpty ? jsonString.trimLeft()[0] : '';
+    if (firstChar != '{' && firstChar != '[') {
+      return const ImportResult(error: 'error_invalid_json');
+    }
+
+    dynamic decodedRaw;
+    try {
+      decodedRaw = jsonDecode(jsonString);
+    } on Exception {
+      return const ImportResult(error: 'error_invalid_json');
+    }
+
+    if (decodedRaw is! Map<String, dynamic>) {
+      return const ImportResult(error: 'error_invalid_format');
+    }
+
+    final decoded = decodedRaw as Map<String, dynamic>;
+
+    String payloadJson;
+    if (decoded.containsKey('payload')) {
+      final payloadValue = decoded['payload'];
+      if (payloadValue is! String || (payloadValue as String).isEmpty) {
+        return const ImportResult(error: 'error_invalid_format');
       }
+      if (decoded['secret'] != null && decoded['secret'] is! String) {
+        return const ImportResult(error: 'error_invalid_format');
+      }
+      final envelope = SyncEnvelope.fromJson(decoded);
+      if (expectedSecret != null && envelope.secret != expectedSecret) {
+        return const ImportResult(error: 'error_invalid_secret');
+      }
+      payloadJson = envelope.payload;
+    } else if (expectedSecret != null) {
+      return const ImportResult(error: 'error_missing_secret');
+    } else {
+      payloadJson = jsonString;
+    }
 
-      final payload = jsonDecode(payloadJson) as Map<String, dynamic>;
+    dynamic payloadRaw;
+    try {
+      payloadRaw = jsonDecode(payloadJson);
+    } on Exception {
+      return const ImportResult(error: 'error_invalid_json');
+    }
+
+    if (payloadRaw is! Map<String, dynamic>) {
+      return const ImportResult(error: 'error_invalid_format');
+    }
+
+    final payload = payloadRaw as Map<String, dynamic>;
+
+    if (!payload.containsKey('version') ||
+        !payload.containsKey('exportedAt') ||
+        !payload.containsKey('tasks') ||
+        !payload.containsKey('folders')) {
+      return const ImportResult(error: 'error_missing_keys');
+    }
+
+    if (payload['tasks'] is! List || payload['folders'] is! List) {
+      return const ImportResult(error: 'error_invalid_lists');
+    }
+
+    try {
       final snapshot = AsaDataSnapshot.fromJson(payload);
 
       int tasksImported = 0;
@@ -208,7 +278,7 @@ class ExportImportService {
       return ImportResult(tasksImported: tasksImported, foldersImported: foldersImported);
     } on Exception catch (error, stackTrace) {
       LoggerService.instance.e('Import parsing failed', error: error, stackTrace: stackTrace);
-      return ImportResult(error: error.toString());
+      return const ImportResult(error: 'error_import_failed');
     }
   }
 

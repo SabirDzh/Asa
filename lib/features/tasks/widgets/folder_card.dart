@@ -24,6 +24,7 @@ class FolderRow extends StatefulWidget {
 
 class _FolderRowState extends State<FolderRow> {
   bool _isDragHovered = false;
+  final GlobalKey _rowKey = GlobalKey();
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -73,8 +74,15 @@ class _FolderRowState extends State<FolderRow> {
     final Offset offset = renderBox.localToGlobal(Offset.zero);
     final size = MediaQuery.of(iconContext).size;
     final Rect positionRect = offset & renderBox.size;
+    // Anchor the menu to the bottom-right of the ... button so it always
+    // appears below the icon and scales with the row.
     final RelativeRect position = RelativeRect.fromRect(
-      positionRect.shift(const Offset(0, 8)),
+      Rect.fromLTWH(
+        positionRect.right - 4,
+        positionRect.bottom + 4,
+        4,
+        0,
+      ),
       Offset.zero & size,
     );
 
@@ -152,6 +160,55 @@ class _FolderRowState extends State<FolderRow> {
     }
   }
 
+  void _showStreakPopup() async {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final renderBox = _rowKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final size = MediaQuery.of(context).size;
+    final positionRect = offset & renderBox.size;
+    final menuIconColor = Theme.of(context).colorScheme.onSurface;
+
+    final String? value = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(
+          positionRect.right - 4,
+          positionRect.bottom + 4,
+          4,
+          0,
+        ),
+        Offset.zero & size,
+      ),
+      color: isDark ? AppColors.navDark : AppColors.navLight,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.menuRadius)),
+      items: [
+        PopupMenuItem<String>(
+          value: 'info',
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Icon(Iconsax.information, color: menuIconColor, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                settings.tr('streak_info'),
+                style: TextStyle(color: menuIconColor, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!mounted) return;
+    if (value == 'info') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.folder.name)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -159,6 +216,7 @@ class _FolderRowState extends State<FolderRow> {
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     final rowChild = Material(
+      key: _rowKey,
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
@@ -170,6 +228,7 @@ class _FolderRowState extends State<FolderRow> {
           );
         },
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+        onLongPress: widget.folder.isSystemStreak ? _showStreakPopup : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: AppTheme.rowHeight,

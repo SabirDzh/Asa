@@ -396,10 +396,10 @@ class _HomeFolderList extends StatelessWidget {
         vertical: 4,
       ),
       itemCount: folders.length,
-      onReorderItem:
-          (oldIndex, newIndex) => context
-              .read<TaskProvider>()
-              .reorderRootFolders(oldIndex, newIndex),
+      onReorderItem: (oldIndex, newIndex) {
+        if (oldIndex < newIndex) newIndex -= 1;
+        context.read<TaskProvider>().reorderRootFolders(oldIndex, newIndex);
+      },
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
           animation: animation,

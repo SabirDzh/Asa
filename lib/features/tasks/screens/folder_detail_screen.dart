@@ -319,21 +319,70 @@ class _FolderContent extends StatelessWidget {
     final inProgress = folderTasks.where((t) => !t.isCompleted).toList();
     final completed = folderTasks.where((t) => t.isCompleted).toList();
 
+    // Build task widgets. The first completed task carries the divider
+    // above it so the divider is not an independent reorderable child.
+    final completedWidgets = <Widget>[];
+    for (var i = 0; i < completed.length; i++) {
+      final t = completed[i];
+      Widget taskWidget = Padding(
+        key: ValueKey(t.id),
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TaskRow(task: t),
+      );
+      if (inProgress.isNotEmpty && i == 0) {
+        taskWidget = Column(
+          key: ValueKey('completed_${t.id}'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Align(
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: 328,
+                  child: Divider(
+                    color: isDark ? Colors.white30 : AppColors.navLight,
+                    thickness: 2,
+                    height: 2,
+                  ),
+                ),
+              ),
+            ),
+            taskWidget,
+          ],
+        );
+      }
+      completedWidgets.add(taskWidget);
+    }
+
     return ReorderableListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.screenPad,
-        vertical: 12,
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.screenPad,
+        12,
+        AppTheme.screenPad,
+        80,
       ),
       onReorderItem: (oldIndex, newIndex) {
+        if (oldIndex < newIndex) newIndex -= 1;
         final sc = subfolders.length;
-        if (oldIndex >= sc && newIndex >= sc) {
-          final oldTaskIndex = oldIndex - sc;
-          final newTaskIndex = newIndex - sc;
+        final taskCount = inProgress.length + completed.length;
+        final taskStart = sc;
+        final taskEnd = sc + taskCount;
+        if (oldIndex < sc && newIndex < sc) {
+          context.read<TaskProvider>().reorderSubfolders(
+            folder.id,
+            oldIndex,
+            newIndex,
+          );
+        } else if (oldIndex >= taskStart &&
+            oldIndex < taskEnd &&
+            newIndex >= taskStart &&
+            newIndex < taskEnd) {
           context.read<TaskProvider>().reorderFolderTasks(
             folder.id,
-            oldTaskIndex,
-            newTaskIndex,
+            oldIndex - taskStart,
+            newIndex - taskStart,
           );
         }
       },
@@ -358,29 +407,7 @@ class _FolderContent extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: TaskRow(task: t),
           ),
-        if (inProgress.isNotEmpty && completed.isNotEmpty)
-          Padding(
-            key: const ValueKey('divider_key'),
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Align(
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: 328,
-                child: Divider(
-                  color: isDark ? Colors.white30 : AppColors.navLight,
-                  thickness: 2,
-                  height: 2,
-                ),
-              ),
-            ),
-          ),
-        for (final t in completed)
-          Padding(
-            key: ValueKey(t.id),
-            padding: const EdgeInsets.only(bottom: 8),
-            child: TaskRow(task: t),
-          ),
-        const SizedBox(key: ValueKey('bottom_space_key'), height: 80),
+        ...completedWidgets,
       ],
     );
   }

@@ -138,11 +138,16 @@ class AvatarSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Center(
-          child: TextButton(
+          child: ElevatedButton(
             onPressed: () => _pickAvatar(context),
-            style: TextButton.styleFrom(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: surface,
               foregroundColor: textSecondary,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+              ),
             ),
             child: Text(
               changeAvatarLabel,

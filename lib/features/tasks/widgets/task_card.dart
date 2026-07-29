@@ -103,8 +103,15 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final Offset offset = renderBox.localToGlobal(Offset.zero);
     final size = MediaQuery.of(iconContext).size;
     final Rect positionRect = offset & renderBox.size;
+    // Anchor the menu to the bottom-right of the ... button so it always
+    // appears below the icon and scales with the row.
     final RelativeRect position = RelativeRect.fromRect(
-      positionRect.shift(const Offset(0, 8)),
+      Rect.fromLTWH(
+        positionRect.right - 4,
+        positionRect.bottom + 4,
+        4,
+        0,
+      ),
       Offset.zero & size,
     );
 

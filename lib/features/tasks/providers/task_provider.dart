@@ -227,22 +227,19 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  void reorderRootFolders(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || newIndex < 0) return;
-    // Reordering a filtered/searched list is ambiguous and can cause data
-    // loss, so only reorder when the full root list is visible.
-    if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
+  void _reorderFoldersByParent(String? parentFolderId, int oldIndex, int newIndex) {
+    final list = _folders
+        .where((f) => f.parentFolderId == parentFolderId && !f.isDeleted)
+        .toList();
+    if (oldIndex < 0 || newIndex < 0 || oldIndex >= list.length || newIndex >= list.length) return;
 
-    final rootList = _folders.where((f) => f.parentFolderId == null).toList();
-    if (oldIndex >= rootList.length || newIndex >= rootList.length) return;
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
 
-    final item = rootList.removeAt(oldIndex);
-    rootList.insert(newIndex, item);
-
-    final rootIds = rootList.map((f) => f.id).toSet();
+    final ids = list.map((f) => f.id).toSet();
     final newFolders = <FolderItem>[
-      ...rootList,
-      ..._folders.where((f) => !rootIds.contains(f.id)),
+      ..._folders.where((f) => !ids.contains(f.id)),
+      ...list,
     ];
 
     _folders
@@ -251,6 +248,18 @@ class TaskProvider with ChangeNotifier {
     _foldersVersion++;
     notifyListeners();
     _saveToPrefs();
+  }
+
+  void reorderRootFolders(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || newIndex < 0) return;
+    // Reordering a filtered/searched list is ambiguous and can cause data
+    // loss, so only reorder when the full root list is visible.
+    if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
+    _reorderFoldersByParent(null, oldIndex, newIndex);
+  }
+
+  void reorderSubfolders(String parentFolderId, int oldIndex, int newIndex) {
+    _reorderFoldersByParent(parentFolderId, oldIndex, newIndex);
   }
 
   void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {

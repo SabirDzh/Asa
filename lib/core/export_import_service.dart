@@ -36,6 +36,39 @@ class ImportResult {
   });
 }
 
+/// Preview/metadata for a file the user is about to import.
+class ImportPreview {
+  final String fileName;
+  final int fileSize;
+  final bool isValid;
+  final String? errorKey;
+  final String? version;
+  final DateTime? exportedAt;
+  final int taskCount;
+  final int folderCount;
+  final AsaDataSnapshot? snapshot;
+  final bool hasSecret;
+
+  const ImportPreview({
+    required this.fileName,
+    required this.fileSize,
+    required this.isValid,
+    this.errorKey,
+    this.version,
+    this.exportedAt,
+    this.taskCount = 0,
+    this.folderCount = 0,
+    this.snapshot,
+    this.hasSecret = false,
+  });
+
+  String get fileSizeLabel {
+    if (fileSize < 1024) return '$fileSize B';
+    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
 /// Holds the portable data snapshot.
 class AsaDataSnapshot {
   final String version;
@@ -138,31 +171,33 @@ class ExportImportService {
     }
   }
 
+  /// Picks a file for import and returns the selected [PlatformFile]
+  /// (including its bytes) without importing anything yet.
+  static Future<PlatformFile?> pickImportFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json', 'asa'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return null;
+    }
+
+    final file = result.files.single;
+    if (file.bytes == null) {
+      return null;
+    }
+
+    return file;
+  }
+
   /// Picks a file and merges its data into the current provider.
   static Future<ImportResult> importFromFile(TaskProvider provider) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json', 'asa'],
-        withData: true,
-      );
-
-      if (result == null || result.files.isEmpty) {
+      final file = await pickImportFile();
+      if (file == null) {
         return const ImportResult(cancelled: true);
-      }
-
-      final file = result.files.single;
-      if (file.bytes == null) {
-        return const ImportResult(error: 'error_import_failed');
-      }
-
-      final ext = file.extension?.toLowerCase();
-      if (ext != 'json' && ext != 'asa') {
-        return const ImportResult(error: 'error_invalid_extension');
-      }
-
-      if (file.size > _kMaxImportFileSize) {
-        return const ImportResult(error: 'error_file_too_large');
       }
 
       return importFromBytes(provider, file.bytes!);
@@ -172,51 +207,118 @@ class ExportImportService {
     }
   }
 
-  /// Imports/merges raw bytes using a last-write-wins (LWW) strategy.
-  static Future<ImportResult> importFromBytes(TaskProvider provider, List<int> bytes, {String? expectedSecret}) async {
+  /// Returns a preview of a file the user is about to import.
+  /// This performs the same validation as [importFromBytes] but does not
+  /// modify the provider state.
+  static ImportPreview previewImport({
+    required String fileName,
+    required int fileSize,
+    required List<int> bytes,
+    String? expectedSecret,
+  }) {
+    final ext = fileName.split('.').lastOrNull?.toLowerCase();
+    if (ext != 'json' && ext != 'asa') {
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_extension',
+      );
+    }
+
+    if (fileSize > _kMaxImportFileSize) {
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_file_too_large',
+      );
+    }
+
     String? jsonString;
     try {
       jsonString = utf8.decode(bytes);
     } on Exception {
-      return const ImportResult(error: 'error_not_utf8');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_not_utf8',
+      );
     }
 
-    // Basic magic bytes / JSON sanity check: first non-whitespace character
-    // must be the start of an object or array.
     final firstChar = jsonString.trimLeft().isNotEmpty ? jsonString.trimLeft()[0] : '';
     if (firstChar != '{' && firstChar != '[') {
-      return const ImportResult(error: 'error_invalid_json');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_json',
+      );
     }
 
     dynamic decodedRaw;
     try {
       decodedRaw = jsonDecode(jsonString);
     } on Exception {
-      return const ImportResult(error: 'error_invalid_json');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_json',
+      );
     }
 
     if (decodedRaw is! Map<String, dynamic>) {
-      return const ImportResult(error: 'error_invalid_format');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_format',
+      );
     }
 
     final decoded = decodedRaw as Map<String, dynamic>;
-
+    bool hasSecret = false;
     String payloadJson;
+
     if (decoded.containsKey('payload')) {
       final payloadValue = decoded['payload'];
       if (payloadValue is! String || (payloadValue as String).isEmpty) {
-        return const ImportResult(error: 'error_invalid_format');
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: fileSize,
+          isValid: false,
+          errorKey: 'error_invalid_format',
+        );
       }
       if (decoded['secret'] != null && decoded['secret'] is! String) {
-        return const ImportResult(error: 'error_invalid_format');
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: fileSize,
+          isValid: false,
+          errorKey: 'error_invalid_format',
+        );
       }
       final envelope = SyncEnvelope.fromJson(decoded);
+      hasSecret = true;
       if (expectedSecret != null && envelope.secret != expectedSecret) {
-        return const ImportResult(error: 'error_invalid_secret');
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: fileSize,
+          isValid: false,
+          errorKey: 'error_invalid_secret',
+          hasSecret: true,
+        );
       }
       payloadJson = envelope.payload;
     } else if (expectedSecret != null) {
-      return const ImportResult(error: 'error_missing_secret');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_missing_secret',
+      );
     } else {
       payloadJson = jsonString;
     }
@@ -225,11 +327,21 @@ class ExportImportService {
     try {
       payloadRaw = jsonDecode(payloadJson);
     } on Exception {
-      return const ImportResult(error: 'error_invalid_json');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_json',
+      );
     }
 
     if (payloadRaw is! Map<String, dynamic>) {
-      return const ImportResult(error: 'error_invalid_format');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_format',
+      );
     }
 
     final payload = payloadRaw as Map<String, dynamic>;
@@ -238,16 +350,62 @@ class ExportImportService {
         !payload.containsKey('exportedAt') ||
         !payload.containsKey('tasks') ||
         !payload.containsKey('folders')) {
-      return const ImportResult(error: 'error_missing_keys');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_missing_keys',
+      );
     }
 
     if (payload['tasks'] is! List || payload['folders'] is! List) {
-      return const ImportResult(error: 'error_invalid_lists');
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_invalid_lists',
+      );
     }
 
     try {
       final snapshot = AsaDataSnapshot.fromJson(payload);
+      final exportedAt = DateTime.fromMillisecondsSinceEpoch(snapshot.exportedAt, isUtc: true);
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: true,
+        version: snapshot.version,
+        exportedAt: exportedAt,
+        taskCount: snapshot.tasks.length,
+        folderCount: snapshot.folders.length,
+        snapshot: snapshot,
+        hasSecret: hasSecret,
+      );
+    } on Exception {
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: fileSize,
+        isValid: false,
+        errorKey: 'error_import_failed',
+      );
+    }
+  }
 
+  /// Imports/merges raw bytes using a last-write-wins (LWW) strategy.
+  static Future<ImportResult> importFromBytes(TaskProvider provider, List<int> bytes, {String? expectedSecret}) async {
+    final preview = previewImport(fileName: '', fileSize: bytes.length, bytes: bytes, expectedSecret: expectedSecret);
+    if (!preview.isValid) {
+      return ImportResult(error: preview.errorKey ?? 'error_import_failed');
+    }
+    if (preview.snapshot == null) {
+      return const ImportResult(error: 'error_import_failed');
+    }
+    return importFromSnapshot(provider, preview.snapshot!);
+  }
+
+  /// Applies a validated [snapshot] to the provider and persists changes.
+  static Future<ImportResult> importFromSnapshot(TaskProvider provider, AsaDataSnapshot snapshot) async {
+    try {
       int tasksImported = 0;
       int foldersImported = 0;
 

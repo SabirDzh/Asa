@@ -7,6 +7,7 @@ import '../../../core/export_import_service.dart';
 import '../../../core/logger_service.dart';
 import '../providers/settings_provider.dart';
 import '../../tasks/providers/task_provider.dart';
+import 'import_preview_bottom_sheet.dart';
 
 void showDataManagementSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -68,19 +69,36 @@ void showDataManagementSheet(BuildContext context) {
               defaultColor: textColor,
               onTap: () async {
                 Navigator.pop(ctx);
-                final result = await ExportImportService.importFromFile(taskProvider);
-                if (context.mounted && !result.cancelled) {
-                  final message = _formatResultMessage(
-                    success: result.success,
-                    error: result.error,
-                    successKey: 'import_success',
-                    failedKey: 'import_failed',
-                    settings: settings,
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
-                }
+                final picked = await ExportImportService.pickImportFile();
+                if (picked == null || !context.mounted) return;
+
+                final preview = ExportImportService.previewImport(
+                  fileName: picked.name,
+                  fileSize: picked.size,
+                  bytes: picked.bytes,
+                );
+
+                if (!context.mounted) return;
+                showImportPreviewBottomSheet(
+                  context,
+                  preview: preview,
+                  bytes: picked.bytes,
+                  taskProvider: taskProvider,
+                  onResult: (result) {
+                    if (!context.mounted) return;
+                    if (result.cancelled) return;
+                    final message = _formatResultMessage(
+                      success: result.success,
+                      error: result.error,
+                      successKey: 'import_success',
+                      failedKey: 'import_failed',
+                      settings: settings,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(message)),
+                    );
+                  },
+                );
               },
             ),
             _buildTile(

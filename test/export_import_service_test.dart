@@ -265,6 +265,64 @@ void main() {
       expect(result.success, false);
       expect(result.error, 'error_invalid_format');
     });
+
+    group('previewImport', () {
+      test('returns valid preview with task and folder counts', () {
+        final snapshot = AsaDataSnapshot(
+          version: '1.1.0',
+          exportedAt: 0,
+          tasks: [TaskItem(id: 't1', title: 'Remote task').toJson()],
+          folders: [FolderItem(id: 'f1', name: 'Remote folder').toJson()],
+        );
+
+        final preview = ExportImportService.previewImport(
+          fileName: 'backup.json',
+          fileSize: 1024,
+          bytes: _utf8(snapshot.toJson()),
+        );
+
+        expect(preview.isValid, true);
+        expect(preview.fileName, 'backup.json');
+        expect(preview.fileSizeLabel, '1.0 KB');
+        expect(preview.taskCount, 1);
+        expect(preview.folderCount, 1);
+        expect(preview.version, '1.1.0');
+        expect(preview.errorKey, isNull);
+      });
+
+      test('returns invalid preview for corrupted JSON', () {
+        final preview = ExportImportService.previewImport(
+          fileName: 'bad.json',
+          fileSize: 12,
+          bytes: utf8.encode('not json'),
+        );
+
+        expect(preview.isValid, false);
+        expect(preview.errorKey, 'error_invalid_json');
+      });
+
+      test('returns invalid preview when file is too large', () {
+        final preview = ExportImportService.previewImport(
+          fileName: 'huge.json',
+          fileSize: 20 * 1024 * 1024,
+          bytes: utf8.encode('{}'),
+        );
+
+        expect(preview.isValid, false);
+        expect(preview.errorKey, 'error_file_too_large');
+      });
+
+      test('returns invalid preview for missing required keys', () {
+        final preview = ExportImportService.previewImport(
+          fileName: 'incomplete.json',
+          fileSize: 100,
+          bytes: utf8.encode(jsonEncode({'version': '1.1.0'})),
+        );
+
+        expect(preview.isValid, false);
+        expect(preview.errorKey, 'error_missing_keys');
+      });
+    });
   });
 }
 

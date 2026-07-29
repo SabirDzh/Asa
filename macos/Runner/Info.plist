@@ -32,7 +32,7 @@
 	<string>This app needs access to the local network to discover nearby devices for syncing tasks.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_taskone-sync._tcp</string>
+		<string>_asa-sync._tcp</string>
 	</array>
 </dict>
 </plist>

@@ -20,8 +20,8 @@ class SyncPeer {
 
 /// Handles local-network P2P sync over mDNS + TCP sockets.
 class SyncService {
-  static const String _serviceType = '_taskone-sync._tcp';
-  static const String _defaultName = 'Taskone Device';
+  static const String _serviceType = '_asa-sync._tcp';
+  static const String _defaultName = 'ASA Device';
 
   static final SyncService instance = SyncService._();
   SyncService._();

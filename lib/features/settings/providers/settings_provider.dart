@@ -23,7 +23,7 @@ class SettingsProvider with ChangeNotifier {
   bool _showInWidget = true;
   WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
   bool _syncEnabled = false;
-  String _syncDeviceName = 'Taskone Device';
+  String _syncDeviceName = 'ASA Device';
   String? _syncSecret;
   bool _initialized = false;
   final _initCompleter = Completer<void>();
@@ -73,7 +73,7 @@ class SettingsProvider with ChangeNotifier {
         (prefs.getInt('widgetDisplayMode') ?? 0).clamp(0, WidgetDisplayMode.values.length - 1)
       ];
       _syncEnabled = prefs.getBool('syncEnabled') ?? false;
-      _syncDeviceName = prefs.getString('syncDeviceName') ?? 'Taskone Device';
+      _syncDeviceName = prefs.getString('syncDeviceName') ?? 'ASA Device';
       _syncSecret = prefs.getString('syncSecret');
       if (_syncSecret != null && _syncSecret!.trim().isEmpty) _syncSecret = null;
       timeDilation = _animationSpeed;
@@ -206,7 +206,7 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> setSyncDeviceName(String name) async {
     final trimmed = name.trim();
-    _syncDeviceName = trimmed.isEmpty ? 'Taskone Device' : trimmed;
+    _syncDeviceName = trimmed.isEmpty ? 'ASA Device' : trimmed;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('syncDeviceName', _syncDeviceName);

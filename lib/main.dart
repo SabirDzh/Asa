@@ -40,7 +40,7 @@ class AsaApp extends StatelessWidget {
     final settingsProvider = Provider.of<SettingsProvider>(context);
 
     return MaterialApp(
-      title: 'Taskone',
+      title: 'ASA',
       debugShowCheckedModeBanner: false,
       themeMode: settingsProvider.themeMode,
       theme: AppTheme.lightTheme,

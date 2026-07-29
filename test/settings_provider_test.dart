@@ -88,6 +88,33 @@ void main() {
     test('tr returns key for missing translation', () {
       expect(provider.tr('nonexistent_key'), 'nonexistent_key');
     });
+
+    test('ensureSyncDeviceId persists and reuses the same ID', () async {
+      await provider.ready;
+      final id = await provider.ensureSyncDeviceId();
+      expect(id, isNotEmpty);
+      expect(provider.syncDeviceId, id);
+
+      final id2 = await provider.ensureSyncDeviceId();
+      expect(id2, id);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('syncDeviceId'), id);
+
+      final other = SettingsProvider();
+      await other.ready;
+      final id3 = await other.ensureSyncDeviceId();
+      expect(id3, id);
+
+      // Concurrent calls before the ID is loaded should return the same
+      // in-flight future.
+      final fresh = SettingsProvider();
+      final f1 = fresh.ensureSyncDeviceId();
+      final f2 = fresh.ensureSyncDeviceId();
+      expect(identical(f1, f2), isTrue);
+      await fresh.ready;
+      expect(await f1, equals(await f2));
+    });
   });
 
   group('AppStrings', () {

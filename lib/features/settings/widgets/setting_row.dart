@@ -37,12 +37,15 @@ class SettingRow extends StatelessWidget {
               Icon(icon, color: iconColor ?? defaultIconColor, size: 24),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ),
               ),

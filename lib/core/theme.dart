@@ -57,7 +57,7 @@ class AppTheme {
   static const double navPadBottom = 24.0;
 
   static const double fabSize = 56.0;
-  static const double scrollHideThreshold = 8.0;
+  static const double scrollHideThreshold = 2.0;
 
   static const double sheetGap = 72.0;  // gap inside bottom sheet
   static const double sheetPadH = 16.0;

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_app_name">ASA</string>
+    <string name="widget_app_name">Taskone</string>
     <string name="widget_streak_format">Day %1$d</string>
     <string name="widget_active_tasks_zero">No active tasks</string>
     <string name="widget_active_tasks_one">1 active task</string>

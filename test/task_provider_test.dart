@@ -12,7 +12,7 @@ void main() {
       provider = TaskProvider();
     });
 
-    String _addTask(String title, {String? folderId}) {
+    String addTask(String title, {String? folderId}) {
       provider.addTask(title, folderId: folderId);
       return provider.allTasks.last.id;
     }
@@ -22,7 +22,7 @@ void main() {
     });
 
     test('addTask creates a task', () {
-      _addTask('Test task');
+      addTask('Test task');
       expect(provider.allTasks.length, 1);
       expect(provider.allTasks[0].title, 'Test task');
     });
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('toggleTask flips isCompleted', () {
-      final taskId = _addTask('Test');
+      final taskId = addTask('Test');
       expect(provider.allTasks.first.isCompleted, false);
 
       provider.toggleTask(taskId);
@@ -45,14 +45,14 @@ void main() {
     });
 
     test('updateTask changes title', () {
-      final taskId = _addTask('Old title');
+      final taskId = addTask('Old title');
 
       provider.updateTask(taskId, 'New title');
       expect(provider.allTasks.first.title, 'New title');
     });
 
     test('updateTask throws on >250 chars', () {
-      final taskId = _addTask('Test');
+      final taskId = addTask('Test');
 
       expect(
         () => provider.updateTask(taskId, 'a' * 251),
@@ -61,7 +61,7 @@ void main() {
     });
 
     test('removeTask soft-deletes the task', () {
-      final taskId = _addTask('Test');
+      final taskId = addTask('Test');
 
       provider.removeTask(taskId);
       expect(provider.tasks, isEmpty);
@@ -72,8 +72,8 @@ void main() {
     test('removeFolder soft-deletes folder and its tasks', () {
       provider.addFolder('Work');
       final folderId = provider.filteredFolders.first.id;
-      _addTask('Task 1', folderId: folderId);
-      _addTask('Task 2', folderId: folderId);
+      addTask('Task 1', folderId: folderId);
+      addTask('Task 2', folderId: folderId);
 
       provider.removeFolder(folderId);
       expect(provider.filteredFolders, isEmpty);
@@ -83,15 +83,15 @@ void main() {
     });
 
     test('clearAllTasks removes all tasks', () {
-      _addTask('Task 1');
-      _addTask('Task 2');
+      addTask('Task 1');
+      addTask('Task 2');
       provider.clearAllTasks();
       expect(provider.tasks, isEmpty);
     });
 
     test('clearAllData removes everything', () {
       provider.addFolder('Work');
-      _addTask('Task');
+      addTask('Task');
       provider.clearAllData();
       expect(provider.filteredFolders, isEmpty);
       expect(provider.tasks, isEmpty);
@@ -116,7 +116,7 @@ void main() {
     test('moveTaskToFolder moves task between folders', () {
       provider.addFolder('Work');
       final folderId = provider.filteredFolders.first.id;
-      final taskId = _addTask('Test task');
+      final taskId = addTask('Test task');
 
       provider.moveTaskToFolder(taskId, folderId);
       final folderTasks = provider.getFolderTasks(folderId);

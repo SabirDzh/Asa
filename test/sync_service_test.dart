@@ -51,7 +51,7 @@ void main() {
     tearDown(() async {
       await SyncService.instance.stop();
       SyncService.instance.setSecret(null);
-      SyncService.instance.setDeviceName('ASA Device');
+      SyncService.instance.setDeviceName('Taskone Device');
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
     });
@@ -74,7 +74,7 @@ void main() {
       expect(SyncService.instance.currentDeviceName, 'Phone');
 
       SyncService.instance.setDeviceName('   ');
-      expect(SyncService.instance.currentDeviceName, 'ASA Device');
+      expect(SyncService.instance.currentDeviceName, 'Taskone Device');
     });
 
     test('start binds to an available port', () async {

@@ -72,8 +72,8 @@ class NotificationService {
 
     const androidDetails = AndroidNotificationDetails(
       'asa_test_channel',
-      'ASA Test',
-      channelDescription: 'Test notifications from ASA',
+      'Taskone Test',
+      channelDescription: 'Test notifications from Taskone',
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
       showWhen: true,
@@ -83,7 +83,7 @@ class NotificationService {
 
     await _plugin.show(
       0,
-      'ASA',
+      'Taskone',
       'Уведомления включены',
       const NotificationDetails(android: androidDetails, iOS: iOSDetails),
     );

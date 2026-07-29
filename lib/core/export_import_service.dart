@@ -108,7 +108,7 @@ class ExportImportService {
       final xFile = XFile(file.path);
       await Share.shareXFiles(
         [xFile],
-        subject: 'ASA backup',
+        subject: 'Taskone backup',
       );
 
       LoggerService.instance.i('Exported ${snapshot.tasks.length} tasks, ${snapshot.folders.length} folders');

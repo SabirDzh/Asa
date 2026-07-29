@@ -77,7 +77,7 @@ class _SplashBody extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'ASA',
+              'Taskone',
               style: TextStyle(
                 color: textColor,
                 fontFamily: 'Inter',

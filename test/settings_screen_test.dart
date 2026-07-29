@@ -80,8 +80,8 @@ void main() {
     await tester.tap(aboutFinder);
     await tester.pumpAndSettle();
 
-    expect(find.text('О приложении ASA'), findsOneWidget);
-    expect(find.text('Версия 1.1.0'), findsOneWidget);
+    expect(find.text('О приложении Taskone'), findsOneWidget);
+    expect(find.text('Версия Taskone 1.1.0'), findsOneWidget);
   });
 
   testWidgets('shows data management sheet on tap', (tester) async {

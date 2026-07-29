@@ -25,6 +25,7 @@ class FolderDetailScreen extends StatefulWidget {
 
 class _FolderDetailScreenState extends State<FolderDetailScreen> {
   final ScrollController _breadcrumbScroll = ScrollController();
+  bool _fabVisible = true;
 
   @override
   void initState() {
@@ -43,6 +44,17 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   void dispose() {
     _breadcrumbScroll.dispose();
     super.dispose();
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification) return false;
+    final delta = notification.scrollDelta ?? 0;
+    if (delta > AppTheme.scrollHideThreshold) {
+      if (_fabVisible) setState(() => _fabVisible = false);
+    } else if (delta < -AppTheme.scrollHideThreshold) {
+      if (!_fabVisible) setState(() => _fabVisible = true);
+    }
+    return false;
   }
 
   void _showCreateSheet(BuildContext context, {required bool isTask}) {
@@ -151,16 +163,30 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         ],
                       ),
                     ),
-                    Expanded(child: _FolderContent(folder: widget.folder)),
-                  ],
+                    Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: _FolderContent(folder: widget.folder),
+                  ),
                 ),
-                Positioned.fill(
+              ],
+            ),
+            Positioned.fill(
+              child: AnimatedOpacity(
+                opacity: _fabVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                child: IgnorePointer(
+                  ignoring: !_fabVisible,
                   child: _FolderFloatingMenu(
                     onMenuClose: () {},
                     showCreateSheet: _showCreateSheet,
                     bottomOffset: AppTheme.navHeight,
+                    isVisible: _fabVisible,
                   ),
                 ),
+              ),
+            ),
               ],
             ),
           ),
@@ -375,11 +401,13 @@ class _FolderFloatingMenu extends StatefulWidget {
   final VoidCallback onMenuClose;
   final void Function(BuildContext, {required bool isTask}) showCreateSheet;
   final double bottomOffset;
+  final bool isVisible;
 
   const _FolderFloatingMenu({
     required this.onMenuClose,
     required this.showCreateSheet,
     this.bottomOffset = 0.0,
+    this.isVisible = true,
   });
 
   @override
@@ -388,6 +416,17 @@ class _FolderFloatingMenu extends StatefulWidget {
 
 class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
   bool _isOpen = false;
+
+  @override
+  void didUpdateWidget(covariant _FolderFloatingMenu oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isVisible && _isOpen) {
+      setState(() {
+        _isOpen = false;
+      });
+      widget.onMenuClose();
+    }
+  }
 
   void _toggleMenu() {
     setState(() => _isOpen = !_isOpen);

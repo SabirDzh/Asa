@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _navIndex = 0;
   late final PageController _pageController;
   final TextEditingController _searchController = TextEditingController();
+  bool _fabVisible = true;
 
   @override
   void initState() {
@@ -210,16 +211,21 @@ class _HomeScreenState extends State<HomeScreen> {
       bottom: false,
       child: Stack(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSearchBar(),
-              const Expanded(child: _HomeFolderList()),
-            ],
+          NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSearchBar(),
+                const Expanded(child: _HomeFolderList()),
+              ],
+            ),
           ),
-          Positioned(
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
             right: AppTheme.screenPad,
-            bottom: AppTheme.screenPad,
+            bottom: _fabVisible ? AppTheme.screenPad : -AppTheme.fabSize - AppTheme.screenPad,
             child: GestureDetector(
               onTap: () => _showCreateFolderSheet(context),
               child: Container(
@@ -316,6 +322,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification) return false;
+    final delta = notification.scrollDelta ?? 0;
+    if (delta > AppTheme.scrollHideThreshold) {
+      if (_fabVisible) setState(() => _fabVisible = false);
+    } else if (delta < -AppTheme.scrollHideThreshold) {
+      if (!_fabVisible) setState(() => _fabVisible = true);
+    }
+    return false;
   }
 
   void _showCreateFolderSheet(BuildContext context) {

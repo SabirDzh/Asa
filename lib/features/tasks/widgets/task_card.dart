@@ -203,7 +203,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         context: iconContext,
         builder: (ctx) => AlertDialog(
           backgroundColor: bg,
-          title: Text(settings.tr('confirm_delete_title'), style: const TextStyle(color: Colors.white)),
+          title: Text(settings.tr('confirm_delete_title'), style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight)),
           content: Text(
             settings.tr('confirm_delete_content'),
             style: TextStyle(color: text),
@@ -490,7 +490,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
             ),
             child: Row(
               children: [
-                const Icon(Iconsax.clipboard_tick, color: Colors.white, size: 24),
+                Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
                 const SizedBox(width: AppTheme.rowGap),
                 Expanded(
                   child: Padding(
@@ -498,11 +498,11 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                     child: Text(
                       widget.task.title,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: textSecondary,
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                         decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
-                        decorationColor: Colors.white,
+                        decorationColor: textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -515,12 +515,12 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                       top: 16,
                       bottom: 16,
                     ),
-                    child: Icon(Iconsax.more_square, color: Colors.white, size: 24),
+                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
                   ),
                 AnimatedTaskCheckbox(
                   isCompleted: widget.task.isCompleted,
                   onTap: () {},
-                  textSecondary: Colors.white,
+                  textSecondary: textSecondary,
                   padding: const EdgeInsets.only(
                     left: AppTheme.rowGap,
                     right: AppTheme.rowPadH,

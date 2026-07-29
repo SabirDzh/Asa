@@ -136,7 +136,7 @@ class _FolderRowState extends State<FolderRow> {
         context: iconContext,
         builder: (ctx) => AlertDialog(
           backgroundColor: bg,
-          title: Text(settings.tr('confirm_delete_title'), style: const TextStyle(color: Colors.white)),
+          title: Text(settings.tr('confirm_delete_title'), style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight)),
           content: Text(
             settings.tr('confirm_delete_content'),
             style: TextStyle(color: text),
@@ -351,15 +351,15 @@ class _FolderRowState extends State<FolderRow> {
             ),
             child: Row(
               children: [
-                _dragIcon(),
+                _dragIcon(textSecondary),
                 const SizedBox(width: AppTheme.rowGap),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(right: AppTheme.rowGap),
                     child: Text(
                       widget.folder.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: textSecondary,
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                       ),
@@ -375,7 +375,7 @@ class _FolderRowState extends State<FolderRow> {
                       top: 16,
                       bottom: 16,
                     ),
-                    child: Icon(Iconsax.more_square, color: Colors.white, size: 24),
+                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
                   )
                 else
                   const SizedBox(width: AppTheme.rowPadH),
@@ -392,7 +392,7 @@ class _FolderRowState extends State<FolderRow> {
     );
   }
 
-  Widget _dragIcon() => _buildFolderIcon(color: Colors.white);
+  Widget _dragIcon(Color textSecondary) => _buildFolderIcon(color: textSecondary);
 
   Widget _folderIcon(Color textSecondary) =>
       _buildFolderIcon(color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary);

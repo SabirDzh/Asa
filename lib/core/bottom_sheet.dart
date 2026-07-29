@@ -128,7 +128,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _handleBar(),
+            _handleBar(isDark: Theme.of(context).brightness == Brightness.dark),
             const SizedBox(height: AppTheme.sheetGap),
             _inputRow(),
             if (widget.folderIconAssets != null && widget.folderIconAssets!.isNotEmpty) ...[
@@ -165,10 +165,10 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
   }
 
   Widget _inputRow() {
-    final isDark =
-        WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-            Brightness.dark;
-    final iconColor = isDark ? Colors.white70 : Colors.black54;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textColor = isDark ? AppColors.textDark : AppColors.textLight;
+    final hintColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     Future<void> handlePaste() async {
       final text = await getClipboardText();
@@ -201,13 +201,13 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
               autofocus: true,
               inputFormatters: [textInputFormatter()],
               style: TextStyle(
-                color: isDark ? Colors.white : Colors.black,
+                color: textColor,
                 fontSize: 16,
               ),
               decoration: InputDecoration(
                 hintText: widget.hintText,
                 hintStyle: TextStyle(
-                  color: isDark ? Colors.white54 : Colors.black54,
+                  color: hintColor,
                   fontSize: 16,
                 ),
                 border: InputBorder.none,
@@ -345,13 +345,13 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
   }
 }
 
-Widget _handleBar() {
+Widget _handleBar({required bool isDark}) {
   return Center(
     child: Container(
       width: 48,
       height: 4,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white54 : Colors.black26,
         borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
       ),
     ),

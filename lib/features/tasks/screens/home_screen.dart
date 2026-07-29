@@ -265,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen
         AppTheme.screenPad,
         AppTheme.screenPad,
         AppTheme.screenPad,
-        36,
+        AppTheme.screenPad,
       ),
       child: Container(
         height: AppTheme.rowHeight,

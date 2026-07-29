@@ -53,21 +53,23 @@ void main() {
 
   group('FolderItem', () {
     test('toJson / fromJson round-trip', () {
-      final folder = FolderItem(id: 'f1', name: 'Work', isSystemStreak: false, parentFolderId: null);
+      final folder = FolderItem(id: 'f1', name: 'Work', isSystemStreak: false, parentFolderId: null, iconAsset: 'assets/icons/work.svg');
       final json = folder.toJson();
       final restored = FolderItem.fromJson(json);
       expect(restored.id, 'f1');
       expect(restored.name, 'Work');
       expect(restored.isSystemStreak, false);
       expect(restored.parentFolderId, null);
+      expect(restored.iconAsset, 'assets/icons/work.svg');
     });
 
     test('copyWith preserves unchanged fields', () {
       final folder = FolderItem(id: 'f1', name: 'Work');
-      final copy = folder.copyWith(name: 'Personal');
+      final copy = folder.copyWith(name: 'Personal', iconAsset: 'assets/icons/study.svg');
       expect(copy.id, 'f1');
       expect(copy.name, 'Personal');
       expect(copy.isSystemStreak, false);
+      expect(copy.iconAsset, 'assets/icons/study.svg');
     });
   });
 }

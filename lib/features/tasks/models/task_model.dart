@@ -104,6 +104,7 @@ class FolderItem {
   String name;
   final bool isSystemStreak;
   String? parentFolderId;
+  String? iconAsset;
   final DateTime createdAt;
   final DateTime updatedAt;
   bool isDeleted;
@@ -113,6 +114,7 @@ class FolderItem {
     required this.name,
     this.isSystemStreak = false,
     this.parentFolderId,
+    this.iconAsset,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isDeleted = false,
@@ -124,6 +126,7 @@ class FolderItem {
         'name': name,
         'isSystemStreak': isSystemStreak,
         'parentFolderId': parentFolderId,
+        'iconAsset': iconAsset,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'isDeleted': isDeleted,
@@ -134,6 +137,7 @@ class FolderItem {
         name: json['name'],
         isSystemStreak: json['isSystemStreak'] ?? false,
         parentFolderId: json['parentFolderId'],
+        iconAsset: json['iconAsset'],
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
@@ -148,6 +152,7 @@ class FolderItem {
     String? name,
     bool? isSystemStreak,
     Object? parentFolderId = const Object(),
+    Object? iconAsset = const Object(),
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isDeleted,
@@ -159,6 +164,9 @@ class FolderItem {
       parentFolderId: parentFolderId == const Object()
           ? this.parentFolderId
           : parentFolderId as String?,
+      iconAsset: iconAsset == const Object()
+          ? this.iconAsset
+          : iconAsset as String?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,

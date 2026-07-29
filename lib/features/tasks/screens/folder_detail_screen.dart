@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
+import '../../../core/folder_icons.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/responsive_center.dart';
 import '../models/task_model.dart';
@@ -46,6 +48,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   void _showCreateSheet(BuildContext context, {required bool isTask}) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final controller = TextEditingController();
+    String? selectedIcon;
     showInputSheet(
       context: context,
       icon: isTask ? Iconsax.clipboard_tick : Iconsax.folder_minus,
@@ -55,6 +58,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         tooltip: settings.tr('paste'),
         errorText: settings.tr('paste_error'),
       ),
+      folderIconAssets: isTask ? null : folderIconAssets,
+      onIconSelected: (asset) => selectedIcon = asset,
+      noIconLabel: settings.tr('default_icon'),
+      iconLabels: isTask ? null : folderIconLabels(settings.tr),
+      iconPickerTitle: settings.tr('folder_icon'),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {
@@ -68,6 +76,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               context.read<TaskProvider>().addFolder(
                 v,
                 parentFolderId: widget.folder.id,
+                iconAsset: selectedIcon,
               );
             }
           } catch (e) {
@@ -223,13 +232,7 @@ class _Breadcrumbs extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isLast) ...[
-                          Icon(
-                            f.isSystemStreak
-                                ? Iconsax.calendar_1
-                                : Iconsax.folder_minus,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
+                          _folderIcon(f, AppColors.primary),
                           const SizedBox(width: 8),
                         ],
                         Text(
@@ -248,6 +251,22 @@ class _Breadcrumbs extends StatelessWidget {
               );
             }).toList(),
       ),
+    );
+  }
+
+  Widget _folderIcon(FolderItem folder, Color color) {
+    if (folder.iconAsset != null && folder.iconAsset!.isNotEmpty) {
+      return SvgPicture.asset(
+        folder.iconAsset!,
+        width: 24,
+        height: 24,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
+    }
+    return Icon(
+      folder.isSystemStreak ? Iconsax.calendar_1 : Iconsax.folder_minus,
+      color: color,
+      size: 24,
     );
   }
 }

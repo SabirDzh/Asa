@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
+import '../../../core/folder_icons.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../screens/folder_detail_screen.dart';
@@ -26,6 +28,7 @@ class _FolderRowState extends State<FolderRow> {
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final controller = TextEditingController(text: widget.folder.name);
+    String? selectedIcon = widget.folder.iconAsset;
     showInputSheet(
       context: context,
       icon: Iconsax.folder_minus,
@@ -35,11 +38,21 @@ class _FolderRowState extends State<FolderRow> {
         tooltip: settings.tr('paste'),
         errorText: settings.tr('paste_error'),
       ),
+      folderIconAssets: folderIconAssets,
+      selectedIconAsset: selectedIcon,
+      onIconSelected: (asset) => selectedIcon = asset,
+      noIconLabel: settings.tr('default_icon'),
+      iconLabels: folderIconLabels(settings.tr),
+      iconPickerTitle: settings.tr('folder_icon'),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {
           try {
-            context.read<TaskProvider>().updateFolder(widget.folder.id, v);
+            context.read<TaskProvider>().updateFolder(
+              widget.folder.id,
+              v,
+              iconAsset: selectedIcon,
+            );
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
@@ -173,11 +186,7 @@ class _FolderRowState extends State<FolderRow> {
           ),
           child: Row(
           children: [
-            Icon(
-              widget.folder.isSystemStreak ? Iconsax.calendar_1 : Iconsax.folder_minus,
-              color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary,
-              size: 24,
-            ),
+            _folderIcon(textSecondary),
             const SizedBox(width: AppTheme.rowGap),
             Expanded(
               child: Text(
@@ -280,7 +289,7 @@ class _FolderRowState extends State<FolderRow> {
             ),
             child: Row(
               children: [
-                const Icon(Iconsax.folder_minus, color: Colors.white, size: 24),
+                _dragIcon(),
                 const SizedBox(width: AppTheme.rowGap),
                 Expanded(
                   child: Text(
@@ -315,6 +324,27 @@ class _FolderRowState extends State<FolderRow> {
         child: dragTargetChild,
       ),
       child: dragTargetChild,
+    );
+  }
+
+  Widget _dragIcon() => _buildFolderIcon(color: Colors.white);
+
+  Widget _folderIcon(Color textSecondary) =>
+      _buildFolderIcon(color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary);
+
+  Widget _buildFolderIcon({required Color color}) {
+    if (widget.folder.iconAsset != null && widget.folder.iconAsset!.isNotEmpty) {
+      return SvgPicture.asset(
+        widget.folder.iconAsset!,
+        width: 24,
+        height: 24,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
+    }
+    return Icon(
+      widget.folder.isSystemStreak ? Iconsax.calendar_1 : Iconsax.folder_minus,
+      color: color,
+      size: 24,
     );
   }
 }

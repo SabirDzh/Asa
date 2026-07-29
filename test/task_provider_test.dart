@@ -33,6 +33,11 @@ void main() {
       expect(provider.filteredFolders[0].name, 'Work');
     });
 
+    test('addFolder stores iconAsset', () {
+      provider.addFolder('Work', iconAsset: 'assets/icons/work.svg');
+      expect(provider.filteredFolders.first.iconAsset, 'assets/icons/work.svg');
+    });
+
     test('toggleTask flips isCompleted', () {
       final taskId = _addTask('Test');
       expect(provider.allTasks.first.isCompleted, false);

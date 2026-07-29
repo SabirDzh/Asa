@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
+import '../../../core/folder_icons.dart';
 import '../../../core/responsive_center.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
@@ -320,6 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showCreateFolderSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final controller = TextEditingController();
+    String? selectedIcon;
     showInputSheet(
       context: context,
       icon: Iconsax.folder_minus,
@@ -329,11 +331,16 @@ class _HomeScreenState extends State<HomeScreen> {
         tooltip: settings.tr('paste'),
         errorText: settings.tr('paste_error'),
       ),
+      folderIconAssets: folderIconAssets,
+      onIconSelected: (asset) => selectedIcon = asset,
+      noIconLabel: settings.tr('default_icon'),
+      iconLabels: folderIconLabels(settings.tr),
+      iconPickerTitle: settings.tr('folder_icon'),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {
           try {
-            context.read<TaskProvider>().addFolder(v);
+            context.read<TaskProvider>().addFolder(v, iconAsset: selectedIcon);
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

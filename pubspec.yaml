@@ -28,6 +28,7 @@ dependencies:
   bonsoir: ^5.1.10
   device_calendar: ^4.3.0
   timezone: ^0.9.4
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -54,6 +55,8 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
   fonts:
     - family: Inter
       fonts:

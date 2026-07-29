@@ -477,13 +477,13 @@ class TaskProvider with ChangeNotifier {
     );
   }
 
-  void addFolder(String name, {String? parentFolderId}) {
+  void addFolder(String name, {String? parentFolderId, String? iconAsset}) {
     if (name.isEmpty) return;
     if (name.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
     _folders.add(
-      FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId, updatedAt: DateTime.now()),
+      FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId, iconAsset: iconAsset, updatedAt: DateTime.now()),
     );
     _foldersVersion++;
     notifyListeners();
@@ -521,13 +521,13 @@ class TaskProvider with ChangeNotifier {
     await _saveToPrefs();
   }
 
-  void updateFolder(String id, String newName) {
+  void updateFolder(String id, String newName, {String? iconAsset}) {
     final index = _folders.indexWhere((f) => f.id == id);
     if (index != -1 && !_folders[index].isSystemStreak) {
       if (newName.length > 250) {
         throw Exception('Название длиннее 250 символов');
       }
-      _folders[index] = _folders[index].copyWith(name: newName, updatedAt: DateTime.now());
+      _folders[index] = _folders[index].copyWith(name: newName, iconAsset: iconAsset, updatedAt: DateTime.now());
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();

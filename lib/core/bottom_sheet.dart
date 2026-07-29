@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:iconsax/iconsax.dart';
 
 import 'clipboard_utils.dart';
 import 'theme.dart';
@@ -22,6 +24,12 @@ void showInputSheet({
   required TextEditingController controller,
   required void Function(String, BuildContext) onSubmit,
   InputPasteOptions? paste,
+  List<String>? folderIconAssets,
+  String? selectedIconAsset,
+  ValueChanged<String?>? onIconSelected,
+  String? noIconLabel,
+  Map<String, String>? iconLabels,
+  String? iconPickerTitle,
 }) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final inputBg = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
@@ -39,6 +47,12 @@ void showInputSheet({
       sheetBg: sheetBg,
       paste: paste,
       onSubmit: onSubmit,
+      folderIconAssets: folderIconAssets,
+      selectedIconAsset: selectedIconAsset,
+      onIconSelected: onIconSelected,
+      noIconLabel: noIconLabel,
+      iconLabels: iconLabels,
+      iconPickerTitle: iconPickerTitle,
     ),
   );
 }
@@ -51,6 +65,12 @@ class _InputSheetBody extends StatefulWidget {
   final Color sheetBg;
   final InputPasteOptions? paste;
   final void Function(String, BuildContext) onSubmit;
+  final List<String>? folderIconAssets;
+  final String? selectedIconAsset;
+  final ValueChanged<String?>? onIconSelected;
+  final String? noIconLabel;
+  final Map<String, String>? iconLabels;
+  final String? iconPickerTitle;
 
   const _InputSheetBody({
     required this.icon,
@@ -60,6 +80,12 @@ class _InputSheetBody extends StatefulWidget {
     required this.sheetBg,
     required this.paste,
     required this.onSubmit,
+    this.folderIconAssets,
+    this.selectedIconAsset,
+    this.onIconSelected,
+    this.noIconLabel,
+    this.iconLabels,
+    this.iconPickerTitle,
   });
 
   @override
@@ -68,6 +94,18 @@ class _InputSheetBody extends StatefulWidget {
 
 class _InputSheetBodyState extends State<_InputSheetBody> {
   String? _errorText;
+  String? _selectedIconAsset;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIconAsset = widget.selectedIconAsset;
+  }
+
+  void _selectIcon(String? asset) {
+    setState(() => _selectedIconAsset = asset);
+    widget.onIconSelected?.call(asset);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +131,22 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
             _handleBar(),
             const SizedBox(height: AppTheme.sheetGap),
             _inputRow(),
+            if (widget.folderIconAssets != null && widget.folderIconAssets!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              if (widget.iconPickerTitle != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    widget.iconPickerTitle!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              _iconPicker(),
+            ],
             if (_errorText != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -190,6 +244,72 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
   String _truncate(String text) {
     if (text.length <= kMaxTextInputLength) return text;
     return text.substring(0, kMaxTextInputLength);
+  }
+
+  Widget _iconPicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = AppColors.primary;
+    final inactiveColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    return SizedBox(
+      height: 56,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        children: [
+          _iconTile(null, activeColor, inactiveColor),
+          for (final asset in widget.folderIconAssets!) _iconTile(asset, activeColor, inactiveColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconTile(String? asset, Color activeColor, Color inactiveColor) {
+    final isSelected = _selectedIconAsset == asset;
+    final tile = Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: () => _selectIcon(asset),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor.withValues(alpha: 0.15) : null,
+            border: Border.all(
+              color: isSelected ? activeColor : inactiveColor.withValues(alpha: 0.3),
+              width: 2,
+            ),
+            borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+          ),
+          alignment: Alignment.center,
+          child: asset == null
+              ? Icon(Iconsax.folder_minus, color: inactiveColor, size: 24)
+              : SvgPicture.asset(
+                  asset,
+                  width: 24,
+                  height: 24,
+                  colorFilter: ColorFilter.mode(
+                    isSelected ? activeColor : inactiveColor,
+                    BlendMode.srcIn,
+                  ),
+                ),
+        ),
+      ),
+    );
+    return Tooltip(
+      message: _iconLabel(asset),
+      child: tile,
+    );
+  }
+
+  String _iconLabel(String? asset) {
+    if (asset == null) return widget.noIconLabel ?? 'Default icon';
+    if (widget.iconLabels != null && widget.iconLabels!.containsKey(asset)) {
+      return widget.iconLabels![asset]!;
+    }
+    final name = asset.split('/').last.replaceAll('.svg', '');
+    if (name.isEmpty) return asset;
+    return '${name[0].toUpperCase()}${name.substring(1)}';
   }
 
   Widget _buildContextMenu({

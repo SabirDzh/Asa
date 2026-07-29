@@ -99,7 +99,7 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                 labelStyle: TextStyle(color: widget.textSecondary),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onChanged: (value) => _updateDeviceName(value),
+              onSubmitted: (value) => _updateDeviceName(value),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -113,7 +113,7 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                 hintStyle: TextStyle(color: widget.textSecondary.withValues(alpha: 0.6)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onChanged: (value) => _updateSecret(value),
+              onSubmitted: (value) => _updateSecret(value),
             ),
             const SizedBox(height: 16),
             Row(

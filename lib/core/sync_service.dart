@@ -43,6 +43,7 @@ class SyncService {
   final List<SyncPeer> _peers = [];
   bool _running = false;
   int? _actualPort;
+  List<String> _localAddresses = [];
 
   bool get isRunning => _running;
   int? get actualPort => _actualPort;
@@ -199,6 +200,7 @@ class SyncService {
 
   Future<void> _startDiscovery() async {
     try {
+      _localAddresses = await _loadLocalAddresses();
       _discovery = BonsoirDiscovery(type: _serviceType);
       await _discovery!.ready;
 
@@ -243,9 +245,37 @@ class SyncService {
   }
 
   void _addPeer(SyncPeer peer) {
+    // Don't show our own device in the peers list.
+    if (_isOwnPeer(peer)) return;
     _peers.removeWhere((p) => p.name == peer.name);
     _peers.add(peer);
     _peersController.add(List.unmodifiable(_peers));
+  }
+
+  /// Returns true if [peer] is this device.
+  ///
+  /// Uses the listening port and local network addresses; the name check is a
+  /// fallback for hosts/MDNS records that don't expose a usable IP.
+  bool _isOwnPeer(SyncPeer peer) {
+    if (peer.port != _actualPort) return false;
+    if (peer.host == '127.0.0.1' || peer.host == 'localhost') return true;
+    if (_localAddresses.contains(peer.host)) return true;
+    // Fallback: exact match by broadcast name.
+    return peer.name == _deviceName;
+  }
+
+  /// Loads local network interface addresses so we can recognize ourselves.
+  Future<List<String>> _loadLocalAddresses() async {
+    try {
+      final interfaces = await NetworkInterface.list();
+      return interfaces
+          .expand((interface) => interface.addresses)
+          .map((addr) => addr.address)
+          .toList();
+    } on Exception catch (error, stackTrace) {
+      LoggerService.instance.w('Failed to load local network interfaces', error: error, stackTrace: stackTrace);
+      return [];
+    }
   }
 
   void _removePeer(String name) {

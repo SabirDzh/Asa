@@ -4,6 +4,8 @@ class TaskItem {
   bool isCompleted;
   String? folderId;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  bool isDeleted;
 
   TaskItem({
     required this.id,
@@ -11,7 +13,10 @@ class TaskItem {
     this.isCompleted = false,
     this.folderId,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+    DateTime? updatedAt,
+    this.isDeleted = false,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -19,6 +24,8 @@ class TaskItem {
         'isCompleted': isCompleted,
         'folderId': folderId,
         'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'isDeleted': isDeleted,
       };
 
   factory TaskItem.fromJson(Map<String, dynamic> json) => TaskItem(
@@ -29,6 +36,10 @@ class TaskItem {
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
+        updatedAt: json['updatedAt'] != null
+            ? DateTime.parse(json['updatedAt'])
+            : DateTime.now(),
+        isDeleted: json['isDeleted'] ?? false,
       );
 
   TaskItem copyWith({
@@ -37,6 +48,8 @@ class TaskItem {
     bool? isCompleted,
     Object? folderId = const Object(),
     DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isDeleted,
   }) {
     return TaskItem(
       id: id ?? this.id,
@@ -44,6 +57,8 @@ class TaskItem {
       isCompleted: isCompleted ?? this.isCompleted,
       folderId: folderId == const Object() ? this.folderId : folderId as String?,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }
@@ -54,6 +69,8 @@ class FolderItem {
   final bool isSystemStreak;
   String? parentFolderId;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  bool isDeleted;
 
   FolderItem({
     required this.id,
@@ -61,7 +78,10 @@ class FolderItem {
     this.isSystemStreak = false,
     this.parentFolderId,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+    DateTime? updatedAt,
+    this.isDeleted = false,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -69,6 +89,8 @@ class FolderItem {
         'isSystemStreak': isSystemStreak,
         'parentFolderId': parentFolderId,
         'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'isDeleted': isDeleted,
       };
 
   factory FolderItem.fromJson(Map<String, dynamic> json) => FolderItem(
@@ -79,6 +101,10 @@ class FolderItem {
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
+        updatedAt: json['updatedAt'] != null
+            ? DateTime.parse(json['updatedAt'])
+            : DateTime.now(),
+        isDeleted: json['isDeleted'] ?? false,
       );
 
   FolderItem copyWith({
@@ -87,6 +113,8 @@ class FolderItem {
     bool? isSystemStreak,
     Object? parentFolderId = const Object(),
     DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isDeleted,
   }) {
     return FolderItem(
       id: id ?? this.id,
@@ -96,6 +124,8 @@ class FolderItem {
           ? this.parentFolderId
           : parentFolderId as String?,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

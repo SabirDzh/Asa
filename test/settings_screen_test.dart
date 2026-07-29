@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:asa/features/settings/screens/settings_screen.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
+import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 
 Widget createTestApp({bool standalone = true}) {
@@ -33,27 +34,23 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('renders all setting rows', (tester) async {
+  testWidgets('renders all setting groups', (tester) async {
     await pumpAndInit(tester, createTestApp());
 
     final scrollable = find.byType(Scrollable).first;
-
     Future<void> expectVisible(String text) async {
       final finder = find.text(text);
-      await tester.scrollUntilVisible(finder, 80, scrollable: scrollable);
+      await tester.scrollUntilVisible(finder, 60, scrollable: scrollable);
       await tester.pumpAndSettle();
       expect(finder, findsOneWidget);
     }
 
-    await expectVisible('Уведомления');
-    await expectVisible('Тема приложения: Системная');
-    await expectVisible('Показывать задачи в виджете');
-    await expectVisible('Что отображать: Стрик');
-    await expectVisible('Масштаб интерфейса: Стандарт');
-    await expectVisible('Управление данными');
-    await expectVisible('Язык: русский');
-    await expectVisible('Плавность анимации: Обычно');
-    await expectVisible('О приложении');
+    expect(find.text('Настройки'), findsOneWidget);
+    await expectVisible('ВНЕШНИЙ ВИД');
+    await expectVisible('СИНХРОНИЗАЦИЯ И ОБМЕН');
+    await expectVisible('УВЕДОМЛЕНИЯ И ДАННЫЕ');
+    await expectVisible('ДРУГОЕ');
+    expect(find.byType(SettingRow), findsWidgets);
   });
 
   testWidgets('renders avatar section', (tester) async {

@@ -39,8 +39,11 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  List<TaskItem> get tasks => List.unmodifiable(_tasks);
-  List<FolderItem> get folders => List.unmodifiable(_folders);
+  /// Active (non-deleted) tasks.
+  List<TaskItem> get tasks => List.unmodifiable(_tasks.where((t) => !t.isDeleted));
+
+  /// Active (non-deleted) folders, including the system streak folder.
+  List<FolderItem> get folders => List.unmodifiable(_folders.where((f) => !f.isDeleted));
   String get searchQuery => _searchQuery;
   TaskFilter get filter => _filter;
   int get streakCount => _streakCount;
@@ -151,7 +154,7 @@ class TaskProvider with ChangeNotifier {
   List<FolderItem> get filteredFolders {
     if (_filter == TaskFilter.completed) return [];
     return _folders.where((f) {
-      if (f.parentFolderId != null) {
+      if (f.isDeleted || f.parentFolderId != null) {
         return false;
       }
       if (_searchQuery.isEmpty) {
@@ -164,7 +167,7 @@ class TaskProvider with ChangeNotifier {
   // Subfolders inside a specific parent folder
   List<FolderItem> getSubfolders(String parentFolderId) {
     return _folders.where((f) {
-      if (f.parentFolderId != parentFolderId) {
+      if (f.isDeleted || f.parentFolderId != parentFolderId) {
         return false;
       }
       if (_searchQuery.isEmpty) {
@@ -179,7 +182,7 @@ class TaskProvider with ChangeNotifier {
       return [];
     }
     return _tasks.where((t) {
-      if (t.isCompleted) return false;
+      if (t.isDeleted || t.isCompleted) return false;
       if (_searchQuery.isEmpty) return true;
       return t.title.toLowerCase().contains(_searchQuery);
     }).toList();
@@ -190,14 +193,14 @@ class TaskProvider with ChangeNotifier {
       return [];
     }
     return _tasks.where((t) {
-      if (!t.isCompleted) return false;
+      if (t.isDeleted || !t.isCompleted) return false;
       if (_searchQuery.isEmpty) return true;
       return t.title.toLowerCase().contains(_searchQuery);
     }).toList();
   }
 
   List<TaskItem> getFolderTasks(String folderId) {
-    return _tasks.where((t) => t.folderId == folderId).toList();
+    return _tasks.where((t) => t.folderId == folderId && !t.isDeleted).toList();
   }
 
   List<TaskItem> get allTasks => List.unmodifiable(_tasks);
@@ -206,7 +209,7 @@ class TaskProvider with ChangeNotifier {
   void moveTaskToFolder(String taskId, String? targetFolderId) {
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(folderId: targetFolderId);
+      _tasks[index] = _tasks[index].copyWith(folderId: targetFolderId, updatedAt: DateTime.now());
       notifyListeners();
       _saveToPrefs();
     }
@@ -216,7 +219,7 @@ class TaskProvider with ChangeNotifier {
     if (folderId == targetParentFolderId) return;
     final index = _folders.indexWhere((f) => f.id == folderId);
     if (index != -1 && !_folders[index].isSystemStreak) {
-      _folders[index] = _folders[index].copyWith(parentFolderId: targetParentFolderId);
+      _folders[index] = _folders[index].copyWith(parentFolderId: targetParentFolderId, updatedAt: DateTime.now());
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
@@ -279,9 +282,31 @@ class TaskProvider with ChangeNotifier {
     if (title.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
-    _tasks.add(TaskItem(id: _uuid.v4(), title: title, folderId: folderId));
+    _tasks.add(TaskItem(id: _uuid.v4(), title: title, folderId: folderId, updatedAt: DateTime.now()));
     notifyListeners();
     _saveToPrefs();
+  }
+
+  /// Adds a raw [task] directly, used by import/sync flows.
+  void addTaskRaw(TaskItem task) {
+    _tasks.add(task);
+    notifyListeners();
+    _saveToPrefs();
+  }
+
+  /// Upserts a task during import/sync, updating the existing record if it
+  /// already exists. Returns true if the item was changed.
+  bool upsertTask(TaskItem task) {
+    final index = _tasks.indexWhere((t) => t.id == task.id);
+    if (index == -1) {
+      _tasks.add(task);
+      return true;
+    }
+    if (task.updatedAt.isAfter(_tasks[index].updatedAt)) {
+      _tasks[index] = task;
+      return true;
+    }
+    return false;
   }
 
   void toggleTask(String id) {
@@ -289,6 +314,7 @@ class TaskProvider with ChangeNotifier {
     if (index != -1) {
       _tasks[index] = _tasks[index].copyWith(
         isCompleted: !_tasks[index].isCompleted,
+        updatedAt: DateTime.now(),
       );
       notifyListeners();
       _saveToPrefs();
@@ -296,9 +322,12 @@ class TaskProvider with ChangeNotifier {
   }
 
   void removeTask(String id) {
-    _tasks.removeWhere((t) => t.id == id);
-    notifyListeners();
-    _saveToPrefs();
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index != -1) {
+      _tasks[index] = _tasks[index].copyWith(isDeleted: true, updatedAt: DateTime.now());
+      notifyListeners();
+      _saveToPrefs();
+    }
   }
 
   void updateTask(String id, String newTitle) {
@@ -307,7 +336,7 @@ class TaskProvider with ChangeNotifier {
     }
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(title: newTitle);
+      _tasks[index] = _tasks[index].copyWith(title: newTitle, updatedAt: DateTime.now());
       notifyListeners();
       _saveToPrefs();
     }
@@ -319,11 +348,42 @@ class TaskProvider with ChangeNotifier {
       throw Exception('Название длиннее 250 символов');
     }
     _folders.add(
-      FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId),
+      FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId, updatedAt: DateTime.now()),
     );
     _foldersVersion++;
     notifyListeners();
     _saveToPrefs();
+  }
+
+  /// Adds a raw [folder] directly, used by import/sync flows.
+  void addFolderRaw(FolderItem folder) {
+    _folders.add(folder);
+    _foldersVersion++;
+    notifyListeners();
+    _saveToPrefs();
+  }
+
+  /// Upserts a folder during import/sync, updating the existing record if it
+  /// already exists. Returns true if the item was changed.
+  bool upsertFolder(FolderItem folder) {
+    final index = _folders.indexWhere((f) => f.id == folder.id);
+    if (index == -1) {
+      _folders.add(folder);
+      return true;
+    }
+    if (folder.updatedAt.isAfter(_folders[index].updatedAt)) {
+      _folders[index] = folder;
+      return true;
+    }
+    return false;
+  }
+
+  /// Notifies listeners and persists the current state. Called after bulk
+  /// operations such as import/sync merges.
+  Future<void> persist() async {
+    _foldersVersion++;
+    notifyListeners();
+    await _saveToPrefs();
   }
 
   void updateFolder(String id, String newName) {
@@ -332,7 +392,7 @@ class TaskProvider with ChangeNotifier {
       if (newName.length > 250) {
         throw Exception('Название длиннее 250 символов');
       }
-      _folders[index] = _folders[index].copyWith(name: newName);
+      _folders[index] = _folders[index].copyWith(name: newName, updatedAt: DateTime.now());
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
@@ -342,6 +402,7 @@ class TaskProvider with ChangeNotifier {
   void removeFolder(String id) {
     final index = _folders.indexWhere((f) => f.id == id);
     if (index != -1 && !_folders[index].isSystemStreak) {
+      final now = DateTime.now();
       final childFolders =
           _folders
               .where((f) => f.parentFolderId == id)
@@ -350,8 +411,12 @@ class TaskProvider with ChangeNotifier {
       for (final childId in childFolders) {
         removeFolder(childId);
       }
-      _folders.removeAt(index);
-      _tasks.removeWhere((t) => t.folderId == id);
+      _folders[index] = _folders[index].copyWith(isDeleted: true, updatedAt: now);
+      for (var i = 0; i < _tasks.length; i++) {
+        if (_tasks[i].folderId == id) {
+          _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);
+        }
+      }
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
@@ -359,7 +424,10 @@ class TaskProvider with ChangeNotifier {
   }
 
   void clearAllTasks() {
-    _tasks.clear();
+    final now = DateTime.now();
+    for (var i = 0; i < _tasks.length; i++) {
+      _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);
+    }
     notifyListeners();
     _saveToPrefs();
   }
@@ -373,8 +441,15 @@ class TaskProvider with ChangeNotifier {
   }
 
   void clearAllData() {
-    _tasks.clear();
-    _folders.removeWhere((f) => !f.isSystemStreak);
+    final now = DateTime.now();
+    for (var i = 0; i < _tasks.length; i++) {
+      _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);
+    }
+    for (var i = 0; i < _folders.length; i++) {
+      if (!_folders[i].isSystemStreak) {
+        _folders[i] = _folders[i].copyWith(isDeleted: true, updatedAt: now);
+      }
+    }
     _foldersVersion++;
     notifyListeners();
     _saveToPrefs();

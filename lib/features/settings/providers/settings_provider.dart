@@ -22,6 +22,9 @@ class SettingsProvider with ChangeNotifier {
   String? _avatarPath;
   bool _showInWidget = true;
   WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
+  bool _syncEnabled = false;
+  String _syncDeviceName = 'ASA Device';
+  String? _syncSecret;
   bool _initialized = false;
   final _initCompleter = Completer<void>();
 
@@ -42,6 +45,9 @@ class SettingsProvider with ChangeNotifier {
   String? get avatarPath => _avatarPath;
   bool get showInWidget => _showInWidget;
   WidgetDisplayMode get widgetDisplayMode => _widgetDisplayMode;
+  bool get syncEnabled => _syncEnabled;
+  String get syncDeviceName => _syncDeviceName;
+  String? get syncSecret => _syncSecret;
 
   bool get isDarkMode => _themeMode == ThemeMode.dark ||
       (_themeMode == ThemeMode.system &&
@@ -66,6 +72,10 @@ class SettingsProvider with ChangeNotifier {
       _widgetDisplayMode = WidgetDisplayMode.values[
         (prefs.getInt('widgetDisplayMode') ?? 0).clamp(0, WidgetDisplayMode.values.length - 1)
       ];
+      _syncEnabled = prefs.getBool('syncEnabled') ?? false;
+      _syncDeviceName = prefs.getString('syncDeviceName') ?? 'ASA Device';
+      _syncSecret = prefs.getString('syncSecret');
+      if (_syncSecret != null && _syncSecret!.trim().isEmpty) _syncSecret = null;
       timeDilation = _animationSpeed;
       _initialized = true;
       _syncWidgetSettings();
@@ -185,6 +195,33 @@ class SettingsProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('widgetDisplayMode', mode.index);
     _syncWidgetSettings();
+  }
+
+  Future<void> setSyncEnabled(bool value) async {
+    _syncEnabled = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('syncEnabled', value);
+  }
+
+  Future<void> setSyncDeviceName(String name) async {
+    final trimmed = name.trim();
+    _syncDeviceName = trimmed.isEmpty ? 'ASA Device' : trimmed;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('syncDeviceName', _syncDeviceName);
+  }
+
+  Future<void> setSyncSecret(String? secret) async {
+    final trimmed = secret?.trim();
+    _syncSecret = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (_syncSecret == null) {
+      await prefs.remove('syncSecret');
+    } else {
+      await prefs.setString('syncSecret', _syncSecret!);
+    }
   }
 
   String widgetModeLabel(WidgetDisplayMode mode) {

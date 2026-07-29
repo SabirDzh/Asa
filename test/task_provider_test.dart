@@ -59,14 +59,16 @@ void main() {
       );
     });
 
-    test('removeTask removes the task', () {
+    test('removeTask soft-deletes the task', () {
       final taskId = _addTask('Test');
 
       provider.removeTask(taskId);
-      expect(provider.allTasks, isEmpty);
+      expect(provider.tasks, isEmpty);
+      expect(provider.allTasks.length, 1);
+      expect(provider.allTasks.first.isDeleted, true);
     });
 
-    test('removeFolder removes folder and its tasks', () {
+    test('removeFolder soft-deletes folder and its tasks', () {
       provider.addFolder('Work');
       final folderId = provider.filteredFolders.first.id;
       _addTask('Task 1', folderId: folderId);
@@ -74,14 +76,16 @@ void main() {
 
       provider.removeFolder(folderId);
       expect(provider.filteredFolders, isEmpty);
-      expect(provider.allTasks, isEmpty);
+      expect(provider.tasks, isEmpty);
+      expect(provider.allTasks.length, 2);
+      expect(provider.allTasks.every((t) => t.isDeleted), true);
     });
 
     test('clearAllTasks removes all tasks', () {
       _addTask('Task 1');
       _addTask('Task 2');
       provider.clearAllTasks();
-      expect(provider.allTasks, isEmpty);
+      expect(provider.tasks, isEmpty);
     });
 
     test('clearAllData removes everything', () {
@@ -89,7 +93,7 @@ void main() {
       _addTask('Task');
       provider.clearAllData();
       expect(provider.filteredFolders, isEmpty);
-      expect(provider.allTasks, isEmpty);
+      expect(provider.tasks, isEmpty);
     });
 
     test('setFilter changes filter', () {

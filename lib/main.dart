@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/theme.dart';
 import 'core/notification_service.dart';
 import 'core/scale_utils.dart';
+import 'core/logger_service.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/tasks/providers/task_provider.dart';
 import 'features/splash/splash_screen.dart';
@@ -12,6 +13,7 @@ import 'core/theme_switcher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LoggerService.listenToFlutterErrors();
 
   try {
     await NotificationService.init();

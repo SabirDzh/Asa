@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/sync_service.dart';
 import '../../../core/theme.dart';
 import '../../../core/version_service.dart';
 import '../settings/providers/settings_provider.dart';
@@ -25,7 +26,14 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     final settings = context.read<SettingsProvider>();
     final tasks = context.read<TaskProvider>();
-    _readyFuture = Future.wait([settings.ready, tasks.ready]);
+    _readyFuture = Future.wait([settings.ready, tasks.ready]).then((_) async {
+      if (settings.syncEnabled) {
+        SyncService.instance.setProvider(tasks);
+        SyncService.instance.setDeviceName(settings.syncDeviceName);
+        SyncService.instance.setSecret(settings.syncSecret);
+        await SyncService.instance.start();
+      }
+    });
   }
 
   @override

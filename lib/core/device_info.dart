@@ -11,7 +11,13 @@ Future<String> getDefaultDeviceName() async {
     if (kIsWeb) return 'ASA Web';
     if (Platform.isAndroid) {
       final android = await deviceInfo.androidInfo;
-      return android.model.isNotEmpty ? android.model : 'ASA Device';
+      final manufacturer = android.manufacturer.trim();
+      final model = android.model.trim();
+      final parts = <String>[
+        if (manufacturer.isNotEmpty && !model.toLowerCase().contains(manufacturer.toLowerCase())) manufacturer,
+        if (model.isNotEmpty) model,
+      ];
+      return parts.isNotEmpty ? parts.join(' ') : 'ASA Device';
     }
     if (Platform.isIOS) {
       final ios = await deviceInfo.iosInfo;

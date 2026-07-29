@@ -28,6 +28,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   bool _isExiting = false;
   bool? _previousCompleted;
 
+  /// The system streak folder is regenerated every day, so tasks inside it
+  /// cannot be linked to calendar events.
+  bool get _isInStreakFolder => widget.task.folderId == 'system_streak_folder';
+
   @override
   void initState() {
     super.initState();
@@ -150,22 +154,23 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
             ],
           ),
         ),
-        PopupMenuItem<String>(
-          value: 'calendar',
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              Icon(Iconsax.calendar, color: menuIconColor, size: 22),
-              const SizedBox(width: 10),
-              Text(
-                widget.task.calendarEventId != null
-                    ? settings.tr('remove_from_calendar')
-                    : settings.tr('add_to_calendar'),
-                style: TextStyle(color: menuIconColor, fontSize: 16),
-              ),
-            ],
+        if (!_isInStreakFolder)
+          PopupMenuItem<String>(
+            value: 'calendar',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(Iconsax.calendar, color: menuIconColor, size: 22),
+                const SizedBox(width: 10),
+                Text(
+                  widget.task.calendarEventId != null
+                      ? settings.tr('remove_from_calendar')
+                      : settings.tr('add_to_calendar'),
+                  style: TextStyle(color: menuIconColor, fontSize: 16),
+                ),
+              ],
+            ),
           ),
-        ),
         PopupMenuItem<String>(
           value: 'delete',
           child: Row(
@@ -397,38 +402,43 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
               ),
             ),
           ),
-          if (widget.task.calendarEventId != null)
-            Padding(
-              padding: const EdgeInsets.only(left: AppTheme.rowGap, top: 16, bottom: 16),
-              child: Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
-            ),
-          Flexible(child: _buildTimeChip(context)),
-          if (!widget.task.isCompleted)
-            Builder(
-              builder: (iconCtx) => GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _showPopupMenu(iconCtx),
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    left: AppTheme.rowGap,
-                    right: AppTheme.rowGap,
-                    top: AppTheme.rowPadV,
-                    bottom: AppTheme.rowPadV,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.task.calendarEventId != null && !_isInStreakFolder)
+                Padding(
+                  padding: const EdgeInsets.only(left: AppTheme.rowGap, top: 16, bottom: 16),
+                  child: Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
+                ),
+              _buildTimeChip(context),
+              if (!widget.task.isCompleted)
+                Builder(
+                  builder: (iconCtx) => GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _showPopupMenu(iconCtx),
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        left: AppTheme.rowGap,
+                        right: AppTheme.rowGap,
+                        top: AppTheme.rowPadV,
+                        bottom: AppTheme.rowPadV,
+                      ),
+                      child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
+                    ),
                   ),
-                  child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
+                ),
+              AnimatedTaskCheckbox(
+                isCompleted: widget.task.isCompleted,
+                onTap: _handleToggle,
+                textSecondary: textSecondary,
+                padding: const EdgeInsets.only(
+                  left: AppTheme.rowGap,
+                  right: AppTheme.rowPadH,
+                  top: AppTheme.rowPadV,
+                  bottom: AppTheme.rowPadV,
                 ),
               ),
-            ),
-          AnimatedTaskCheckbox(
-            isCompleted: widget.task.isCompleted,
-            onTap: _handleToggle,
-            textSecondary: textSecondary,
-            padding: const EdgeInsets.only(
-              left: AppTheme.rowGap,
-              right: AppTheme.rowPadH,
-              top: AppTheme.rowPadV,
-              bottom: AppTheme.rowPadV,
-            ),
+            ],
           ),
         ],
       ),

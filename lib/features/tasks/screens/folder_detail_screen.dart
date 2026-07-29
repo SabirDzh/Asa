@@ -103,6 +103,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> with ScrollHide
 
     return Scaffold(
       backgroundColor: bg,
+      resizeToAvoidBottomInset: false,
       body: ResponsiveCenter(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,

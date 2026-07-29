@@ -24,7 +24,6 @@ void showAnimationSpeedSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    showDragHandle: true,
     enableDrag: true,
     builder: (ctx) => Container(
       decoration: BoxDecoration(
@@ -151,17 +150,7 @@ void showCustomSpeedSheet(BuildContext context) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 48,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: textSecondary,
-                        borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.sheetGap),
+                  const SizedBox(height: 8),
                   Text(
                     settings.tr('animation_speed'),
                     style: TextStyle(

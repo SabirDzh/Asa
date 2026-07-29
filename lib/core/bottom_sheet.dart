@@ -212,17 +212,6 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
-                suffixIcon: widget.paste != null
-                    ? IconButton(
-                        tooltip: widget.paste!.tooltip,
-                        icon: Icon(
-                          Icons.content_paste_rounded,
-                          color: iconColor,
-                          size: 22,
-                        ),
-                        onPressed: handlePaste,
-                      )
-                    : null,
               ),
               contextMenuBuilder: (context, editableTextState) {
                 return _buildContextMenu(
@@ -235,6 +224,19 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
               onSubmitted: (val) => widget.onSubmit(val, context),
             ),
           ),
+          if (widget.paste != null) ...[
+            IconButton(
+              tooltip: widget.paste!.tooltip,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              icon: Icon(
+                Icons.content_paste_rounded,
+                color: iconColor,
+                size: 24,
+              ),
+              onPressed: handlePaste,
+            ),
+          ],
         ],
       ),
     );

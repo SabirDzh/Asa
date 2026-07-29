@@ -13,7 +13,6 @@ void showWidgetModeSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    showDragHandle: true,
     enableDrag: true,
     builder: (ctx) => Container(
       decoration: BoxDecoration(
@@ -34,7 +33,6 @@ void showWidgetModeSheet(BuildContext context) {
             ),
           ),
           const SizedBox(height: 16),
-          _modeTile(ctx, settings, WidgetDisplayMode.streak, textColor),
           _modeTile(ctx, settings, WidgetDisplayMode.activeTasks, textColor),
           _modeTile(ctx, settings, WidgetDisplayMode.lastFolder, textColor),
           const SizedBox(height: 8),

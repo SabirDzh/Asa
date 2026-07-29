@@ -11,7 +11,7 @@ import '../../../core/home_widget_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/scale_utils.dart';
 
-enum WidgetDisplayMode { streak, activeTasks, lastFolder }
+enum WidgetDisplayMode { activeTasks, lastFolder }
 
 class SettingsProvider with ChangeNotifier {
   final Future<String> Function() _deviceNameProvider;
@@ -19,13 +19,13 @@ class SettingsProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
-  double _animationSpeed = 1.0;
+  double _animationSpeed = 0.5;
   double _appScale = 1.0;
   List<double> _customAnimationSpeeds = [];
   List<double> _customAppScales = [];
   String? _avatarPath;
   bool _showInWidget = true;
-  WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
+  WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.activeTasks;
   bool _syncEnabled = false;
   String _syncDeviceName = 'ASA Device';
   String _syncDeviceId = '';
@@ -71,15 +71,21 @@ class SettingsProvider with ChangeNotifier {
       _themeMode = ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
-      _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
+      _animationSpeed = prefs.getDouble('animationSpeed') ?? 0.5;
       _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
       _customAnimationSpeeds = _loadDoubleList(prefs, 'customAnimationSpeeds');
       _customAppScales = _loadDoubleList(prefs, 'customAppScales');
       _avatarPath = prefs.getString('avatarPath');
       _showInWidget = prefs.getBool('showInWidget') ?? true;
-      _widgetDisplayMode = WidgetDisplayMode.values[
-        (prefs.getInt('widgetDisplayMode') ?? 0).clamp(0, WidgetDisplayMode.values.length - 1)
-      ];
+      final oldMode = prefs.getInt('widgetDisplayMode');
+      if (oldMode == null || oldMode == 0 || oldMode == 1) {
+        // Previous 'streak' (0) and previous 'activeTasks' (1) both map to activeTasks.
+        _widgetDisplayMode = WidgetDisplayMode.activeTasks;
+      } else {
+        // Previous 'lastFolder' (2)
+        _widgetDisplayMode = WidgetDisplayMode.lastFolder;
+      }
+      prefs.setInt('widgetDisplayMode', _widgetDisplayMode.index);
       _syncEnabled = prefs.getBool('syncEnabled') ?? false;
       final savedName = prefs.getString('syncDeviceName');
       _syncDeviceName = savedName != null && savedName.trim().isNotEmpty
@@ -268,8 +274,6 @@ class SettingsProvider with ChangeNotifier {
 
   String widgetModeLabel(WidgetDisplayMode mode) {
     switch (mode) {
-      case WidgetDisplayMode.streak:
-        return tr('widget_mode_streak');
       case WidgetDisplayMode.activeTasks:
         return tr('widget_mode_active_tasks');
       case WidgetDisplayMode.lastFolder:

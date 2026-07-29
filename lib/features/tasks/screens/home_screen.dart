@@ -131,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      resizeToAvoidBottomInset: false,
       body: ResponsiveCenter(
         child: PageView(
           controller: _pageController,

@@ -20,7 +20,7 @@ class HomeWidgetService {
   int _lastActive = -1;
   String? _lastFolder;
   bool _lastEnabled = true;
-  WidgetDisplayMode _lastMode = WidgetDisplayMode.streak;
+  WidgetDisplayMode _lastMode = WidgetDisplayMode.activeTasks;
 
   Timer? _debounce;
 

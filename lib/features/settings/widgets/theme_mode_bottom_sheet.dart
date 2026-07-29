@@ -27,7 +27,6 @@ void showThemeModeSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    showDragHandle: true,
     enableDrag: true,
     builder: (ctx) => Container(
       decoration: BoxDecoration(

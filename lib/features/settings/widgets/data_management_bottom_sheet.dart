@@ -19,7 +19,6 @@ void showDataManagementSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    showDragHandle: true,
     enableDrag: true,
     builder: (ctx) => Container(
       decoration: BoxDecoration(
@@ -27,7 +26,7 @@ void showDataManagementSheet(BuildContext context) {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+        maxHeight: MediaQuery.of(ctx).size.height * 0.7 + 6,
       ),
       padding: const EdgeInsets.all(20),
       child: SingleChildScrollView(
@@ -77,14 +76,14 @@ void showDataManagementSheet(BuildContext context) {
                 final preview = ExportImportService.previewImport(
                   fileName: picked.name,
                   fileSize: picked.size,
-                  bytes: picked.bytes,
+                  bytes: picked.bytes!,
                 );
 
                 if (!context.mounted) return;
                 showImportPreviewBottomSheet(
                   context,
                   preview: preview,
-                  bytes: picked.bytes,
+                  bytes: picked.bytes!,
                   taskProvider: taskProvider,
                   onResult: (result) {
                     if (!context.mounted) return;

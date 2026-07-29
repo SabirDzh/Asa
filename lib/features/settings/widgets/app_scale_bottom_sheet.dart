@@ -25,9 +25,6 @@ String appScaleLabel(BuildContext context, SettingsProvider settings) {
   }
 
   if (presetLabel != null) {
-    if ((storedScale - effectiveScale).abs() > 0.01) {
-      return '$presetLabel (${effectiveScale.toStringAsFixed(2)})';
-    }
     return presetLabel;
   }
   return '${settings.tr('scale_custom')} (${effectiveScale.toStringAsFixed(2)})';
@@ -43,7 +40,6 @@ void showAppScaleSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    showDragHandle: true,
     enableDrag: true,
     builder: (ctx) => Container(
       decoration: BoxDecoration(
@@ -164,17 +160,7 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 48,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: textSecondary,
-                        borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.sheetGap),
+                  const SizedBox(height: 8),
                   Text(
                     settings.tr('app_scale'),
                     style: TextStyle(

@@ -143,8 +143,14 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                       final peer = _peers[index];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text(peer.name, style: TextStyle(color: widget.textColor)),
-                        subtitle: Text('${peer.host}:${peer.port}', style: TextStyle(color: widget.textSecondary)),
+                        title: Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Text(peer.name, style: TextStyle(color: widget.textColor)),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Text('${peer.host}:${peer.port}', style: TextStyle(color: widget.textSecondary)),
+                        ),
                         trailing: IconButton(
                           icon: Icon(Iconsax.send_2, color: widget.textSecondary),
                           onPressed: () async {

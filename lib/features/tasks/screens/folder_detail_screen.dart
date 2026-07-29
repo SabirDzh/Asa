@@ -51,6 +51,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       icon: isTask ? Iconsax.clipboard_tick : Iconsax.folder_minus,
       hintText: isTask ? settings.tr('new_task') : settings.tr('new_folder'),
       controller: controller,
+      paste: InputPasteOptions(
+        tooltip: settings.tr('paste'),
+        errorText: settings.tr('paste_error'),
+      ),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {

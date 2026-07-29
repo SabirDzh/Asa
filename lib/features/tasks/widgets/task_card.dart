@@ -71,6 +71,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
       icon: Iconsax.clipboard_tick,
       hintText: settings.tr('edit_task'),
       controller: controller,
+      paste: InputPasteOptions(
+        tooltip: settings.tr('paste'),
+        errorText: settings.tr('paste_error'),
+      ),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {

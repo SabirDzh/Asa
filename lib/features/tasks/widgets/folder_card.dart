@@ -31,6 +31,10 @@ class _FolderRowState extends State<FolderRow> {
       icon: Iconsax.folder_minus,
       hintText: settings.tr('edit_folder'),
       controller: controller,
+      paste: InputPasteOptions(
+        tooltip: settings.tr('paste'),
+        errorText: settings.tr('paste_error'),
+      ),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {

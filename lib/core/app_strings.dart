@@ -88,6 +88,8 @@ class AppStrings {
       'export_data': 'Экспорт данных',
       'import_data': 'Импорт данных',
       'send_logs': 'Отправить логи разработчику',
+      'paste': 'Вставить',
+      'paste_error': 'Буфер обмена пуст или не содержит текста',
     },
     'en': {
       'search': 'Search',
@@ -177,6 +179,8 @@ class AppStrings {
       'export_data': 'Export data',
       'import_data': 'Import data',
       'send_logs': 'Send logs to developer',
+      'paste': 'Paste',
+      'paste_error': 'Clipboard is empty or does not contain text',
     },
   };
 

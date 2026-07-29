@@ -1,5 +1,8 @@
 import 'package:flutter/services.dart';
 
+/// Default maximum length for task/folder titles and search input.
+const int kMaxTextInputLength = 250;
+
 TextInputFormatter numericInputFormatter() => TextInputFormatter.withFunction((oldValue, newValue) {
       final text = newValue.text;
       if (text.isEmpty) return newValue;
@@ -24,5 +27,5 @@ String sanitizeText(String value) {
       .trim();
 }
 
-TextInputFormatter textInputFormatter({int maxLength = 250}) =>
+TextInputFormatter textInputFormatter({int maxLength = kMaxTextInputLength}) =>
     LengthLimitingTextInputFormatter(maxLength);

@@ -93,6 +93,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
+    expect(find.text('Экспорт данных'), findsOneWidget);
+    expect(find.text('Импорт данных'), findsOneWidget);
+    expect(find.text('Отправить логи разработчику'), findsOneWidget);
     expect(find.text('Очистить все задачи'), findsOneWidget);
     expect(find.text('Очистить все папки'), findsOneWidget);
     expect(find.text('Сбросить все данные'), findsOneWidget);

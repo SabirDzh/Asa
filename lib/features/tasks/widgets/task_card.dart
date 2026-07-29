@@ -411,8 +411,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                 child: Padding(
                   padding: const EdgeInsets.only(
                     left: AppTheme.rowGap,
-                    top: 16,
-                    bottom: 16,
+                    top: AppTheme.rowPadV,
+                    bottom: AppTheme.rowPadV,
                   ),
                   child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
                 ),
@@ -512,8 +512,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                   Padding(
                     padding: const EdgeInsets.only(
                       left: AppTheme.rowGap,
-                      top: 16,
-                      bottom: 16,
+                      top: AppTheme.rowPadV,
+                      bottom: AppTheme.rowPadV,
                     ),
                     child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
                   ),

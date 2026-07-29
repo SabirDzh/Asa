@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen
                 top: Radius.circular(24),
               ),
             ),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppTheme.screenPad),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

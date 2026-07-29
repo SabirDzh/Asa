@@ -122,7 +122,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
         SnackBar(
           content: Text(
             settings.tr('duration_error'),
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppColors.textDark),
           ),
         ),
       );
@@ -219,7 +219,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))),
+              Container(width: 48, height: 4, decoration: BoxDecoration(color: textSecondary, borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius))),
               const SizedBox(height: 20),
               Text(
                 settings.tr('set_time'),
@@ -281,7 +281,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                         backgroundColor: AppColors.primary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.pillRadius)),
                       ),
-                      child: Text(settings.tr('save'), style: const TextStyle(color: Colors.white)),
+                      child: Text(settings.tr('save'), style: const TextStyle(color: AppColors.textDark)),
                     ),
                   ),
                 ],

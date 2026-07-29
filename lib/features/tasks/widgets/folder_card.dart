@@ -270,8 +270,8 @@ class _FolderRowState extends State<FolderRow> {
                     padding: const EdgeInsets.only(
                       left: AppTheme.rowGap,
                       right: AppTheme.rowPadH,
-                      top: 16,
-                      bottom: 16,
+                      top: AppTheme.rowPadV,
+                      bottom: AppTheme.rowPadV,
                     ),
                     child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
                   ),
@@ -372,8 +372,8 @@ class _FolderRowState extends State<FolderRow> {
                     padding: const EdgeInsets.only(
                       left: AppTheme.rowGap,
                       right: AppTheme.rowPadH,
-                      top: 16,
-                      bottom: 16,
+                      top: AppTheme.rowPadV,
+                      bottom: AppTheme.rowPadV,
                     ),
                     child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
                   )

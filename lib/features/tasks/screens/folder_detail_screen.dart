@@ -120,7 +120,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> with ScrollHide
                 Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.screenPad,
+                        AppTheme.screenPad,
+                        AppTheme.screenPad,
+                        AppTheme.screenPad * 2,
+                      ),
                       child: Row(
                         children: [
                           GestureDetector(
@@ -338,8 +343,8 @@ class _FolderContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 9),
               child: Align(
                 alignment: Alignment.center,
-                child: SizedBox(
-                  width: 328,
+                child:                SizedBox(
+                  width: AppTheme.rowWidth,
                   child: Divider(
                     color: isDark ? Colors.white30 : AppColors.navLight,
                     thickness: 2,

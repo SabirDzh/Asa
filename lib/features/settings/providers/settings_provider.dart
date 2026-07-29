@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/app_strings.dart';
 import '../../../core/home_widget_service.dart';
@@ -24,6 +25,8 @@ class SettingsProvider with ChangeNotifier {
   WidgetDisplayMode _widgetDisplayMode = WidgetDisplayMode.streak;
   bool _syncEnabled = false;
   String _syncDeviceName = 'ASA Device';
+  String _syncDeviceId = '';
+  Future<String>? _syncDeviceIdFuture;
   String? _syncSecret;
   bool _initialized = false;
   final _initCompleter = Completer<void>();
@@ -47,6 +50,7 @@ class SettingsProvider with ChangeNotifier {
   WidgetDisplayMode get widgetDisplayMode => _widgetDisplayMode;
   bool get syncEnabled => _syncEnabled;
   String get syncDeviceName => _syncDeviceName;
+  String get syncDeviceId => _syncDeviceId;
   String? get syncSecret => _syncSecret;
 
   bool get isDarkMode => _themeMode == ThemeMode.dark ||
@@ -77,6 +81,9 @@ class SettingsProvider with ChangeNotifier {
       _syncSecret = prefs.getString('syncSecret');
       if (_syncSecret != null && _syncSecret!.trim().isEmpty) _syncSecret = null;
       timeDilation = _animationSpeed;
+      // Ensure a stable device ID exists for sync. This is a local only
+      // SharedPreferences read/write and completes quickly.
+      await ensureSyncDeviceId();
       _initialized = true;
       _syncWidgetSettings();
       // Defer the notification so it only fires after the provider is attached
@@ -210,6 +217,27 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('syncDeviceName', _syncDeviceName);
+  }
+
+  /// Returns the stable device ID used to identify this device during sync.
+  /// If no ID exists, a new UUID is generated and persisted.
+  Future<String> ensureSyncDeviceId() {
+    if (_syncDeviceId.isNotEmpty) return Future.value(_syncDeviceId);
+    if (_syncDeviceIdFuture != null) return _syncDeviceIdFuture!;
+    _syncDeviceIdFuture = _loadOrCreateDeviceId();
+    _syncDeviceIdFuture!.then((_) => _syncDeviceIdFuture = null);
+    return _syncDeviceIdFuture!;
+  }
+
+  Future<String> _loadOrCreateDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    var id = prefs.getString('syncDeviceId');
+    if (id == null || id.trim().isEmpty) {
+      id = const Uuid().v4();
+      await prefs.setString('syncDeviceId', id);
+    }
+    _syncDeviceId = id;
+    return id;
   }
 
   Future<void> setSyncSecret(String? secret) async {

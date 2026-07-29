@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:bonsoir/bonsoir.dart';
+import 'package:flutter/foundation.dart';
 
 import '../features/tasks/providers/task_provider.dart';
 import 'export_import_service.dart';
@@ -12,10 +13,18 @@ class SyncPeer {
   final String host;
   final int port;
 
-  const SyncPeer({required this.name, required this.host, required this.port});
+  /// Unique device ID advertised in the mDNS TXT record, if available.
+  final String? deviceId;
+
+  const SyncPeer({
+    required this.name,
+    required this.host,
+    required this.port,
+    this.deviceId,
+  });
 
   @override
-  String toString() => 'SyncPeer($name @ $host:$port)';
+  String toString() => 'SyncPeer($name @ $host:$port, did=$deviceId)';
 }
 
 /// Handles local-network P2P sync over mDNS + TCP sockets.
@@ -33,6 +42,7 @@ class SyncService {
   TaskProvider? _provider;
   String _deviceName = _defaultName;
   String? _secret;
+  String _deviceId = '';
 
   final _peersController = StreamController<List<SyncPeer>>.broadcast();
   Stream<List<SyncPeer>> get peers => _peersController.stream;
@@ -48,8 +58,14 @@ class SyncService {
   bool get isRunning => _running;
   int? get actualPort => _actualPort;
 
+  @visibleForTesting
+  bool isOwnPeer(SyncPeer peer) => _isOwnPeer(peer);
+
   /// Current human-readable device name used for mDNS broadcast.
   String get currentDeviceName => _deviceName;
+
+  /// Current stable device ID used to identify this device on the network.
+  String get currentDeviceId => _deviceId;
 
   /// Current shared secret, if any.
   String? get currentSecret => _secret;
@@ -62,6 +78,14 @@ class SyncService {
     final newName = name.trim().isEmpty ? _defaultName : name.trim();
     if (newName == _deviceName) return;
     _deviceName = newName;
+    _updateBroadcast();
+  }
+
+  /// Sets the stable device ID used to filter this device from peer discovery.
+  void setDeviceId(String id) {
+    final trimmed = id.trim();
+    if (trimmed == _deviceId) return;
+    _deviceId = trimmed;
     _updateBroadcast();
   }
 
@@ -170,6 +194,7 @@ class SyncService {
         name: _deviceName,
         type: _serviceType,
         port: _actualPort!,
+        attributes: <String, String>{if (_deviceId.isNotEmpty) 'did': _deviceId},
       );
       _broadcast = BonsoirBroadcast(service: _currentService!);
       await _broadcast!.ready;
@@ -188,6 +213,7 @@ class SyncService {
         name: _deviceName,
         type: _serviceType,
         port: _actualPort!,
+        attributes: <String, String>{if (_deviceId.isNotEmpty) 'did': _deviceId},
       );
       _broadcast = BonsoirBroadcast(service: _currentService!);
       await _broadcast!.ready;
@@ -216,6 +242,7 @@ class SyncService {
               name: resolved.name,
               host: resolved.host ?? '127.0.0.1',
               port: resolved.port,
+              deviceId: resolved.attributes['did'],
             ),
           );
         } else if (event.type ==
@@ -247,16 +274,18 @@ class SyncService {
   void _addPeer(SyncPeer peer) {
     // Don't show our own device in the peers list.
     if (_isOwnPeer(peer)) return;
-    _peers.removeWhere((p) => p.name == peer.name);
+    _peers.removeWhere((p) => p.name == peer.name && p.host == peer.host && p.port == peer.port);
     _peers.add(peer);
     _peersController.add(List.unmodifiable(_peers));
   }
 
   /// Returns true if [peer] is this device.
   ///
-  /// Uses the listening port and local network addresses; the name check is a
-  /// fallback for hosts/MDNS records that don't expose a usable IP.
+  /// The primary check is the stable device ID advertised in the mDNS TXT
+  /// record. If that is not available, it falls back to the listening port,
+  /// local network addresses, and finally the broadcast name.
   bool _isOwnPeer(SyncPeer peer) {
+    if (_deviceId.isNotEmpty && peer.deviceId == _deviceId) return true;
     if (peer.port != _actualPort) return false;
     if (peer.host == '127.0.0.1' || peer.host == 'localhost') return true;
     if (_localAddresses.contains(peer.host)) return true;

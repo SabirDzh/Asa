@@ -104,8 +104,10 @@ class SettingsScreen extends StatelessWidget {
                     final tasks = Provider.of<TaskProvider>(context, listen: false);
                     await settings.setSyncEnabled(value);
                     if (value) {
+                      final deviceId = await settings.ensureSyncDeviceId();
                       SyncService.instance.setProvider(tasks);
                       SyncService.instance.setDeviceName(settings.syncDeviceName);
+                      SyncService.instance.setDeviceId(deviceId);
                       SyncService.instance.setSecret(settings.syncSecret);
                       await SyncService.instance.start();
                     } else {

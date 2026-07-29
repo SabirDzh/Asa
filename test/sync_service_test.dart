@@ -52,6 +52,7 @@ void main() {
       await SyncService.instance.stop();
       SyncService.instance.setSecret(null);
       SyncService.instance.setDeviceName('ASA Device');
+      SyncService.instance.setDeviceId('');
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
     });
@@ -75,6 +76,32 @@ void main() {
 
       SyncService.instance.setDeviceName('   ');
       expect(SyncService.instance.currentDeviceName, 'ASA Device');
+    });
+
+    test('isOwnPeer filters self by device ID and falls back to name/port', () {
+      SyncService.instance.setDeviceId('my-device-id');
+
+      final ownById = SyncPeer(
+        name: 'Other Device',
+        host: '192.168.1.20',
+        port: 9999,
+        deviceId: 'my-device-id',
+      );
+      final other = SyncPeer(
+        name: 'ASA Device',
+        host: '192.168.1.21',
+        port: 9999,
+        deviceId: 'other-device-id',
+      );
+      final sameName = SyncPeer(
+        name: 'ASA Device',
+        host: '192.168.1.21',
+        port: 9999,
+      );
+
+      expect(SyncService.instance.isOwnPeer(ownById), true);
+      expect(SyncService.instance.isOwnPeer(other), false);
+      expect(SyncService.instance.isOwnPeer(sameName), false);
     });
 
     test('start binds to an available port', () async {

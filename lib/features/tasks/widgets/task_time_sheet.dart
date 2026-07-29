@@ -78,7 +78,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
 
   bool get _hasAnyValue {
     if (_showDuration && _durationController.text.trim().isNotEmpty) return true;
-    if (_showPeriod && (_startTime != null || _endTime != null)) return true;
+    if (_startTime != null || _endTime != null) return true;
     return false;
   }
 
@@ -227,46 +227,39 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final provider = context.read<TaskProvider>();
 
+    int? duration;
     if (_showDuration) {
       final text = _durationController.text.trim();
       if (text.isNotEmpty) {
         final parsed = _parseDuration(text);
         if (parsed != null) {
-          _durationMinutes = parsed;
+          duration = parsed;
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(settings.tr('duration_error'))),
           );
           return;
         }
-      } else {
-        _durationMinutes = null;
       }
-      provider.setTaskTime(
-        widget.task.id,
-        startTime: null,
-        endTime: null,
-        expectedDuration: _durationMinutes,
-      );
-    } else {
-      final start = _toDateTime(_startTime);
-      final end = _toDateTime(_endTime);
-
-      if (start != null && end != null && (end.isBefore(start) || end.isAtSameMomentAs(start))) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(settings.tr('invalid_period'))),
-        );
-        return;
-      }
-
-      provider.setTaskTime(
-        widget.task.id,
-        startTime: start,
-        endTime: end,
-        expectedDuration: null,
-      );
     }
+
+    final start = _toDateTime(_startTime);
+    final end = _toDateTime(_endTime);
+
+    if (start != null && end != null && (end.isBefore(start) || end.isAtSameMomentAs(start))) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(settings.tr('invalid_period'))),
+      );
+      return;
+    }
+
+    provider.setTaskTime(
+      widget.task.id,
+      startTime: start,
+      endTime: end,
+      expectedDuration: _showDuration ? duration : null,
+    );
     Navigator.pop(context);
   }
 
@@ -368,27 +361,25 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                       ),
                       const SizedBox(height: 20),
                     ],
-                    if (_showPeriod) ...[
-                      _sectionTitle(Iconsax.clock, settings.tr('time_period')),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _timeButton(
-                              label: _startTime != null ? _formatTime(_startTime!) : settings.tr('start_time'),
-                              onTap: () => _pickTime(true),
-                            ),
+                    _sectionTitle(Iconsax.clock, settings.tr('time_period')),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _timeButton(
+                            label: _startTime != null ? _formatTime(_startTime!) : settings.tr('start_time'),
+                            onTap: () => _pickTime(true),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _timeButton(
-                              label: _endTime != null ? _formatTime(_endTime!) : settings.tr('end_time'),
-                              onTap: () => _pickTime(false),
-                            ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _timeButton(
+                            label: _endTime != null ? _formatTime(_endTime!) : settings.tr('end_time'),
+                            onTap: () => _pickTime(false),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

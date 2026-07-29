@@ -11,6 +11,7 @@ import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 import 'task_time_sheet.dart';
+import 'task_detail_sheet.dart';
 
 /// Single task row with smooth animated checkbox, entrance/exit animations, and LongPressDraggable support
 class TaskRow extends StatefulWidget {
@@ -387,18 +388,22 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           ),
           const SizedBox(width: AppTheme.rowGap),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: AppTheme.rowGap),
-              child: Text(
-                widget.task.title,
-                style: TextStyle(
-                  color: textSecondary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
-                  decorationColor: textSecondary,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => showTaskDetailSheet(context, widget.task),
+              child: Padding(
+                padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                child: Text(
+                  widget.task.title,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
+                    decorationColor: textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -419,7 +424,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                     child: Padding(
                       padding: const EdgeInsets.only(
                         left: AppTheme.rowGap,
-                        right: AppTheme.rowGap,
+                        right: 0,
                         top: AppTheme.rowPadV,
                         bottom: AppTheme.rowPadV,
                       ),
@@ -427,12 +432,13 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                     ),
                   ),
                 ),
+              const SizedBox(width: AppTheme.rowGap),
               AnimatedTaskCheckbox(
                 isCompleted: widget.task.isCompleted,
                 onTap: _handleToggle,
                 textSecondary: textSecondary,
                 padding: const EdgeInsets.only(
-                  left: AppTheme.rowGap,
+                  left: 0,
                   right: AppTheme.rowPadH,
                   top: AppTheme.rowPadV,
                   bottom: AppTheme.rowPadV,

@@ -38,14 +38,7 @@ class SettingsScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 24),
           children: [
-            Text(
-              settings.tr('settings'),
-              style: TextStyle(
-                color: isDark ? AppColors.textDark : AppColors.textLight,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+
             const SizedBox(height: 24),
             const AvatarSection(),
             const SizedBox(height: 32),

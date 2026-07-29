@@ -112,7 +112,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom +
-            MediaQuery.of(context).size.height * 0.10,
+            MediaQuery.of(context).size.height * 0.02,
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -123,7 +123,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
           top: AppTheme.sheetPadTop,
           left: AppTheme.sheetPadH,
           right: AppTheme.sheetPadH,
-          bottom: 20,
+          bottom: 12,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

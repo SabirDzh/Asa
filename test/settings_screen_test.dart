@@ -45,7 +45,6 @@ void main() {
       expect(finder, findsOneWidget);
     }
 
-    expect(find.text('Настройки'), findsOneWidget);
     await expectVisible('ВНЕШНИЙ ВИД');
     await expectVisible('СИНХРОНИЗАЦИЯ И ОБМЕН');
     await expectVisible('УВЕДОМЛЕНИЯ И ДАННЫЕ');

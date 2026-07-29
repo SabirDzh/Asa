@@ -3,7 +3,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
-import '../../../core/input_utils.dart';
 import '../../../core/scale_utils.dart';
 import '../providers/settings_provider.dart';
 
@@ -116,119 +115,113 @@ Widget _scaleTile(
 }
 
 void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, AdaptiveAppScaleRange range) {
-  final clamped = settings.appScale.clamp(range.min, range.max);
-  final controller = TextEditingController(
-    text: clamped.toStringAsFixed(2),
-  );
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
-  final inputBg = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
+  final divisions = ((range.max - range.min) / _kStep).round();
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.only(
-          top: AppTheme.sheetPadTop,
-          left: AppTheme.sheetPadH,
-          right: AppTheme.sheetPadH,
-          bottom: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white : Colors.black26,
-                  borderRadius:
-                      BorderRadius.circular(AppTheme.sheetHandleRadius),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppTheme.sheetGap),
-            Container(
-              height: AppTheme.rowHeight,
+    builder: (ctx) {
+      double value = settings.appScale.clamp(range.min, range.max);
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
               decoration: BoxDecoration(
-                color: inputBg,
-                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                color: sheetBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.rowPadH,
-                vertical: AppTheme.rowPadV,
-              ),                child: Row(
+              padding: const EdgeInsets.only(
+                top: AppTheme.sheetPadTop,
+                left: AppTheme.sheetPadH,
+                right: AppTheme.sheetPadH,
+                bottom: 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Iconsax.maximize, color: isDark ? Colors.white70 : Colors.black54, size: 24),
-                  const SizedBox(width: AppTheme.rowGap),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      autofocus: true,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [numericInputFormatter()],
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: '1.00',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black54,
-                          fontSize: 16,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white : Colors.black26,
+                        borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.sheetGap),
+                  Text(
+                    settings.tr('app_scale'),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    value.toStringAsFixed(2),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${range.min.toStringAsFixed(2)} – ${range.max.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black54,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.primary,
+                      inactiveTrackColor: isDark ? Colors.white24 : Colors.black12,
+                      thumbColor: AppColors.primary,
+                      overlayColor: AppColors.primary.withValues(alpha: 0.12),
+                      tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
+                      activeTickMarkColor: Colors.transparent,
+                      inactiveTickMarkColor: Colors.transparent,
+                    ),
+                    child: Slider(
+                      value: value,
+                      min: range.min,
+                      max: range.max,
+                      divisions: divisions,
+                      label: value.toStringAsFixed(2),
+                      onChanged: (v) => setState(() => value = v),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        settings.addCustomAppScale(value, range.min, range.max);
+                        Navigator.pop(ctx);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                        ),
+                      ),
+                      child: Text(settings.tr('save_btn')),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                '${range.min.toStringAsFixed(2)} – ${range.max.toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  final parsed = double.tryParse(controller.text.trim());
-                  if (parsed == null || parsed < range.min || parsed > range.max) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text(settings.tr('scale_error'))),
-                    );
-                    return;
-                  }
-                  settings.addCustomAppScale(parsed, range.min, range.max);
-                  Navigator.pop(ctx);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                  ),
-                ),
-                child: Text(settings.tr('save_btn')),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
+          );
+        },
+      );
+    },
   );
 }

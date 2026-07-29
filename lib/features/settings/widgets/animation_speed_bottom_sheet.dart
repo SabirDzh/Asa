@@ -3,7 +3,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
-import '../../../core/input_utils.dart';
 import '../providers/settings_provider.dart';
 
 String animationSpeedLabel(SettingsProvider settings) {
@@ -117,118 +116,113 @@ void showCustomSpeedSheet(BuildContext context) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
-  final inputBg = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
-  final controller = TextEditingController(text: settings.animationSpeed.toString());
+
+  const minSpeed = 0.1;
+  const maxSpeed = 5.0;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.only(
-          top: AppTheme.sheetPadTop,
-          left: AppTheme.sheetPadH,
-          right: AppTheme.sheetPadH,
-          bottom: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white : Colors.black26,
-                  borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppTheme.sheetGap),
-            Container(
-              height: AppTheme.rowHeight,
+    builder: (ctx) {
+      double value = settings.animationSpeed.clamp(minSpeed, maxSpeed);
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
               decoration: BoxDecoration(
-                color: inputBg,
-                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                color: sheetBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.rowPadH,
-                vertical: AppTheme.rowPadV,
+              padding: const EdgeInsets.only(
+                top: AppTheme.sheetPadTop,
+                left: AppTheme.sheetPadH,
+                right: AppTheme.sheetPadH,
+                bottom: 20,
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Iconsax.timer_1, color: isDark ? Colors.white70 : Colors.black54, size: 24),
-                  const SizedBox(width: AppTheme.rowGap),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [numericInputFormatter()],
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: '1.0',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black54,
-                          fontSize: 16,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white : Colors.black26,
+                        borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius),
                       ),
-                      onSubmitted: (val) => _trySaveCustom(ctx, controller, settings),
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.sheetGap),
+                  Text(
+                    settings.tr('animation_speed'),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '${_formatSpeed(value)}x',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    settings.tr('speed_range'),
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black54,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.primary,
+                      inactiveTrackColor: isDark ? Colors.white24 : Colors.black12,
+                      thumbColor: AppColors.primary,
+                      overlayColor: AppColors.primary.withValues(alpha: 0.12),
+                      tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
+                      activeTickMarkColor: Colors.transparent,
+                      inactiveTickMarkColor: Colors.transparent,
+                    ),
+                    child: Slider(
+                      value: value,
+                      min: minSpeed,
+                      max: maxSpeed,
+                      divisions: 49,
+                      label: _formatSpeed(value),
+                      onChanged: (v) => setState(() => value = v),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        settings.addCustomAnimationSpeed(value);
+                        Navigator.pop(ctx);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                        ),
+                      ),
+                      child: Text(settings.tr('save_btn')),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                settings.tr('speed_range'),
-                style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 14),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: ElevatedButton(
-                onPressed: () => _trySaveCustom(ctx, controller, settings),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                  ),
-                ),
-                child: Text(settings.tr('save_btn')),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
+          );
+        },
+      );
+    },
   );
-}
-
-void _trySaveCustom(
-  BuildContext ctx,
-  TextEditingController controller,
-  SettingsProvider settings,
-) {
-  final v = controller.text.trim();
-  final parsed = double.tryParse(v);
-  if (parsed == null || parsed < 0.1 || parsed > 5.0) {
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(content: Text(settings.tr('speed_error'))),
-    );
-    return;
-  }
-  settings.addCustomAnimationSpeed(parsed);
-  Navigator.pop(ctx);
 }

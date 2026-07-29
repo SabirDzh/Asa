@@ -36,18 +36,19 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/app_icon.png"
+  remove_alpha_ios: true
+  image_path: "assets/app_icon_source.png"
   adaptive_icon_background: "#F2F2F7"
-  adaptive_icon_foreground: "assets/app_icon.png"
+  adaptive_icon_foreground: "assets/app_icon_source.png"
   macos:
     generate: true
-    image_path: "assets/app_icon.png"
+    image_path: "assets/app_icon_source.png"
   windows:
     generate: true
-    image_path: "assets/app_icon.png"
+    image_path: "assets/app_icon_source.png"
   linux:
     generate: true
-    image_path: "assets/app_icon.png"
+    image_path: "assets/app_icon_source.png"
 
 flutter:
   uses-material-design: true

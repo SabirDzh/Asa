@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 
 void main() {
@@ -121,6 +122,58 @@ void main() {
       final folderTasks = provider.getFolderTasks(folderId);
       expect(folderTasks.length, 1);
       expect(folderTasks[0].id, taskId);
+    });
+
+    group('upsertTask / upsertFolder', () {
+      test('upsertTask adds a new task', () {
+        final task = TaskItem(id: 't1', title: 'New');
+        final changed = provider.upsertTask(task);
+
+        expect(changed, true);
+        expect(provider.tasks.length, 1);
+        expect(provider.tasks.first.id, 't1');
+      });
+
+      test('upsertTask overwrites with newer updatedAt', () {
+        provider.addTask('Old');
+        final id = provider.tasks.first.id;
+        final newer = TaskItem(id: id, title: 'Newer', updatedAt: DateTime.now().add(const Duration(days: 1)));
+
+        final changed = provider.upsertTask(newer);
+
+        expect(changed, true);
+        expect(provider.tasks.first.title, 'Newer');
+      });
+
+      test('upsertTask keeps newer local task', () {
+        provider.addTask('Local');
+        final id = provider.tasks.first.id;
+        final older = TaskItem(id: id, title: 'Older', updatedAt: DateTime.now().subtract(const Duration(days: 1)));
+
+        final changed = provider.upsertTask(older);
+
+        expect(changed, false);
+        expect(provider.tasks.first.title, 'Local');
+      });
+
+      test('upsertFolder adds a new folder', () {
+        final folder = FolderItem(id: 'f1', name: 'New');
+        final changed = provider.upsertFolder(folder);
+
+        expect(changed, true);
+        expect(provider.folders.any((f) => f.id == 'f1'), true);
+      });
+
+      test('upsertFolder overwrites with newer updatedAt', () {
+        provider.addFolder('Old');
+        final id = provider.folders.first.id;
+        final newer = FolderItem(id: id, name: 'Newer', updatedAt: DateTime.now().add(const Duration(days: 1)));
+
+        final changed = provider.upsertFolder(newer);
+
+        expect(changed, true);
+        expect(provider.folders.first.name, 'Newer');
+      });
     });
   });
 }

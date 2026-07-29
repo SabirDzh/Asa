@@ -47,6 +47,12 @@ class SyncService {
   bool get isRunning => _running;
   int? get actualPort => _actualPort;
 
+  /// Current human-readable device name used for mDNS broadcast.
+  String get currentDeviceName => _deviceName;
+
+  /// Current shared secret, if any.
+  String? get currentSecret => _secret;
+
   /// Sets the [TaskProvider] used for incoming sync merges.
   void setProvider(TaskProvider provider) => _provider = provider;
 
@@ -60,7 +66,8 @@ class SyncService {
 
   /// Sets the shared secret used to authenticate sync payloads.
   void setSecret(String? secret) {
-    _secret = secret?.trim().isNotEmpty == true ? secret : null;
+    final trimmed = secret?.trim();
+    _secret = (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
   }
 
   /// Starts the sync server and mDNS discovery.

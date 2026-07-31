@@ -75,9 +75,12 @@ void main() {
 
     expect(find.textContaining('Длительность: 1:00'), findsOneWidget);
     expect(find.textContaining('Период: 10:00 – 11:00'), findsOneWidget);
+    expect(find.text('Редактировать'), findsNothing);
+    expect(find.text('Установить время'), findsNothing);
+    expect(find.text('Удалить'), findsNothing);
   });
 
-  testWidgets('timer icon opens the time editor', (tester) async {
+  testWidgets('time editor opens from the task ellipsis menu', (tester) async {
     final task = TaskItem(
       id: 'timer-task',
       title: 'Timer task',
@@ -90,7 +93,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('task_timer_icon')));
+    await tester.tap(find.byIcon(Iconsax.more_square));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Установить время'));
     await tester.pumpAndSettle();
 
     expect(find.text('Установить время'), findsOneWidget);

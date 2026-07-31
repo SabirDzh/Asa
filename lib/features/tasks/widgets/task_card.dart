@@ -15,7 +15,9 @@ import '../../settings/providers/settings_provider.dart';
 import 'task_time_sheet.dart';
 import 'task_detail_sheet.dart';
 
-/// Single task row with smooth animated checkbox, entrance/exit animations, and LongPressDraggable support
+/// Single task row with smooth animated checkbox, entrance/exit animations, and LongPressDraggable support.
+/// Editing actions are available from the ellipsis menu; the detail view is read-only.
+
 class TaskRow extends StatefulWidget {
   final TaskItem task;
   final bool enableDrag;
@@ -334,29 +336,17 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     return Padding(
       padding: const EdgeInsets.only(left: AppTheme.rowGap),
       child: Semantics(
-        button: true,
-        label: settings.tr('set_time'),
-        child: Tooltip(
-          message: settings.tr('set_time'),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-            child: InkWell(
-              onTap: () => showTaskTimeSheet(context, widget.task),
-              borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-              child: SizedBox(
-                width: 48,
-                height: 48,
-                child: Center(
-                  child: SvgPicture.asset(
-                    key: const ValueKey('task_timer_icon'),
-                    'assets/icons/timer.svg',
-                    width: 20,
-                    height: 20,
-                    colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                  ),
-                ),
-              ),
+        label: settings.tr('time'),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: SvgPicture.asset(
+              key: const ValueKey('task_timer_icon'),
+              'assets/icons/timer.svg',
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
             ),
           ),
         ),

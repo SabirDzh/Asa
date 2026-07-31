@@ -57,6 +57,26 @@ class NotificationService {
 
   static String _tr(String ru, String en) => _languageCode == 'en' ? en : ru;
 
+  /// The stable action identifier used by Android and iOS timer actions.
+  @visibleForTesting
+  static String get startTimerActionId => _startTimerActionId;
+
+  /// Returns the payload used by notification actions for [taskId].
+  @visibleForTesting
+  static String taskPayloadForId(String taskId) => '$_taskPayloadPrefix$taskId';
+
+  /// Returns whether a task has a valid, non-zero period for a reminder.
+  /// A start/end pair with the same time has no computable duration and must
+  /// not create a notification that offers a timer which cannot start.
+  @visibleForTesting
+  static bool hasSchedulablePeriod(TaskItem task) {
+    if (task.isDeleted || task.isCompleted) return false;
+    final start = task.startTime;
+    final end = task.endTime;
+    if (start == null || end == null) return false;
+    return TaskItem.durationForPeriod(start, end) != null;
+  }
+
   /// Returns a deterministic positive notification ID for a task.
   static int notificationIdForTask(String taskId) {
     var hash = 2166136261;
@@ -215,10 +235,7 @@ class NotificationService {
     if (_scheduledFingerprints[id] == fingerprint) return;
     await _plugin.cancel(id);
     if (prefs.getBool('notificationsEnabled') == false ||
-        task.isDeleted ||
-        task.isCompleted ||
-        task.startTime == null ||
-        task.endTime == null) {
+        !hasSchedulablePeriod(task)) {
       _scheduledFingerprints.remove(id);
       return;
     }
@@ -268,7 +285,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        payload: '$_taskPayloadPrefix${task.id}',
+        payload: taskPayloadForId(task.id),
       );
       _scheduledFingerprints[id] = fingerprint;
     } on Object {
@@ -283,7 +300,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        payload: '$_taskPayloadPrefix${task.id}',
+        payload: taskPayloadForId(task.id),
       );
       _scheduledFingerprints[id] = fingerprint;
     }

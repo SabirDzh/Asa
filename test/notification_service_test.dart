@@ -3,6 +3,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'package:asa/core/notification_service.dart';
+import 'package:asa/features/tasks/models/task_model.dart';
 
 void main() {
   setUpAll(() {
@@ -47,6 +48,87 @@ void main() {
       expect(scheduled.day, 1);
       expect(scheduled.hour, 10);
       expect(scheduled.minute, 30);
+    });
+
+    test('exposes a stable timer action and task payload contract', () {
+      expect(NotificationService.startTimerActionId, 'start_timer');
+      expect(
+        NotificationService.taskPayloadForId('task-42'),
+        'asa_task:task-42',
+      );
+    });
+
+    test('rejects incomplete, zero-length, completed, and deleted periods', () {
+      expect(
+        NotificationService.hasSchedulablePeriod(
+          TaskItem(
+            id: 'incomplete',
+            title: 'Incomplete',
+            startTime: DateTime(2026, 7, 31, 10),
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NotificationService.hasSchedulablePeriod(
+          TaskItem(
+            id: 'zero',
+            title: 'Zero',
+            startTime: DateTime(2026, 7, 31, 10),
+            endTime: DateTime(2026, 7, 31, 10),
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NotificationService.hasSchedulablePeriod(
+          TaskItem(
+            id: 'completed',
+            title: 'Completed',
+            isCompleted: true,
+            startTime: DateTime(2026, 7, 31, 10),
+            endTime: DateTime(2026, 7, 31, 11),
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NotificationService.hasSchedulablePeriod(
+          TaskItem(
+            id: 'deleted',
+            title: 'Deleted',
+            isDeleted: true,
+            startTime: DateTime(2026, 7, 31, 10),
+            endTime: DateTime(2026, 7, 31, 11),
+          ),
+        ),
+        isFalse,
+      );
+    });
+
+    test('accepts daytime and overnight periods', () {
+      expect(
+        NotificationService.hasSchedulablePeriod(
+          TaskItem(
+            id: 'day',
+            title: 'Day',
+            startTime: DateTime(2026, 7, 31, 10),
+            endTime: DateTime(2026, 7, 31, 11),
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        NotificationService.hasSchedulablePeriod(
+          TaskItem(
+            id: 'overnight',
+            title: 'Overnight',
+            startTime: DateTime(2026, 7, 31, 23),
+            endTime: DateTime(2026, 7, 31, 1),
+          ),
+        ),
+        isTrue,
+      );
     });
   });
 }

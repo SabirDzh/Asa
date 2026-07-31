@@ -4,7 +4,12 @@ import 'package:asa/features/tasks/models/task_model.dart';
 void main() {
   group('TaskItem', () {
     test('toJson / fromJson round-trip', () {
-      final task = TaskItem(id: '1', title: 'Test task', isCompleted: true, folderId: 'f1');
+      final task = TaskItem(
+        id: '1',
+        title: 'Test task',
+        isCompleted: true,
+        folderId: 'f1',
+      );
       final json = task.toJson();
       final restored = TaskItem.fromJson(json);
       expect(restored.id, '1');
@@ -42,22 +47,43 @@ void main() {
       expect(restored.expectedDuration, 90);
       expect(restored.startTime?.isAtSameMomentAs(start), true);
       expect(restored.endTime?.isAtSameMomentAs(end), true);
-      expect(restored.timerStartedAt?.isAtSameMomentAs(DateTime(2025, 1, 1, 16, 5)), true);
+      expect(
+        restored.timerStartedAt?.isAtSameMomentAs(DateTime(2025, 1, 1, 16, 5)),
+        true,
+      );
       expect(restored.timerElapsedSeconds, 30);
     });
 
-    test('copyWith updates time fields', () {
-      final task = TaskItem(id: '1', title: 'Task');
-      final start = DateTime(2025, 1, 1, 10, 0);
-      final updated = task.copyWith(startTime: start, expectedDuration: 60);
-      expect(updated.startTime?.isAtSameMomentAs(start), true);
-      expect(updated.expectedDuration, 60);
+    test('calculates period duration and supports overnight periods', () {
+      final daytimeStart = DateTime(2025, 1, 1, 10, 0);
+      final daytimeEnd = DateTime(2025, 1, 1, 11, 0);
+      expect(TaskItem.durationForPeriod(daytimeStart, daytimeEnd), 60);
+
+      final overnightStart = DateTime(2025, 1, 1, 23, 30);
+      final overnightEnd = DateTime(2025, 1, 1, 1, 0);
+      expect(TaskItem.durationForPeriod(overnightStart, overnightEnd), 90);
+      expect(TaskItem.durationForPeriod(daytimeStart, daytimeStart), isNull);
+    });
+
+    test('keeps legacy duration when a task has no period', () {
+      final task = TaskItem(
+        id: '1',
+        title: 'Legacy task',
+        expectedDuration: 45,
+      );
+      expect(task.effectiveDurationMinutes, 45);
     });
   });
 
   group('FolderItem', () {
     test('toJson / fromJson round-trip', () {
-      final folder = FolderItem(id: 'f1', name: 'Work', isSystemStreak: false, parentFolderId: null, iconAsset: 'assets/icons/work.svg');
+      final folder = FolderItem(
+        id: 'f1',
+        name: 'Work',
+        isSystemStreak: false,
+        parentFolderId: null,
+        iconAsset: 'assets/icons/work.svg',
+      );
       final json = folder.toJson();
       final restored = FolderItem.fromJson(json);
       expect(restored.id, 'f1');
@@ -69,7 +95,10 @@ void main() {
 
     test('copyWith preserves unchanged fields', () {
       final folder = FolderItem(id: 'f1', name: 'Work');
-      final copy = folder.copyWith(name: 'Personal', iconAsset: 'assets/icons/study.svg');
+      final copy = folder.copyWith(
+        name: 'Personal',
+        iconAsset: 'assets/icons/study.svg',
+      );
       expect(copy.id, 'f1');
       expect(copy.name, 'Personal');
       expect(copy.isSystemStreak, false);

@@ -86,10 +86,7 @@ class NotificationService {
         DarwinNotificationCategory(
           _taskCategoryIdEn,
           actions: [
-            DarwinNotificationAction.plain(
-              _startTimerActionId,
-              'Start timer',
-            ),
+            DarwinNotificationAction.plain(_startTimerActionId, 'Start timer'),
           ],
         ),
       ],
@@ -98,7 +95,8 @@ class NotificationService {
     await _plugin.initialize(
       settings,
       onDidReceiveNotificationResponse: _handleNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse: notificationBackgroundResponseHandler,
+      onDidReceiveBackgroundNotificationResponse:
+          notificationBackgroundResponseHandler,
     );
     _initialized = true;
   }
@@ -111,12 +109,25 @@ class NotificationService {
 
     var granted = false;
     if (Platform.isAndroid) {
-      final android = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final android =
+          _plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
       granted = await android?.requestNotificationsPermission() ?? false;
     } else if (Platform.isIOS) {
-      final iOS = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-      granted = await iOS?.requestPermissions(alert: true, badge: true, sound: true) ?? false;
+      final iOS =
+          _plugin
+              .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin
+              >();
+      granted =
+          await iOS?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ) ??
+          false;
     } else {
       granted = true;
     }
@@ -144,8 +155,9 @@ class NotificationService {
     );
   }
 
-  /// Synchronizes all task-start reminders. Tasks without a future start time,
-  /// completed tasks, and deleted tasks have their reminder cancelled.
+  /// Synchronizes all task-start reminders. Tasks without a complete period
+  /// (start and end), completed tasks, and deleted tasks have their reminder
+  /// cancelled.
   static Future<void> syncTasks(Iterable<TaskItem> tasks) async {
     final taskList = tasks.toList(growable: false);
     for (final task in taskList) {
@@ -173,9 +185,10 @@ class NotificationService {
   /// reminder is intentionally treated as a daily schedule: a time that has
   /// already passed today is scheduled for tomorrow.
   static tz.TZDateTime nextScheduledStart(DateTime startTime, {DateTime? now}) {
-    final current = now == null
-        ? tz.TZDateTime.now(tz.local)
-        : tz.TZDateTime.from(now, tz.local);
+    final current =
+        now == null
+            ? tz.TZDateTime.now(tz.local)
+            : tz.TZDateTime.from(now, tz.local);
     var scheduled = tz.TZDateTime.from(startTime, tz.local);
     if (!scheduled.isAfter(current)) {
       scheduled = tz.TZDateTime(
@@ -197,20 +210,21 @@ class NotificationService {
 
     final id = notificationIdForTask(task.id);
     final prefs = await SharedPreferences.getInstance();
-    final fingerprint = '${task.title}|${task.startTime?.toIso8601String()}|${task.expectedDuration}|${task.isCompleted}|${task.isDeleted}|$_languageCode';
+    final fingerprint =
+        '${task.title}|${task.startTime?.toIso8601String()}|${task.endTime?.toIso8601String()}|${task.effectiveDurationMinutes}|${task.isCompleted}|${task.isDeleted}|$_languageCode';
     if (_scheduledFingerprints[id] == fingerprint) return;
     await _plugin.cancel(id);
     if (prefs.getBool('notificationsEnabled') == false ||
         task.isDeleted ||
         task.isCompleted ||
-        task.startTime == null) {
+        task.startTime == null ||
+        task.endTime == null) {
       _scheduledFingerprints.remove(id);
       return;
     }
 
     final scheduled = nextScheduledStart(task.startTime!);
 
-    final hasDuration = task.expectedDuration != null && task.expectedDuration! > 0;
     final androidDetails = AndroidNotificationDetails(
       _taskChannelId,
       _tr('Начало задачи', 'Task starts'),
@@ -220,26 +234,30 @@ class NotificationService {
       ),
       importance: Importance.high,
       priority: Priority.high,
-      actions: hasDuration
-          ? [
-              AndroidNotificationAction(
-                _startTimerActionId,
-                _tr('Запустить таймер', 'Start timer'),
-                showsUserInterface: true,
-              ),
-            ]
-          : const [],
+      actions: [
+        AndroidNotificationAction(
+          _startTimerActionId,
+          _tr('Запустить таймер', 'Start timer'),
+          showsUserInterface: true,
+        ),
+      ],
     );
     final iOSDetails = DarwinNotificationDetails(
-      categoryIdentifier: hasDuration
-          ? (_languageCode == 'en' ? _taskCategoryIdEn : _taskCategoryIdRu)
-          : null,
+      categoryIdentifier:
+          _languageCode == 'en' ? _taskCategoryIdEn : _taskCategoryIdRu,
     );
 
-    final body = hasDuration
-        ? '${task.title} · ${_tr('Запустить таймер на', 'Start timer for')} ${_formatDuration(task.expectedDuration!)}?'
-        : task.title;
-    final details = NotificationDetails(android: androidDetails, iOS: iOSDetails);
+    final duration = task.effectiveDurationMinutes;
+    final durationText =
+        duration != null && duration > 0
+            ? ' · ${_tr('Период', 'Period')} ${_formatDuration(duration)}'
+            : '';
+    final body =
+        '${task.title}$durationText · ${_tr('Запустить таймер?', 'Start timer?')}';
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iOSDetails,
+    );
     try {
       await _plugin.zonedSchedule(
         id,
@@ -248,7 +266,8 @@ class NotificationService {
         scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: '$_taskPayloadPrefix${task.id}',
       );
       _scheduledFingerprints[id] = fingerprint;
@@ -262,7 +281,8 @@ class NotificationService {
         scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: '$_taskPayloadPrefix${task.id}',
       );
       _scheduledFingerprints[id] = fingerprint;
@@ -314,11 +334,15 @@ class NotificationService {
     return taskId;
   }
 
-  static Future<void> handleBackgroundResponse(NotificationResponse response) async {
+  static Future<void> handleBackgroundResponse(
+    NotificationResponse response,
+  ) async {
     await _handleNotificationResponse(response);
   }
 
-  static Future<void> _handleNotificationResponse(NotificationResponse response) async {
+  static Future<void> _handleNotificationResponse(
+    NotificationResponse response,
+  ) async {
     if (response.actionId != _startTimerActionId) return;
     final taskId = _taskIdFromPayload(response.payload);
     if (taskId == null) return;
@@ -340,7 +364,6 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_pendingTimerTaskKey, taskId);
   }
-
 }
 
 /// Top-level entry point required by flutter_local_notifications for background

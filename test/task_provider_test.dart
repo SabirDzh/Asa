@@ -29,6 +29,16 @@ void main() {
       expect(provider.allTasks[0].title, 'Test task');
     });
 
+    test('addTask calculates duration from a selected period', () {
+      provider.addTask(
+        'Timed task',
+        startTime: DateTime(2025, 1, 1, 10, 0),
+        endTime: DateTime(2025, 1, 1, 11, 0),
+      );
+
+      expect(provider.allTasks.single.expectedDuration, 60);
+    });
+
     test('addFolder creates a folder', () {
       provider.addFolder('Work');
       expect(provider.filteredFolders.length, 1);
@@ -58,7 +68,10 @@ void main() {
 
       provider.startTimer(taskId, startedAt: startedAt);
       expect(provider.isTimerRunning(taskId), true);
-      expect(provider.elapsedForTask(taskId, now: stoppedAt), const Duration(minutes: 12, seconds: 30));
+      expect(
+        provider.elapsedForTask(taskId, now: stoppedAt),
+        const Duration(minutes: 12, seconds: 30),
+      );
 
       provider.stopTimer(taskId, stoppedAt: stoppedAt);
       expect(provider.isTimerRunning(taskId), false);
@@ -135,22 +148,29 @@ void main() {
       expect(provider.tasks, isEmpty);
     });
 
-    test('setTaskTime updates start, end and expectedDuration', () {
+    test('setTaskTime calculates duration from the selected period', () {
       final taskId = addTaskForTest('Time task');
       final start = DateTime(2025, 1, 1, 16, 0);
       final end = DateTime(2025, 1, 1, 17, 0);
 
-      provider.setTaskTime(
-        taskId,
-        startTime: start,
-        endTime: end,
-        expectedDuration: 90,
-      );
+      provider.setTaskTime(taskId, startTime: start, endTime: end);
 
       final task = provider.tasks.first;
       expect(task.startTime?.isAtSameMomentAs(start), true);
       expect(task.endTime?.isAtSameMomentAs(end), true);
-      expect(task.expectedDuration, 90);
+      expect(task.expectedDuration, 60);
+      expect(task.effectiveDurationMinutes, 60);
+    });
+
+    test('setTaskTime calculates overnight duration', () {
+      final taskId = addTaskForTest('Night task');
+      provider.setTaskTime(
+        taskId,
+        startTime: DateTime(2025, 1, 1, 23, 30),
+        endTime: DateTime(2025, 1, 1, 1, 0),
+      );
+
+      expect(provider.tasks.first.expectedDuration, 90);
     });
 
     test('setFilter changes filter', () {
@@ -188,8 +208,14 @@ void main() {
 
       provider.moveFolderToFolder(parentId, childId);
 
-      expect(provider.folders.firstWhere((f) => f.id == parentId).parentFolderId, null);
-      expect(provider.folders.firstWhere((f) => f.id == childId).parentFolderId, parentId);
+      expect(
+        provider.folders.firstWhere((f) => f.id == parentId).parentFolderId,
+        null,
+      );
+      expect(
+        provider.folders.firstWhere((f) => f.id == childId).parentFolderId,
+        parentId,
+      );
     });
 
     test('moveFolderToFolder ignores missing target parent', () {
@@ -205,55 +231,107 @@ void main() {
       provider.addFolder('Root');
       final rootId = provider.filteredFolders.first.id;
 
-      provider.addFolder('Invalid child', parentFolderId: 'system_streak_folder');
+      provider.addFolder(
+        'Invalid child',
+        parentFolderId: 'system_streak_folder',
+      );
       provider.moveFolderToFolder(rootId, 'system_streak_folder');
 
       expect(provider.folders.where((f) => f.name == 'Invalid child'), isEmpty);
-      expect(provider.folders.firstWhere((f) => f.id == rootId).parentFolderId, null);
+      expect(
+        provider.folders.firstWhere((f) => f.id == rootId).parentFolderId,
+        null,
+      );
     });
 
     test('raw and upsert folder paths reject reserved streak records', () {
-      provider.addFolderRaw(FolderItem(id: 'system_streak_folder', name: 'Fake streak'));
-      provider.addFolderRaw(FolderItem(id: 'raw-system', name: 'System-shaped', isSystemStreak: true));
-      provider.addFolderRaw(FolderItem(
-        id: 'raw-child',
-        name: 'Child of streak',
-        parentFolderId: 'system_streak_folder',
-      ));
+      provider.addFolderRaw(
+        FolderItem(id: 'system_streak_folder', name: 'Fake streak'),
+      );
+      provider.addFolderRaw(
+        FolderItem(
+          id: 'raw-system',
+          name: 'System-shaped',
+          isSystemStreak: true,
+        ),
+      );
+      provider.addFolderRaw(
+        FolderItem(
+          id: 'raw-child',
+          name: 'Child of streak',
+          parentFolderId: 'system_streak_folder',
+        ),
+      );
 
-      expect(provider.upsertFolder(FolderItem(id: 'system_streak_folder', name: 'Fake streak')), false);
-      expect(provider.upsertFolder(FolderItem(id: 'upsert-system', name: 'System-shaped', isSystemStreak: true)), false);
-      expect(provider.upsertFolder(FolderItem(
-        id: 'upsert-child',
-        name: 'Child of streak',
-        parentFolderId: 'system_streak_folder',
-      )), false);
-      expect(provider.folders.where((folder) => folder.id.startsWith('raw-')), isEmpty);
+      expect(
+        provider.upsertFolder(
+          FolderItem(id: 'system_streak_folder', name: 'Fake streak'),
+        ),
+        false,
+      );
+      expect(
+        provider.upsertFolder(
+          FolderItem(
+            id: 'upsert-system',
+            name: 'System-shaped',
+            isSystemStreak: true,
+          ),
+        ),
+        false,
+      );
+      expect(
+        provider.upsertFolder(
+          FolderItem(
+            id: 'upsert-child',
+            name: 'Child of streak',
+            parentFolderId: 'system_streak_folder',
+          ),
+        ),
+        false,
+      );
+      expect(
+        provider.folders.where((folder) => folder.id.startsWith('raw-')),
+        isEmpty,
+      );
     });
 
-    test('loading persisted streak corruption restores user folders to root', () async {
-      final persistedFolder = FolderItem(
-        id: 'user-child',
-        name: 'Recovered folder',
-        parentFolderId: 'system_streak_folder',
-      );
-      final persistedStreak = FolderItem(
-        id: 'system_streak_folder',
-        name: 'Fake streak',
-        isSystemStreak: true,
-      );
-      SharedPreferences.setMockInitialValues({
-        'saved_folders': '[${jsonEncode(persistedFolder.toJson())},${jsonEncode(persistedStreak.toJson())},{"id":"broken","name":42}]',
-      });
+    test(
+      'loading persisted streak corruption restores user folders to root',
+      () async {
+        final persistedFolder = FolderItem(
+          id: 'user-child',
+          name: 'Recovered folder',
+          parentFolderId: 'system_streak_folder',
+        );
+        final persistedStreak = FolderItem(
+          id: 'system_streak_folder',
+          name: 'Fake streak',
+          isSystemStreak: true,
+        );
+        SharedPreferences.setMockInitialValues({
+          'saved_folders':
+              '[${jsonEncode(persistedFolder.toJson())},${jsonEncode(persistedStreak.toJson())},{"id":"broken","name":42}]',
+        });
 
-      final restored = TaskProvider();
-      await restored.ready;
+        final restored = TaskProvider();
+        await restored.ready;
 
-      final recovered = restored.folders.firstWhere((folder) => folder.id == 'user-child');
-      expect(recovered.parentFolderId, isNull);
-      expect(restored.folders.where((folder) => folder.id == 'system_streak_folder'), hasLength(1));
-      expect(restored.folders.where((folder) => folder.name == 'Fake streak'), isEmpty);
-    });
+        final recovered = restored.folders.firstWhere(
+          (folder) => folder.id == 'user-child',
+        );
+        expect(recovered.parentFolderId, isNull);
+        expect(
+          restored.folders.where(
+            (folder) => folder.id == 'system_streak_folder',
+          ),
+          hasLength(1),
+        );
+        expect(
+          restored.folders.where((folder) => folder.name == 'Fake streak'),
+          isEmpty,
+        );
+      },
+    );
 
     test('clearAllFolders soft-deletes folders and their tasks', () {
       provider.addFolder('Work');
@@ -264,8 +342,14 @@ void main() {
 
       expect(provider.folders, isEmpty);
       expect(provider.tasks, isEmpty);
-      expect(provider.allTasks.firstWhere((t) => t.id == taskId).isDeleted, true);
-      expect(provider.allTasks.firstWhere((t) => t.id == taskId).folderId, folderId);
+      expect(
+        provider.allTasks.firstWhere((t) => t.id == taskId).isDeleted,
+        true,
+      );
+      expect(
+        provider.allTasks.firstWhere((t) => t.id == taskId).folderId,
+        folderId,
+      );
     });
 
     test('serializes the latest task state to preferences', () async {
@@ -294,7 +378,11 @@ void main() {
       test('upsertTask overwrites with newer updatedAt', () {
         provider.addTask('Old');
         final id = provider.tasks.first.id;
-        final newer = TaskItem(id: id, title: 'Newer', updatedAt: DateTime.now().add(const Duration(days: 1)));
+        final newer = TaskItem(
+          id: id,
+          title: 'Newer',
+          updatedAt: DateTime.now().add(const Duration(days: 1)),
+        );
 
         final changed = provider.upsertTask(newer);
 
@@ -305,7 +393,11 @@ void main() {
       test('upsertTask keeps newer local task', () {
         provider.addTask('Local');
         final id = provider.tasks.first.id;
-        final older = TaskItem(id: id, title: 'Older', updatedAt: DateTime.now().subtract(const Duration(days: 1)));
+        final older = TaskItem(
+          id: id,
+          title: 'Older',
+          updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+        );
 
         final changed = provider.upsertTask(older);
 
@@ -324,7 +416,11 @@ void main() {
       test('upsertFolder overwrites with newer updatedAt', () {
         provider.addFolder('Old');
         final id = provider.folders.first.id;
-        final newer = FolderItem(id: id, name: 'Newer', updatedAt: DateTime.now().add(const Duration(days: 1)));
+        final newer = FolderItem(
+          id: id,
+          name: 'Newer',
+          updatedAt: DateTime.now().add(const Duration(days: 1)),
+        );
 
         final changed = provider.upsertFolder(newer);
 

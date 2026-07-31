@@ -56,7 +56,6 @@ void main() {
     final task = TaskItem(
       id: 'timed-task',
       title: 'Time task',
-      expectedDuration: 90,
       startTime: DateTime(2025, 1, 1, 10, 0),
       endTime: DateTime(2025, 1, 1, 11, 0),
     );
@@ -74,7 +73,7 @@ void main() {
     await tester.tap(find.text('Time task'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Длительность: 1:30'), findsOneWidget);
+    expect(find.textContaining('Длительность: 1:00'), findsOneWidget);
     expect(find.textContaining('Период: 10:00 – 11:00'), findsOneWidget);
   });
 
@@ -82,7 +81,8 @@ void main() {
     final task = TaskItem(
       id: 'timer-task',
       title: 'Timer task',
-      expectedDuration: 30,
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 10, 30),
     );
 
     await tester.pumpWidget(
@@ -94,8 +94,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Установить время'), findsOneWidget);
-    expect(find.text('Длительность'), findsOneWidget);
     expect(find.text('Период'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
   });
 
   testWidgets('folder ellipsis opens the folder action menu', (tester) async {

@@ -3,12 +3,11 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
-import '../../../core/input_utils.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 
-/// Shows a bottom sheet to set either a duration or a time period for [task].
+/// Shows a bottom sheet to set the start and end period for [task].
 Future<void> showTaskTimeSheet(BuildContext context, TaskItem task) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -27,18 +26,12 @@ class _TaskTimeSheet extends StatefulWidget {
 }
 
 class _TaskTimeSheetState extends State<_TaskTimeSheet> {
-  int? _durationMinutes;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-
-  // A task may have both a period reminder and an expected duration.
-
-  late final TextEditingController _durationController;
 
   @override
   void initState() {
     super.initState();
-    _durationMinutes = widget.task.expectedDuration;
     if (widget.task.startTime != null) {
       final dt = widget.task.startTime!;
       _startTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
@@ -47,29 +40,9 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       final dt = widget.task.endTime!;
       _endTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
     }
-
-    _durationController = TextEditingController(
-      text: _durationMinutes != null ? _formatDuration(_durationMinutes!) : '',
-    );
-    _durationController.addListener(_onDurationChanged);
   }
 
-  @override
-  void dispose() {
-    _durationController.removeListener(_onDurationChanged);
-    _durationController.dispose();
-    super.dispose();
-  }
-
-  void _onDurationChanged() {
-    if (mounted) setState(() {});
-  }
-
-  bool get _hasAnyValue {
-    if (_durationController.text.trim().isNotEmpty) return true;
-    if (_startTime != null || _endTime != null) return true;
-    return false;
-  }
+  bool get _hasCompletePeriod => _startTime != null && _endTime != null;
 
   Future<void> _pickTime(bool isStart) async {
     final current = isStart ? _startTime : _endTime;
@@ -95,7 +68,8 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     int hour = initialTime.hour;
     int minute = initialTime.minute;
@@ -104,72 +78,93 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                settings.tr(titleKey),
-                style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600),
+      builder:
+          (ctx) => Container(
+            decoration: BoxDecoration(
+              color: sheetBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 180,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _WheelList(
-                        initialIndex: hour,
-                        itemCount: 24,
-                        label: (i) => i.toString().padLeft(2, '0'),
-                        onChanged: (i) => hour = i,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(':', style: TextStyle(color: textColor, fontSize: 24)),
-                    ),
-                    Expanded(
-                      child: _WheelList(
-                        initialIndex: minute,
-                        itemCount: 60,
-                        label: (i) => i.toString().padLeft(2, '0'),
-                        onChanged: (i) => minute = i,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
+            ),
+            padding: const EdgeInsets.all(20),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: TextButton.styleFrom(foregroundColor: textSecondary),
-                      child: Text(settings.tr('cancel')),
+                  Text(
+                    settings.tr(titleKey),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, TimeOfDay(hour: hour, minute: minute)),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                      child: Text(settings.tr('save'), style: const TextStyle(color: AppColors.textDark)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 180,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _WheelList(
+                            initialIndex: hour,
+                            itemCount: 24,
+                            label: (i) => i.toString().padLeft(2, '0'),
+                            onChanged: (i) => hour = i,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            ':',
+                            style: TextStyle(color: textColor, fontSize: 24),
+                          ),
+                        ),
+                        Expanded(
+                          child: _WheelList(
+                            initialIndex: minute,
+                            itemCount: 60,
+                            label: (i) => i.toString().padLeft(2, '0'),
+                            onChanged: (i) => minute = i,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                            foregroundColor: textSecondary,
+                          ),
+                          child: Text(settings.tr('cancel')),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              () => Navigator.pop(
+                                ctx,
+                                TimeOfDay(hour: hour, minute: minute),
+                              ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                          ),
+                          child: Text(
+                            settings.tr('save'),
+                            style: const TextStyle(color: AppColors.textDark),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -185,69 +180,27 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     return '$h:$m';
   }
 
-  String _formatDuration(int minutes) {
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    return '$h:${m.toString().padLeft(2, '0')}';
-  }
-
-  int? _parseDuration(String text) {
-    final cleaned = text.trim();
-    if (cleaned.isEmpty) return null;
-    // Support "1:30" -> 90 min, "90" -> 90 min, "1h30" -> 90 min
-    final colon = cleaned.split(':');
-    if (colon.length == 2) {
-      final h = int.tryParse(colon[0].trim()) ?? 0;
-      final m = int.tryParse(colon[1].trim()) ?? 0;
-      return h * 60 + m;
-    }
-    final digits = int.tryParse(cleaned);
-    if (digits != null) return digits;
-    final hMatch = RegExp(r'(\d+)\s*h\s*(\d+)?', caseSensitive: false).firstMatch(cleaned);
-    if (hMatch != null) {
-      final h = int.tryParse(hMatch.group(1)!) ?? 0;
-      final m = int.tryParse(hMatch.group(2) ?? '0') ?? 0;
-      return h * 60 + m;
-    }
-    return null;
-  }
-
   void _save(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final provider = context.read<TaskProvider>();
-
-    int? duration;
-    {
-      final text = _durationController.text.trim();
-      if (text.isNotEmpty) {
-        final parsed = _parseDuration(text);
-        if (parsed != null) {
-          duration = parsed;
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(settings.tr('duration_error'))),
-          );
-          return;
-        }
-      }
-    }
-
-    final start = _toDateTime(_startTime);
-    final end = _toDateTime(_endTime);
-
-    if (start != null && end != null && (end.isBefore(start) || end.isAtSameMomentAs(start))) {
-      if (!mounted) return;
+    if (!_hasCompletePeriod) return;
+    if (_startTime!.hour == _endTime!.hour &&
+        _startTime!.minute == _endTime!.minute) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(settings.tr('invalid_period'))),
+        SnackBar(
+          content: Text(
+            Provider.of<SettingsProvider>(
+              context,
+              listen: false,
+            ).tr('invalid_period'),
+          ),
+        ),
       );
       return;
     }
-
+    final provider = context.read<TaskProvider>();
     provider.setTaskTime(
       widget.task.id,
-      startTime: start,
-      endTime: end,
-      expectedDuration: duration,
+      startTime: _toDateTime(_startTime),
+      endTime: _toDateTime(_endTime),
     );
     Navigator.pop(context);
   }
@@ -257,7 +210,6 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       widget.task.id,
       startTime: null,
       endTime: null,
-      expectedDuration: null,
     );
     Navigator.pop(context);
   }
@@ -268,12 +220,17 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    final animationDuration = Duration(milliseconds: (300 * settings.animationSpeed).round());
+    final animationDuration = Duration(
+      milliseconds: (300 * settings.animationSpeed).round(),
+    );
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: sheetBg,
@@ -297,49 +254,44 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                       child: Container(
                         width: 48,
                         height: 4,
-                        decoration: BoxDecoration(color: textSecondary, borderRadius: BorderRadius.circular(AppTheme.sheetHandleRadius)),
+                        decoration: BoxDecoration(
+                          color: textSecondary,
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.sheetHandleRadius,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),
                     Text(
                       settings.tr('set_time'),
-                      style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 16),
-                    _sectionTitle(Iconsax.timer_1, settings.tr('duration')),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _durationController,
-                      keyboardType: TextInputType.text,
-                      inputFormatters: [textInputFormatter()],
-                      style: TextStyle(color: textColor, fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: '1:30',
-                        hintStyle: TextStyle(color: textSecondary),
-                        filled: true,
-                        fillColor: isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                          borderSide: BorderSide.none,
-                        ),
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _sectionTitle(Iconsax.clock, settings.tr('time_period')),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
                           child: _timeButton(
-                            label: _startTime != null ? _formatTime(_startTime!) : settings.tr('start_time'),
+                            label:
+                                _startTime != null
+                                    ? _formatTime(_startTime!)
+                                    : settings.tr('start_time'),
                             onTap: () => _pickTime(true),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _timeButton(
-                            label: _endTime != null ? _formatTime(_endTime!) : settings.tr('end_time'),
+                            label:
+                                _endTime != null
+                                    ? _formatTime(_endTime!)
+                                    : settings.tr('end_time'),
                             onTap: () => _pickTime(false),
                           ),
                         ),
@@ -356,9 +308,14 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                       onPressed: () => _clear(context),
                       style: TextButton.styleFrom(
                         foregroundColor: textSecondary,
-                        minimumSize: const Size(double.infinity, AppTheme.rowHeight),
+                        minimumSize: const Size(
+                          double.infinity,
+                          AppTheme.rowHeight,
+                        ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.pillRadius,
+                          ),
                         ),
                       ),
                       child: Text(settings.tr('clear')),
@@ -367,12 +324,23 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _hasAnyValue ? () => _save(context) : null,
+                      onPressed:
+                          _hasCompletePeriod ? () => _save(context) : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _hasAnyValue ? AppColors.primary : AppColors.primary.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.pillRadius)),
+                        backgroundColor:
+                            _hasCompletePeriod
+                                ? AppColors.primary
+                                : AppColors.primary.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.pillRadius,
+                          ),
+                        ),
                       ),
-                      child: Text(settings.tr('save'), style: const TextStyle(color: AppColors.textDark)),
+                      child: Text(
+                        settings.tr('save'),
+                        style: const TextStyle(color: AppColors.textDark),
+                      ),
                     ),
                   ),
                 ],
@@ -391,7 +359,14 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       children: [
         Icon(icon, color: textColor, size: 20),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -403,15 +378,23 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       child: Container(
         height: AppTheme.rowHeight,
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight,
+          color:
+              isDark
+                  ? AppColors.surfaceSecondaryDark
+                  : AppColors.surfaceSecondaryLight,
           borderRadius: BorderRadius.circular(AppTheme.pillRadius),
         ),
         alignment: Alignment.center,
-        child: Text(label, style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight, fontSize: 16)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isDark ? AppColors.textDark : AppColors.textLight,
+            fontSize: 16,
+          ),
+        ),
       ),
     );
   }
-
 }
 
 class _WheelList extends StatefulWidget {
@@ -451,7 +434,10 @@ class _WheelListState extends State<_WheelList> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
 
-    final selectedColor = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
+    final selectedColor =
+        isDark
+            ? AppColors.surfaceSecondaryDark
+            : AppColors.surfaceSecondaryLight;
 
     return Stack(
       alignment: Alignment.center,

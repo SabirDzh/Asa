@@ -44,10 +44,12 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Active (non-deleted) tasks.
-  List<TaskItem> get tasks => List.unmodifiable(_tasks.where((t) => !t.isDeleted));
+  List<TaskItem> get tasks =>
+      List.unmodifiable(_tasks.where((t) => !t.isDeleted));
 
   /// Active (non-deleted) folders, including the system streak folder.
-  List<FolderItem> get folders => List.unmodifiable(_folders.where((f) => !f.isDeleted));
+  List<FolderItem> get folders =>
+      List.unmodifiable(_folders.where((f) => !f.isDeleted));
   String get searchQuery => _searchQuery;
   TaskFilter get filter => _filter;
   int get streakCount => _streakCount;
@@ -194,7 +196,9 @@ class TaskProvider with ChangeNotifier {
     if (existingIndex != -1) {
       // Update in place so the streak keeps its ID, position, and any
       // tasks that were dropped into it. Recreating it would orphan tasks.
-      _folders[existingIndex] = _folders[existingIndex].copyWith(name: streakFolderName);
+      _folders[existingIndex] = _folders[existingIndex].copyWith(
+        name: streakFolderName,
+      );
     } else {
       _folders.insert(
         0,
@@ -277,14 +281,17 @@ class TaskProvider with ChangeNotifier {
     final task = _tasks[index];
     var seconds = task.timerElapsedSeconds;
     if (task.timerStartedAt != null) {
-      seconds += (now ?? DateTime.now()).difference(task.timerStartedAt!).inSeconds;
+      seconds +=
+          (now ?? DateTime.now()).difference(task.timerStartedAt!).inSeconds;
     }
     return Duration(seconds: seconds.clamp(0, 1 << 31));
   }
 
   void startTimer(String id, {DateTime? startedAt}) {
     final index = _tasks.indexWhere((task) => task.id == id);
-    if (index == -1 || _tasks[index].isDeleted || _tasks[index].isCompleted) return;
+    if (index == -1 || _tasks[index].isDeleted || _tasks[index].isCompleted) {
+      return;
+    }
     if (_tasks[index].timerStartedAt != null) return;
     _tasks[index] = _tasks[index].copyWith(
       timerStartedAt: startedAt ?? DateTime.now(),
@@ -300,7 +307,8 @@ class TaskProvider with ChangeNotifier {
     final task = _tasks[index];
     final startedAt = task.timerStartedAt;
     if (startedAt == null) return;
-    final elapsed = (stoppedAt ?? DateTime.now()).difference(startedAt).inSeconds;
+    final elapsed =
+        (stoppedAt ?? DateTime.now()).difference(startedAt).inSeconds;
     _tasks[index] = task.copyWith(
       timerStartedAt: null,
       timerElapsedSeconds: task.timerElapsedSeconds + elapsed.clamp(0, 1 << 31),
@@ -326,7 +334,10 @@ class TaskProvider with ChangeNotifier {
   void moveTaskToFolder(String taskId, String? targetFolderId) {
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(folderId: targetFolderId, updatedAt: DateTime.now());
+      _tasks[index] = _tasks[index].copyWith(
+        folderId: targetFolderId,
+        updatedAt: DateTime.now(),
+      );
       notifyListeners();
       _saveToPrefs();
     }
@@ -342,7 +353,9 @@ class TaskProvider with ChangeNotifier {
     if (_wouldCreateFolderCycle(folderId, targetParentFolderId)) return;
 
     final index = _folders.indexWhere((f) => f.id == folderId);
-    if (index != -1 && !_folders[index].isDeleted && !_folders[index].isSystemStreak) {
+    if (index != -1 &&
+        !_folders[index].isDeleted &&
+        !_folders[index].isSystemStreak) {
       _folders[index] = _folders[index].copyWith(
         parentFolderId: targetParentFolderId,
         updatedAt: DateTime.now(),
@@ -369,11 +382,21 @@ class TaskProvider with ChangeNotifier {
     return false;
   }
 
-  void _reorderFoldersByParent(String? parentFolderId, int oldIndex, int newIndex) {
-    final list = _folders
-        .where((f) => f.parentFolderId == parentFolderId && !f.isDeleted)
-        .toList();
-    if (oldIndex < 0 || newIndex < 0 || oldIndex >= list.length || newIndex >= list.length) return;
+  void _reorderFoldersByParent(
+    String? parentFolderId,
+    int oldIndex,
+    int newIndex,
+  ) {
+    final list =
+        _folders
+            .where((f) => f.parentFolderId == parentFolderId && !f.isDeleted)
+            .toList();
+    if (oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= list.length ||
+        newIndex >= list.length) {
+      return;
+    }
 
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
@@ -405,9 +428,8 @@ class TaskProvider with ChangeNotifier {
   }
 
   void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {
-    final folderTasks = _tasks
-        .where((t) => t.folderId == folderId && !t.isDeleted)
-        .toList();
+    final folderTasks =
+        _tasks.where((t) => t.folderId == folderId && !t.isDeleted).toList();
     if (oldIndex < 0 ||
         newIndex < 0 ||
         oldIndex >= folderTasks.length ||
@@ -436,21 +458,25 @@ class TaskProvider with ChangeNotifier {
     String? folderId,
     DateTime? startTime,
     DateTime? endTime,
-    int? expectedDuration,
   }) {
     if (title.isEmpty) return;
     if (title.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
-    _tasks.add(TaskItem(
-      id: _uuid.v4(),
-      title: title,
-      folderId: folderId,
-      startTime: startTime,
-      endTime: endTime,
-      expectedDuration: expectedDuration,
-      updatedAt: DateTime.now(),
-    ));
+    _tasks.add(
+      TaskItem(
+        id: _uuid.v4(),
+        title: title,
+        folderId: folderId,
+        startTime: startTime,
+        endTime: endTime,
+        expectedDuration:
+            startTime != null && endTime != null
+                ? TaskItem.durationForPeriod(startTime, endTime)
+                : null,
+        updatedAt: DateTime.now(),
+      ),
+    );
     notifyListeners();
     _saveToPrefs();
   }
@@ -485,7 +511,10 @@ class TaskProvider with ChangeNotifier {
     final completing = !task.isCompleted;
     var elapsedSeconds = task.timerElapsedSeconds;
     if (completing && task.timerStartedAt != null) {
-      elapsedSeconds += DateTime.now().difference(task.timerStartedAt!).inSeconds.clamp(0, 1 << 31);
+      elapsedSeconds += DateTime.now()
+          .difference(task.timerStartedAt!)
+          .inSeconds
+          .clamp(0, 1 << 31);
     }
 
     _tasks[index] = task.copyWith(
@@ -511,7 +540,10 @@ class TaskProvider with ChangeNotifier {
 
   void _removeTaskCalendarEvent(TaskItem task) {
     if (task.calendarId != null && task.calendarEventId != null) {
-      CalendarService.deleteEvent(task.calendarId!, task.calendarEventId!).catchError((_) {});
+      CalendarService.deleteEvent(
+        task.calendarId!,
+        task.calendarEventId!,
+      ).catchError((_) {});
     }
   }
 
@@ -521,7 +553,10 @@ class TaskProvider with ChangeNotifier {
     }
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(title: newTitle, updatedAt: DateTime.now());
+      _tasks[index] = _tasks[index].copyWith(
+        title: newTitle,
+        updatedAt: DateTime.now(),
+      );
       notifyListeners();
       _saveToPrefs();
       syncTaskCalendarEvent(id).catchError((_) {});
@@ -530,7 +565,11 @@ class TaskProvider with ChangeNotifier {
 
   /// Links the task to a calendar event on [calendarId] at [date].
   /// Updates the existing event if [task.calendarEventId] is already set.
-  Future<void> linkTaskToCalendar(String id, String calendarId, DateTime date) async {
+  Future<void> linkTaskToCalendar(
+    String id,
+    String calendarId,
+    DateTime date,
+  ) async {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index == -1) return;
 
@@ -562,7 +601,10 @@ class TaskProvider with ChangeNotifier {
 
     final task = _tasks[index];
     if (task.calendarId != null && task.calendarEventId != null) {
-      await CalendarService.deleteEvent(task.calendarId!, task.calendarEventId!);
+      await CalendarService.deleteEvent(
+        task.calendarId!,
+        task.calendarEventId!,
+      );
     }
 
     _tasks[index] = task.copyWith(
@@ -576,18 +618,17 @@ class TaskProvider with ChangeNotifier {
 
   /// Updates the time fields of a task. Pass null to clear a field.
   /// Also updates the linked calendar event if one exists.
-  void setTaskTime(
-    String id, {
-    DateTime? startTime,
-    DateTime? endTime,
-    int? expectedDuration,
-  }) {
+  void setTaskTime(String id, {DateTime? startTime, DateTime? endTime}) {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index == -1) return;
+    final calculatedDuration =
+        startTime != null && endTime != null
+            ? TaskItem.durationForPeriod(startTime, endTime)
+            : null;
     _tasks[index] = _tasks[index].copyWith(
       startTime: startTime,
       endTime: endTime,
-      expectedDuration: expectedDuration,
+      expectedDuration: calculatedDuration,
       updatedAt: DateTime.now(),
     );
     notifyListeners();
@@ -654,7 +695,13 @@ class TaskProvider with ChangeNotifier {
       return;
     }
     _folders.add(
-      FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId, iconAsset: iconAsset, updatedAt: DateTime.now()),
+      FolderItem(
+        id: _uuid.v4(),
+        name: name,
+        parentFolderId: parentFolderId,
+        iconAsset: iconAsset,
+        updatedAt: DateTime.now(),
+      ),
     );
     _foldersVersion++;
     notifyListeners();
@@ -708,7 +755,11 @@ class TaskProvider with ChangeNotifier {
       if (newName.length > 250) {
         throw Exception('Название длиннее 250 символов');
       }
-      _folders[index] = _folders[index].copyWith(name: newName, iconAsset: iconAsset, updatedAt: DateTime.now());
+      _folders[index] = _folders[index].copyWith(
+        name: newName,
+        iconAsset: iconAsset,
+        updatedAt: DateTime.now(),
+      );
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
@@ -728,20 +779,23 @@ class TaskProvider with ChangeNotifier {
     if (!visited.add(id)) return false;
 
     final index = _folders.indexWhere((f) => f.id == id);
-    if (index == -1 || _folders[index].isDeleted || _folders[index].isSystemStreak) {
+    if (index == -1 ||
+        _folders[index].isDeleted ||
+        _folders[index].isSystemStreak) {
       return false;
     }
 
     var changed = false;
-    final childIds = _folders
-        .where((f) => f.parentFolderId == id)
-        .map((f) => f.id)
-        .toList();
+    final childIds =
+        _folders.where((f) => f.parentFolderId == id).map((f) => f.id).toList();
     for (final childId in childIds) {
       changed = _removeFolderTree(childId, updatedAt, visited) || changed;
     }
 
-    _folders[index] = _folders[index].copyWith(isDeleted: true, updatedAt: updatedAt);
+    _folders[index] = _folders[index].copyWith(
+      isDeleted: true,
+      updatedAt: updatedAt,
+    );
     changed = true;
     for (var i = 0; i < _tasks.length; i++) {
       if (_tasks[i].folderId == id && !_tasks[i].isDeleted) {

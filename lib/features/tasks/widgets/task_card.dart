@@ -92,7 +92,9 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
             context.read<TaskProvider>().updateTask(widget.task.id, v);
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+              ),
             );
           }
         }
@@ -195,35 +197,50 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
       showTaskTimeSheet(iconContext, widget.task);
     } else if (value == 'calendar') {
       if (widget.task.calendarEventId != null) {
-        await iconContext.read<TaskProvider>().unlinkTaskFromCalendar(widget.task.id);
+        await iconContext.read<TaskProvider>().unlinkTaskFromCalendar(
+          widget.task.id,
+        );
       } else {
         await _linkToCalendar(iconContext);
       }
     } else if (value == 'delete') {
       final isDark = Theme.of(iconContext).brightness == Brightness.dark;
       final bg = isDark ? AppColors.navDark : AppColors.navLight;
-      final text = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+      final text =
+          isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
       final confirmed = await showDialog<bool>(
         context: iconContext,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: bg,
-          title: Text(settings.tr('confirm_delete_title'), style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight)),
-          content: Text(
-            settings.tr('confirm_delete_content'),
-            style: TextStyle(color: text),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(settings.tr('cancel'), style: TextStyle(color: text)),
+        builder:
+            (ctx) => AlertDialog(
+              backgroundColor: bg,
+              title: Text(
+                settings.tr('confirm_delete_title'),
+                style: TextStyle(
+                  color: isDark ? AppColors.textDark : AppColors.textLight,
+                ),
+              ),
+              content: Text(
+                settings.tr('confirm_delete_content'),
+                style: TextStyle(color: text),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(
+                    settings.tr('cancel'),
+                    style: TextStyle(color: text),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(
+                    settings.tr('delete'),
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(settings.tr('delete'), style: const TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
       );
 
       if (confirmed == true && iconContext.mounted) {
@@ -243,7 +260,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     );
     if (date == null || !context.mounted) return;
 
-    final calendars = (await CalendarService.getCalendars()).where((c) => c.id != null && c.id!.isNotEmpty).toList();
+    final calendars =
+        (await CalendarService.getCalendars())
+            .where((c) => c.id != null && c.id!.isNotEmpty)
+            .toList();
     if (calendars.isEmpty) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -264,7 +284,9 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
             backgroundColor: isDark ? AppColors.navDark : AppColors.navLight,
             title: Text(
               settings.tr('calendar_select'),
-              style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight),
+              style: TextStyle(
+                color: isDark ? AppColors.textDark : AppColors.textLight,
+              ),
             ),
             content: SizedBox(
               width: double.maxFinite,
@@ -276,7 +298,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                   return ListTile(
                     title: Text(
                       calendar.name ?? '',
-                      style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight),
+                      style: TextStyle(
+                        color:
+                            isDark ? AppColors.textDark : AppColors.textLight,
+                      ),
                     ),
                     onTap: () => Navigator.pop(context, calendar),
                   );
@@ -289,19 +314,22 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     }
 
     if (selected == null || !context.mounted) return;
-    await context.read<TaskProvider>().linkTaskToCalendar(widget.task.id, selected.id!, date);
+    await context.read<TaskProvider>().linkTaskToCalendar(
+      widget.task.id,
+      selected.id!,
+      date,
+    );
   }
 
   Widget _buildTimeIndicator(BuildContext context) {
     final hasTimeData =
-        widget.task.expectedDuration != null ||
-        widget.task.startTime != null ||
-        widget.task.endTime != null;
+        widget.task.startTime != null || widget.task.endTime != null;
     if (!hasTimeData) return const SizedBox.shrink();
 
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final iconColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Padding(
       padding: const EdgeInsets.only(left: AppTheme.rowGap),
@@ -340,7 +368,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     final cardChild = Container(
       height: AppTheme.rowHeight,
@@ -348,16 +377,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         color: surface,
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),
       ),
-      padding: const EdgeInsets.only(
-        left: AppTheme.rowPadH,
-      ),
+      padding: const EdgeInsets.only(left: AppTheme.rowPadH),
       child: Row(
         children: [
-          Icon(
-            Iconsax.clipboard_tick,
-            color: textSecondary,
-            size: 24,
-          ),
+          Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
           const SizedBox(width: AppTheme.rowGap),
           Expanded(
             child: GestureDetector(
@@ -371,7 +394,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                     color: textSecondary,
                     fontSize: 16,
                     fontWeight: FontWeight.w400,
-                    decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
+                    decoration:
+                        widget.task.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                     decorationColor: textSecondary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -384,25 +410,38 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
             children: [
               if (widget.task.calendarEventId != null && !_isInStreakFolder)
                 Padding(
-                  padding: const EdgeInsets.only(left: AppTheme.rowGap, top: 16, bottom: 16),
-                  child: Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
+                  padding: const EdgeInsets.only(
+                    left: AppTheme.rowGap,
+                    top: 16,
+                    bottom: 16,
+                  ),
+                  child: Icon(
+                    Iconsax.calendar,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
               _buildTimeIndicator(context),
               if (!widget.task.isCompleted)
                 Builder(
-                  builder: (iconCtx) => GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _showPopupMenu(iconCtx),
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        left: AppTheme.rowGap,
-                        right: 0,
-                        top: AppTheme.rowPadV,
-                        bottom: AppTheme.rowPadV,
+                  builder:
+                      (iconCtx) => GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _showPopupMenu(iconCtx),
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            left: AppTheme.rowGap,
+                            right: 0,
+                            top: AppTheme.rowPadV,
+                            bottom: AppTheme.rowPadV,
+                          ),
+                          child: Icon(
+                            Iconsax.more_square,
+                            color: textSecondary,
+                            size: 24,
+                          ),
+                        ),
                       ),
-                      child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
-                    ),
-                  ),
                 ),
               const SizedBox(width: AppTheme.rowGap),
               AnimatedTaskCheckbox(
@@ -428,11 +467,12 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         opacity: Tween(begin: 1.0, end: 0.0).animate(_exitController),
         child: AnimatedBuilder(
           animation: _exitController,
-          builder: (context, child) => Transform.scale(
-            scale: 1.0 - 0.08 * _exitController.value,
-            alignment: Alignment.centerRight,
-            child: child,
-          ),
+          builder:
+              (context, child) => Transform.scale(
+                scale: 1.0 - 0.08 * _exitController.value,
+                alignment: Alignment.centerRight,
+                child: child,
+              ),
           child: cardChild,
         ),
       );
@@ -442,13 +482,14 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         tween: Tween(begin: 0.0, end: 1.0),
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeOutCubic,
-        builder: (context, value, child) => Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 20 * (1 - value)),
-            child: child,
-          ),
-        ),
+        builder:
+            (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 20 * (1 - value)),
+                child: child,
+              ),
+            ),
         child: cardChild,
       );
     }
@@ -474,9 +515,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                 ),
               ],
             ),
-            padding: const EdgeInsets.only(
-              left: AppTheme.rowPadH,
-            ),
+            padding: const EdgeInsets.only(left: AppTheme.rowPadH),
             child: Row(
               children: [
                 Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
@@ -490,7 +529,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                         color: textSecondary,
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
-                        decoration: widget.task.isCompleted ? TextDecoration.lineThrough : null,
+                        decoration:
+                            widget.task.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
                         decorationColor: textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -505,7 +547,11 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                       top: AppTheme.rowPadV,
                       bottom: AppTheme.rowPadV,
                     ),
-                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
+                    child: Icon(
+                      Iconsax.more_square,
+                      color: textSecondary,
+                      size: 24,
+                    ),
                   ),
                 AnimatedTaskCheckbox(
                   isCompleted: widget.task.isCompleted,
@@ -523,10 +569,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           ),
         ),
       ),
-      childWhenDragging: Opacity(
-        opacity: 0.4,
-        child: animatedChild,
-      ),
+      childWhenDragging: Opacity(opacity: 0.4, child: animatedChild),
       child: animatedChild,
     );
   }
@@ -564,8 +607,14 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
       duration: const Duration(milliseconds: 180),
     );
     _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.25), weight: 50),
-      TweenSequenceItem(tween: Tween<double>(begin: 1.25, end: 1.0), weight: 50),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.25),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.25, end: 1.0),
+        weight: 50,
+      ),
     ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
@@ -595,21 +644,34 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: widget.isCompleted ? AppColors.primary : Colors.transparent,
+              color:
+                  widget.isCompleted ? AppColors.primary : Colors.transparent,
               borderRadius: BorderRadius.circular(
-                widget.isCompleted ? AppTheme.checkRadiusDone : AppTheme.checkRadius,
+                widget.isCompleted
+                    ? AppTheme.checkRadiusDone
+                    : AppTheme.checkRadius,
               ),
               border: Border.all(
-                color: widget.isCompleted ? AppColors.primary : widget.textSecondary,
+                color:
+                    widget.isCompleted
+                        ? AppColors.primary
+                        : widget.textSecondary,
                 width: 2,
               ),
             ),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-              child: widget.isCompleted
-                  ? const Icon(Icons.check, key: ValueKey('check'), color: Colors.white, size: 14)
-                  : const SizedBox(key: ValueKey('empty')),
+              transitionBuilder:
+                  (child, anim) => ScaleTransition(scale: anim, child: child),
+              child:
+                  widget.isCompleted
+                      ? const Icon(
+                        Icons.check,
+                        key: ValueKey('check'),
+                        color: Colors.white,
+                        size: 14,
+                      )
+                      : const SizedBox(key: ValueKey('empty')),
             ),
           ),
         ),

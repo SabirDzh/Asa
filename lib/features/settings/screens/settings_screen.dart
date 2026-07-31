@@ -111,21 +111,29 @@ class SettingsScreen extends StatelessWidget {
                   icon: Iconsax.refresh,
                   label: settings.tr('sync'),
                   trailing: Switch(
-                    value: settings.syncEnabled,
-                  onChanged: (value) async {
-                    final tasks = Provider.of<TaskProvider>(context, listen: false);
-                    await settings.setSyncEnabled(value);
-                    if (value) {
-                      final deviceId = await settings.ensureSyncDeviceId();
-                      SyncService.instance.setProvider(tasks);
-                      SyncService.instance.setDeviceName(settings.syncDeviceName);
-                      SyncService.instance.setDeviceId(deviceId);
-                      SyncService.instance.setSecret(settings.syncSecret);
-                      await SyncService.instance.start();
-                    } else {
-                      await SyncService.instance.stop();
-                    }
-                  },
+                    value: settings.syncEnabled,                    onChanged: (value) async {
+                      final tasks = Provider.of<TaskProvider>(context, listen: false);
+                      await settings.setSyncEnabled(value);
+                      if (!context.mounted) return;
+                      if (value) {
+                        final deviceId = await settings.ensureSyncDeviceId();
+                        if (!context.mounted) return;
+                        SyncService.instance.setProvider(tasks);
+                        SyncService.instance.setDeviceName(settings.syncDeviceName);
+                        SyncService.instance.setDeviceId(deviceId);
+                        SyncService.instance.setSecret(settings.syncSecret);
+                        final started = await SyncService.instance.start();
+                        if (!started) {
+                          await settings.setSyncEnabled(false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(settings.tr('sync_start_failed'))),
+                          );
+                        }
+                      } else {
+                        await SyncService.instance.stop();
+                      }
+                    },
                     activeThumbColor: AppColors.primary,
                     trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                   ),

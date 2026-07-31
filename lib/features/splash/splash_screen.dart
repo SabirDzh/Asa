@@ -28,10 +28,15 @@ class _SplashScreenState extends State<SplashScreen> {
     final tasks = context.read<TaskProvider>();
     _readyFuture = Future.wait([settings.ready, tasks.ready]).then((_) async {
       if (settings.syncEnabled) {
+        final deviceId = await settings.ensureSyncDeviceId();
         SyncService.instance.setProvider(tasks);
         SyncService.instance.setDeviceName(settings.syncDeviceName);
+        SyncService.instance.setDeviceId(deviceId);
         SyncService.instance.setSecret(settings.syncSecret);
-        await SyncService.instance.start();
+        final started = await SyncService.instance.start();
+        if (!started) {
+          await settings.setSyncEnabled(false);
+        }
       }
     });
   }

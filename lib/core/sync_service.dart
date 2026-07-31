@@ -39,6 +39,7 @@ class SyncService {
   BonsoirBroadcast? _broadcast;
   BonsoirService? _currentService;
   BonsoirDiscovery? _discovery;
+  StreamSubscription<BonsoirDiscoveryEvent>? _discoverySubscription;
   TaskProvider? _provider;
   String _deviceName = _defaultName;
   String? _secret;
@@ -96,15 +97,21 @@ class SyncService {
   }
 
   /// Starts the sync server and mDNS discovery.
-  Future<void> start() async {
-    if (_running) return;
+  Future<bool> start() async {
+    if (_running) return true;
     _running = true;
 
-    await _startServer();
-    await _startDiscovery();
+    final serverStarted = await _startServer();
+    final discoveryStarted = serverStarted && await _startDiscovery();
+    if (!serverStarted || !discoveryStarted) {
+      await stop();
+      _statusController.add('failed');
+      return false;
+    }
 
     LoggerService.instance.i('Sync service started');
     _statusController.add('started');
+    return true;
   }
 
   /// Stops all sync operations.
@@ -116,6 +123,8 @@ class SyncService {
     await _broadcast?.stop();
     _broadcast = null;
     _currentService = null;
+    await _discoverySubscription?.cancel();
+    _discoverySubscription = null;
     await _discovery?.stop();
     _discovery = null;
     _peers.clear();
@@ -153,7 +162,7 @@ class SyncService {
     }
   }
 
-  Future<void> _startServer() async {
+  Future<bool> _startServer() async {
     try {
       _server = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
       _actualPort = _server!.port;
@@ -199,8 +208,10 @@ class SyncService {
       _broadcast = BonsoirBroadcast(service: _currentService!);
       await _broadcast!.ready;
       await _broadcast!.start();
+      return true;
     } on Exception catch (error, stackTrace) {
       LoggerService.instance.e('Sync server failed', error: error, stackTrace: stackTrace);
+      return false;
     }
   }
 
@@ -224,13 +235,13 @@ class SyncService {
     }
   }
 
-  Future<void> _startDiscovery() async {
+  Future<bool> _startDiscovery() async {
     try {
       _localAddresses = await _loadLocalAddresses();
       _discovery = BonsoirDiscovery(type: _serviceType);
       await _discovery!.ready;
 
-      _discovery!.eventStream!.listen((event) {
+      _discoverySubscription = _discovery!.eventStream!.listen((event) {
         if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
           event.service?.resolve(_discovery!.serviceResolver);
         } else if (event.type ==
@@ -252,8 +263,10 @@ class SyncService {
       });
 
       await _discovery!.start();
+      return true;
     } on Exception catch (error, stackTrace) {
       LoggerService.instance.e('Sync discovery failed', error: error, stackTrace: stackTrace);
+      return false;
     }
   }
 

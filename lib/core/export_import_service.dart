@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -100,18 +101,24 @@ class AsaDataSnapshot {
 
 /// Wire-safe envelope for sync payloads.
 class SyncEnvelope {
+  /// Legacy plaintext secret used by pre-HMAC payloads.
   final String? secret;
+
+  /// HMAC-SHA256 of [payload] for current payloads.
+  final String? mac;
   final String payload;
 
-  const SyncEnvelope({this.secret, required this.payload});
+  const SyncEnvelope({this.secret, this.mac, required this.payload});
 
   Map<String, dynamic> toJson() => {
-        'secret': secret,
+        if (secret != null) 'secret': secret,
+        if (mac != null) 'mac': mac,
         'payload': payload,
       };
 
   factory SyncEnvelope.fromJson(Map<String, dynamic> json) => SyncEnvelope(
         secret: json['secret'] as String?,
+        mac: json['mac'] as String?,
         payload: json['payload'] as String? ?? '',
       );
 }
@@ -280,13 +287,13 @@ class ExportImportService {
       );
     }
 
-    final decoded = decodedRaw as Map<String, dynamic>;
+    final decoded = decodedRaw;
     bool hasSecret = false;
     String payloadJson;
 
     if (decoded.containsKey('payload')) {
       final payloadValue = decoded['payload'];
-      if (payloadValue is! String || (payloadValue as String).isEmpty) {
+      if (payloadValue is! String || payloadValue.isEmpty) {
         return ImportPreview(
           fileName: fileName,
           fileSize: fileSize,
@@ -302,14 +309,52 @@ class ExportImportService {
           errorKey: 'error_invalid_format',
         );
       }
+      if (decoded['mac'] != null && decoded['mac'] is! String) {
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: fileSize,
+          isValid: false,
+          errorKey: 'error_invalid_format',
+        );
+      }
       final envelope = SyncEnvelope.fromJson(decoded);
-      hasSecret = true;
-      if (expectedSecret != null && envelope.secret != expectedSecret) {
+      hasSecret = envelope.secret != null || envelope.mac != null;
+      if (envelope.mac != null) {
+        if (expectedSecret == null) {
+          return ImportPreview(
+            fileName: fileName,
+            fileSize: fileSize,
+            isValid: false,
+            errorKey: 'error_missing_secret',
+            hasSecret: true,
+          );
+        }
+        final expectedMac = _computeMac(expectedSecret, envelope.payload);
+        if (!_constantTimeEquals(envelope.mac!, expectedMac)) {
+          return ImportPreview(
+            fileName: fileName,
+            fileSize: fileSize,
+            isValid: false,
+            errorKey: 'error_invalid_secret',
+            hasSecret: true,
+          );
+        }
+      } else if (envelope.secret != null) {
+        // Do not accept legacy envelopes that put the shared secret on the
+        // wire. Sync payloads must use the HMAC format above.
         return ImportPreview(
           fileName: fileName,
           fileSize: fileSize,
           isValid: false,
           errorKey: 'error_invalid_secret',
+          hasSecret: true,
+        );
+      } else if (expectedSecret != null) {
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: fileSize,
+          isValid: false,
+          errorKey: 'error_missing_secret',
           hasSecret: true,
         );
       }
@@ -346,7 +391,7 @@ class ExportImportService {
       );
     }
 
-    final payload = payloadRaw as Map<String, dynamic>;
+    final payload = payloadRaw;
 
     if (!payload.containsKey('version') ||
         !payload.containsKey('exportedAt') ||
@@ -449,8 +494,25 @@ class ExportImportService {
     if (secret == null) {
       return utf8.encode(payload);
     }
-    final envelope = SyncEnvelope(secret: secret, payload: payload);
+    final envelope = SyncEnvelope(
+      mac: _computeMac(secret, payload),
+      payload: payload,
+    );
     return utf8.encode(jsonEncode(envelope.toJson()));
+  }
+
+  static String _computeMac(String secret, String payload) {
+    final hmac = Hmac(sha256, utf8.encode(secret));
+    return hmac.convert(utf8.encode(payload)).toString();
+  }
+
+  static bool _constantTimeEquals(String left, String right) {
+    if (left.length != right.length) return false;
+    var difference = 0;
+    for (var i = 0; i < left.length; i++) {
+      difference |= left.codeUnitAt(i) ^ right.codeUnitAt(i);
+    }
+    return difference == 0;
   }
 
   static Future<File> _writeToFile(String json) async {

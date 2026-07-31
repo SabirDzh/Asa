@@ -123,7 +123,7 @@ void main() {
     });
 
     group('secret validation', () {
-      test('accepts envelope with correct secret', () async {
+      test('rejects legacy envelope that exposes the secret', () async {
         final payload = AsaDataSnapshot(
           version: '1.1.0',
           exportedAt: 0,
@@ -139,8 +139,8 @@ void main() {
           expectedSecret: '1234',
         );
 
-        expect(result.success, true);
-        expect(result.tasksImported, 1);
+        expect(result.success, false);
+        expect(result.error, 'error_invalid_secret');
       });
 
       test('rejects envelope with wrong secret', () async {
@@ -207,13 +207,65 @@ void main() {
       expect(decoded['tasks'], isA<List<dynamic>>());
     });
 
-    test('buildSyncPayload with secret wraps in envelope', () {
+    test('buildSyncPayload with secret uses a MAC without exposing the secret', () {
       provider.addTask('Task');
       final bytes = ExportImportService.buildSyncPayload(provider, secret: '1234');
       final decoded = _decode(bytes) as Map<String, dynamic>;
 
-      expect(decoded['secret'], '1234');
+      expect(decoded['secret'], isNull);
+      expect(decoded['mac'], isA<String>());
+      expect((decoded['mac'] as String).length, 64);
       expect(decoded['payload'], isA<String>());
+    });
+
+    test('importFromBytes accepts a valid MAC envelope', () async {
+      provider.addTask('Task');
+      final bytes = ExportImportService.buildSyncPayload(provider, secret: '1234');
+
+      final result = await ExportImportService.importFromBytes(
+        TaskProvider(),
+        bytes,
+        expectedSecret: '1234',
+      );
+
+      expect(result.success, true);
+      expect(result.tasksImported, 1);
+    });
+
+    test('importFromBytes rejects a tampered MAC envelope', () async {
+      provider.addTask('Task');
+      final decoded = _decode(
+        ExportImportService.buildSyncPayload(provider, secret: '1234'),
+      ) as Map<String, dynamic>;
+      decoded['mac'] = '0' * 64;
+
+      final result = await ExportImportService.importFromBytes(
+        TaskProvider(),
+        _utf8(decoded),
+        expectedSecret: '1234',
+      );
+
+      expect(result.success, false);
+      expect(result.error, 'error_invalid_secret');
+    });
+
+    test('importFromBytes rejects an unauthenticated envelope', () async {
+      provider.addTask('Task');
+      final decoded = _decode(
+        ExportImportService.buildSyncPayload(provider),
+      ) as Map<String, dynamic>;
+      final unauthenticated = <String, dynamic>{
+        'payload': jsonEncode(decoded),
+      };
+
+      final result = await ExportImportService.importFromBytes(
+        TaskProvider(),
+        _utf8(unauthenticated),
+        expectedSecret: '1234',
+      );
+
+      expect(result.success, false);
+      expect(result.error, 'error_missing_secret');
     });
 
     test('importFromBytes rejects non-UTF8 bytes', () async {

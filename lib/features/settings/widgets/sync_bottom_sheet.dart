@@ -194,7 +194,17 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
   }
 
   Future<void> _refresh() async {
+    final deviceId = await widget.settings.ensureSyncDeviceId();
+    SyncService.instance.setProvider(widget.taskProvider);
+    SyncService.instance.setDeviceName(widget.settings.syncDeviceName);
+    SyncService.instance.setDeviceId(deviceId);
+    SyncService.instance.setSecret(widget.settings.syncSecret);
     await SyncService.instance.stop();
-    await SyncService.instance.start();
+    final started = await SyncService.instance.start();
+    if (!started && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.settings.tr('sync_start_failed'))),
+      );
+    }
   }
 }

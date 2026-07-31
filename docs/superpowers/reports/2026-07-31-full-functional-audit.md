@@ -23,7 +23,7 @@
 | Task editor, information blocks, attachments, time, manual timer | Pure/provider contracts and editor flows are covered; detail now renders saved blocks | Quantity/link/file/image bounds and malformed metadata are covered by model/service tests | Draft cancellation and picker UI remain harness-blocked | Timer persistence and planned-vs-actual semantics pass in provider/model tests | Task 3 gate: 72 tests passed; format/analyze/diff passed; editor/detail widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit task editor and timer workflows` |
 | Settings, theme, language, scale, notifications, avatar | Provider/service contracts pass; language is wired into MaterialApp locale | Image validation and settings bounds are covered by focused tests | Settings widget flow and native permission/picker paths are harness/device-blocked | Lifecycle/native behavior remains device-blocked | Task 4 gate: 44 tests passed; format/analyze/diff passed; settings widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit settings and lifecycle workflows` |
 | Export/import, sync, logging, calendar, external integrations | Pure export/import, HMAC, logger, and attachment contracts pass | Malformed JSON/UTF-8/lists, size limits, tampering, frame bounds, unsafe links and paths covered | Picker cancellation, share result, calendar permission and external handlers are native/device-blocked | Sync lifecycle pure tests pass; LAN and app-kill scenarios remain device-blocked | Task 5 gate: 53 tests passed; format/analyze/diff passed | Android device not connected | PASS automated contracts + BLOCKED native/device evidence | Task 5 audit deliverable |
-| Android notifications, widgets, calendar, picker, APK install | Not run | Not run | Not run | Not run | Native device evidence pending | `adb devices -l`: no devices | BLOCKED | — |
+| Android notifications, widgets, calendar, picker, APK install | APK artifact and native declarations verified; runtime install/launch not possible | Device negative paths not executable | Runtime permissions, exact alarms, picker/calendar/share outcomes blocked | Background/resume, widget refresh, restart persistence and LAN sync blocked | Native Gradle gate passed; APK v2 signature verified | `adb devices -l`: no devices; only macOS/Chrome in `flutter devices` | BLOCKED runtime / PASS native compile | Task 6 blocked-matrix deliverable |
 
 ## Automated command evidence
 
@@ -126,7 +126,18 @@ The widget-test timeouts are not reported as passes and do not invalidate the in
 
 ## Android device evidence
 
-No Android device was connected during Task 1. The following real-device scenarios remain blocked until an Android device is available:
+Task 6 evidence (the checked plan steps represent attempted checks and documented outcomes; `BLOCKED` is not a runtime pass):
+
+- `adb devices -l` — **BLOCKED**: `List of devices attached` contained no devices.
+- `flutter devices` — **BLOCKED** for Android: only macOS desktop and Chrome web were connected; no Android device or emulator was available. Flutter also reported an unavailable wireless iPhone, which is not relevant to the Android matrix.
+- Existing APK: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`, approximately 21 MB.
+- `apksigner verify --verbose` — **PASS**; APK Signature Scheme v2 verified, one signer, v1/v3/v4 not enabled.
+- `(cd android && ./gradlew :app:processDebugResources :app:compileDebugKotlin --no-daemon)` — **PASS**; `BUILD SUCCESSFUL` in 13 seconds, 4 tasks executed and 206 up-to-date.
+- Android package ID: `com.example.asa`.
+- Manifest declarations inspected: `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, and three exported home-screen widget receivers (`AsaWidgetProvider`, `AsaWidgetStatsProvider`, `AsaWidgetTasksProvider`).
+- `adb install`, launch, logcat, notification delivery/action, widget rendering, calendar, picker, avatar, and LAN sync could not be executed without a connected Android device; they remain **BLOCKED**, not passed.
+
+No Android device was connected during Task 6. The following real-device scenarios remain blocked until an Android device is available:
 
 - APK install and launch through ADB.
 - Runtime notification permission and exact-alarm behavior.
@@ -146,7 +157,7 @@ No Android device was connected during Task 1. The following real-device scenari
 
 ## Blocked scenarios and unresolved risks
 
-- Android real-device matrix is blocked by the absence of an ADB-connected Android device.
+- Android real-device matrix is blocked by the absence of an ADB-connected Android device; native resource/Kotlin compilation passed independently.
 - `task_editor_sheet_test.dart` and `task_folder_popup_menu_test.dart` each hang after test startup in the current widget harness and require separate harness diagnosis; Task 3's new detail regression is therefore not executable evidence yet.
 - Passing unit/service tests do not prove native notification delivery, calendar operations, widget rendering, picker behavior, or external URL/file opening.
 - Exact-alarm denial may cause Android notification fallback to be inexact; this must be measured on-device rather than inferred from unit tests.

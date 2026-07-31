@@ -61,31 +61,22 @@ Expected before the fix: one `unnecessary_import` issue in `test/input_utils_tes
 
 Delete the import that analyzer identifies as unused; keep all imports required by the test and do not broaden the test change.
 
-- [ ] **Step 3: Add explicit high-value lint rules**
+- [ ] **Step 3: Keep the baseline analyzer gate bounded**
 
-Update `analysis_options.yaml` so it retains the Flutter defaults and enables rules that catch this project’s confirmed risks:
+Update `analysis_options.yaml` so it retains the Flutter defaults and makes the confirmed unused-import diagnostic fail the gate without starting an unbounded migration:
 
 ```yaml
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
-  language:
-    strict-casts: true
-    strict-inference: true
-    strict-raw-types: true
   errors:
     unnecessary_import: error
-    unawaited_futures: error
-    use_build_context_synchronously: error
 
 linter:
-  rules:
-    avoid_print: true
-    unawaited_futures: true
-    use_build_context_synchronously: true
+  rules: []
 ```
 
-If an enabled rule conflicts with an intentional existing platform boundary, resolve the specific diagnostic with a narrow annotation or awaited call and document why; do not disable the rule globally.
+Do not add global `strict-casts`, `strict-inference`, `strict-raw-types`, `unawaited_futures`, or `use_build_context_synchronously` enforcement in this baseline task. The baseline run identified existing violations for those rules; later tasks will fix concrete violations and can enable each rule only after its scope is clean. Never silence those diagnostics with global ignores.
 
 - [ ] **Step 4: Run the quality gate**
 
@@ -97,7 +88,7 @@ dart analyze
 flutter test test/input_utils_test.dart
 ```
 
-Expected: formatter exits 0, analyzer reports `No issues found!`, and the focused test passes.
+Expected: the focused formatter check for the changed files exits 0, analyzer reports `No issues found!`, and the focused test passes. A repository-wide formatter migration is tracked separately and must not be hidden in this task’s commit.
 
 - [ ] **Step 5: Commit**
 

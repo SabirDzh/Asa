@@ -264,6 +264,88 @@ void main() {
       expect(provider.filteredFolders[0].name, 'Work Projects');
     });
 
+    test(
+      'search and filters compose across active and completed tasks',
+      () async {
+        await provider.ready;
+        provider.addFolder('Work Projects');
+        provider.addFolder('Personal');
+        addTaskForTest('Write report');
+        final completedId = addTaskForTest('Read book');
+        provider.toggleTask(completedId);
+
+        provider.setSearchQuery('report');
+        expect(provider.filteredInProgressTasks.map((task) => task.title), [
+          'Write report',
+        ]);
+        expect(provider.filteredCompletedTasks, isEmpty);
+
+        provider.setSearchQuery('');
+        provider.setFilter(TaskFilter.completed);
+        expect(provider.filteredInProgressTasks, isEmpty);
+        expect(provider.filteredCompletedTasks.map((task) => task.title), [
+          'Read book',
+        ]);
+
+        provider.setFilter(TaskFilter.active);
+        expect(provider.filteredCompletedTasks, isEmpty);
+        expect(provider.filteredInProgressTasks.map((task) => task.title), [
+          'Write report',
+        ]);
+
+        provider.setFilter(TaskFilter.foldersOnly);
+        expect(provider.filteredInProgressTasks, isEmpty);
+        expect(provider.filteredCompletedTasks, isEmpty);
+        expect(
+          provider.filteredFolders.any(
+            (folder) => folder.name == 'Work Projects',
+          ),
+          isTrue,
+        );
+
+        provider.setSearchQuery('work');
+        expect(provider.filteredFolders.map((folder) => folder.name), [
+          'Work Projects',
+        ]);
+      },
+    );
+
+    test(
+      'invalid reorder operations leave task and folder order unchanged',
+      () async {
+        await provider.ready;
+        provider.addFolder('First');
+        provider.addFolder('Second');
+        final folderIdsBefore =
+            provider.filteredFolders.map((folder) => folder.id).toList();
+        final userFolderId =
+            provider.filteredFolders
+                .firstWhere((folder) => !folder.isSystemStreak)
+                .id;
+        provider.addTask('First task', folderId: userFolderId);
+        provider.addTask('Second task', folderId: userFolderId);
+        final taskIdsBefore =
+            provider
+                .getFolderTasks(userFolderId)
+                .map((task) => task.id)
+                .toList();
+
+        provider.reorderRootFolders(-1, 0);
+        provider.reorderRootFolders(0, 999);
+        provider.reorderFolderTasks(userFolderId, -1, 0);
+        provider.reorderFolderTasks(userFolderId, 0, 999);
+
+        expect(
+          provider.filteredFolders.map((folder) => folder.id).toList(),
+          folderIdsBefore,
+        );
+        expect(
+          provider.getFolderTasks(userFolderId).map((task) => task.id).toList(),
+          taskIdsBefore,
+        );
+      },
+    );
+
     test('moveTaskToFolder moves task between folders', () {
       provider.addFolder('Work');
       final folderId = provider.filteredFolders.first.id;

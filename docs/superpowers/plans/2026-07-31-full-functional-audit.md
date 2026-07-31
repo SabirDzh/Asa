@@ -125,7 +125,7 @@ git commit -m "test: establish functional audit baseline"
 - Consumes: `TaskProvider` CRUD/filter/reorder/timer APIs and existing screen navigation.
 - Produces: regression tests/evidence for every task/folder state transition and safe UI behavior.
 
-- [ ] **Step 1: Verify valid task/folder flows**
+- [x] **Step 1: Verify valid task/folder flows**
 
 Exercise and assert:
 
@@ -139,7 +139,7 @@ Exercise and assert:
 - open home, folder detail, breadcrumb/back, empty folder, and streak folder states;
 - verify drag disabled/enabled paths and long-title overflow behavior.
 
-- [ ] **Step 2: Verify invalid and boundary inputs**
+- [x] **Step 2: Verify invalid and boundary inputs**
 
 Assert with tests after arranging a provider with one root folder, one child folder, and one task in the root folder:
 
@@ -168,11 +168,11 @@ expect(provider.folders.firstWhere((folder) => folder.id == rootId).parentFolder
 
 Also cover empty/whitespace title behavior, reserved streak-folder insertion, malformed persisted records, duplicate IDs, folder cycles, and task references to deleted folders.
 
-- [ ] **Step 3: Verify persistence and reload outcomes**
+- [x] **Step 3: Verify persistence and reload outcomes**
 
 After each mutation call `await provider.flushPersistence()`, construct a new provider with the same mock preferences, await `ready`, and compare visible data, soft-delete flags, order, timer fields, info blocks, and folder hierarchy.
 
-- [ ] **Step 4: Fix only reproducible defects and add regressions**
+- [x] **Step 4: Fix only reproducible defects and add regressions**
 
 For each failure, add the smallest failing test first, implement the smallest fix, and rerun the affected file. Do not redesign navigation or models for a test that already passes.
 
@@ -190,6 +190,8 @@ git commit -m "test: audit task and folder workflows"
 ```
 
 If no production defect exists, the report and focused regression tests still form the task deliverable; do not create an empty commit.
+
+- [x] **Step 5: Review, validate, and commit**
 
 ---
 

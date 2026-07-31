@@ -48,6 +48,21 @@
 
 The widget-test timeouts are not reported as passes and do not invalidate the independent 153-test result.
 
+## Task 2: Task and folder workflow evidence
+
+- Provider/model/input focused gate: **PASS** — 66 tests passed, exit code 0.
+- `dart format --output=none --set-exit-if-changed test/task_provider_test.dart` — **PASS**.
+- `dart analyze test/task_provider_test.dart lib/features/tasks/providers/task_provider.dart` — **PASS**; no issues found.
+- `git diff --check` — **PASS**.
+- Added deterministic regression coverage for composed task search/filter behavior, including `foldersOnly`, and invalid task/folder reorder operations preserving state.
+- Existing coverage confirmed CRUD, nested-folder cycle protection, streak-folder protection, soft-delete cascades, persistence/reload, timer state, and malformed persisted records.
+- No reproducible production defect was found in this task; no production source change was needed.
+- HomeScreen widget test `opens create folder sheet on FAB tap` — **BLOCKED**, timed out after 300 seconds with exit code 142. This is recorded as harness evidence, not a product pass/fail.
+
+| Function | Valid cases | Invalid/boundary cases | Cancel/permission cases | Lifecycle/offline cases | Automated evidence | Device evidence | Result | Defect/commit |
+|---|---|---|---|---|---|---|---|---|
+| Task/folder CRUD, search, filters, ordering | CRUD, nested folders, movement, filters/search, soft-delete, streak protection | Length limits, invalid indices, cycles, malformed persistence | UI cancel/permission cases pending widget/device audit | Persistence and coalesced writes passed in existing tests | 66 Task 2 tests passed | Android unavailable | PASS for automated core; UI/device checks pending | `test: audit task and folder workflows` |
+
 ## Android device evidence
 
 No Android device was connected during Task 1. The following real-device scenarios remain blocked until an Android device is available:

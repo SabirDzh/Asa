@@ -35,11 +35,15 @@ void main() {
         expectedDuration: 90,
         startTime: start,
         endTime: end,
+        timerStartedAt: DateTime(2025, 1, 1, 16, 5),
+        timerElapsedSeconds: 30,
       );
       final restored = TaskItem.fromJson(task.toJson());
       expect(restored.expectedDuration, 90);
       expect(restored.startTime?.isAtSameMomentAs(start), true);
       expect(restored.endTime?.isAtSameMomentAs(end), true);
+      expect(restored.timerStartedAt?.isAtSameMomentAs(DateTime(2025, 1, 1, 16, 5)), true);
+      expect(restored.timerElapsedSeconds, 30);
     });
 
     test('copyWith updates time fields', () {

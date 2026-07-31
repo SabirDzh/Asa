@@ -71,6 +71,7 @@ class SettingsProvider with ChangeNotifier {
       _themeMode = ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
+      NotificationService.setLanguage(_languageCode);
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
       _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
       _customAnimationSpeeds = _loadDoubleList(prefs, 'customAnimationSpeeds');
@@ -123,6 +124,7 @@ class SettingsProvider with ChangeNotifier {
         granted = await NotificationService.requestPermission();
         if (granted) {
           await NotificationService.showTestNotification();
+          await NotificationService.rescheduleCachedTasks();
         }
       }
       _notificationsEnabled = granted;
@@ -141,6 +143,7 @@ class SettingsProvider with ChangeNotifier {
   Future<void> setLanguage(String code) async {
     if (code != 'ru' && code != 'en') return;
     _languageCode = code;
+    NotificationService.setLanguage(code);
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('languageCode', code);

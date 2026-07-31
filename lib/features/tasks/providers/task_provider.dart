@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/calendar_service.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/logger_service.dart';
+import '../../../core/notification_service.dart';
 
 enum TaskFilter { all, active, completed, foldersOnly }
 
@@ -91,6 +92,15 @@ class TaskProvider with ChangeNotifier {
       await prefs.setString('saved_tasks', tasksJson);
       await prefs.setString('saved_folders', foldersJson);
       HomeWidgetService.updateData(this);
+      try {
+        await NotificationService.syncTasks(_tasks);
+      } on Object catch (error, stackTrace) {
+        LoggerService.instance.w(
+          'Task notification sync failed; data was saved',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     } on Exception catch (error, stackTrace) {
       LoggerService.instance.e(
         'Task persistence failed',
@@ -256,6 +266,62 @@ class TaskProvider with ChangeNotifier {
 
   List<TaskItem> get allTasks => List.unmodifiable(_tasks);
 
+  bool isTimerRunning(String id) {
+    final index = _tasks.indexWhere((task) => task.id == id);
+    return index != -1 && _tasks[index].timerStartedAt != null;
+  }
+
+  Duration elapsedForTask(String id, {DateTime? now}) {
+    final index = _tasks.indexWhere((task) => task.id == id);
+    if (index == -1) return Duration.zero;
+    final task = _tasks[index];
+    var seconds = task.timerElapsedSeconds;
+    if (task.timerStartedAt != null) {
+      seconds += (now ?? DateTime.now()).difference(task.timerStartedAt!).inSeconds;
+    }
+    return Duration(seconds: seconds.clamp(0, 1 << 31));
+  }
+
+  void startTimer(String id, {DateTime? startedAt}) {
+    final index = _tasks.indexWhere((task) => task.id == id);
+    if (index == -1 || _tasks[index].isDeleted || _tasks[index].isCompleted) return;
+    if (_tasks[index].timerStartedAt != null) return;
+    _tasks[index] = _tasks[index].copyWith(
+      timerStartedAt: startedAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+    _saveToPrefs();
+  }
+
+  void stopTimer(String id, {DateTime? stoppedAt}) {
+    final index = _tasks.indexWhere((task) => task.id == id);
+    if (index == -1) return;
+    final task = _tasks[index];
+    final startedAt = task.timerStartedAt;
+    if (startedAt == null) return;
+    final elapsed = (stoppedAt ?? DateTime.now()).difference(startedAt).inSeconds;
+    _tasks[index] = task.copyWith(
+      timerStartedAt: null,
+      timerElapsedSeconds: task.timerElapsedSeconds + elapsed.clamp(0, 1 << 31),
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+    _saveToPrefs();
+  }
+
+  void resetTimer(String id) {
+    final index = _tasks.indexWhere((task) => task.id == id);
+    if (index == -1) return;
+    _tasks[index] = _tasks[index].copyWith(
+      timerStartedAt: null,
+      timerElapsedSeconds: 0,
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+    _saveToPrefs();
+  }
+
   // ── Drag & Move methods ─────────────────────────────────────
   void moveTaskToFolder(String taskId, String? targetFolderId) {
     final index = _tasks.indexWhere((t) => t.id == taskId);
@@ -413,14 +479,23 @@ class TaskProvider with ChangeNotifier {
 
   void toggleTask(String id) {
     final index = _tasks.indexWhere((t) => t.id == id);
-    if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(
-        isCompleted: !_tasks[index].isCompleted,
-        updatedAt: DateTime.now(),
-      );
-      notifyListeners();
-      _saveToPrefs();
+    if (index == -1) return;
+
+    final task = _tasks[index];
+    final completing = !task.isCompleted;
+    var elapsedSeconds = task.timerElapsedSeconds;
+    if (completing && task.timerStartedAt != null) {
+      elapsedSeconds += DateTime.now().difference(task.timerStartedAt!).inSeconds.clamp(0, 1 << 31);
     }
+
+    _tasks[index] = task.copyWith(
+      isCompleted: completing,
+      timerStartedAt: completing ? null : task.timerStartedAt,
+      timerElapsedSeconds: elapsedSeconds,
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+    _saveToPrefs();
   }
 
   void removeTask(String id) {

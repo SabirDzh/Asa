@@ -7,6 +7,8 @@ class TaskItem {
   DateTime? startTime;
   DateTime? endTime;
   int? expectedDuration;
+  DateTime? timerStartedAt;
+  int timerElapsedSeconds;
   String? calendarId;
   String? calendarEventId;
   final DateTime createdAt;
@@ -22,6 +24,8 @@ class TaskItem {
     this.startTime,
     this.endTime,
     this.expectedDuration,
+    this.timerStartedAt,
+    this.timerElapsedSeconds = 0,
     this.calendarId,
     this.calendarEventId,
     DateTime? createdAt,
@@ -39,6 +43,8 @@ class TaskItem {
         'startTime': startTime?.toIso8601String(),
         'endTime': endTime?.toIso8601String(),
         'expectedDuration': expectedDuration,
+        'timerStartedAt': timerStartedAt?.toIso8601String(),
+        'timerElapsedSeconds': timerElapsedSeconds,
         'calendarId': calendarId,
         'calendarEventId': calendarEventId,
         'createdAt': createdAt.toIso8601String(),
@@ -55,6 +61,8 @@ class TaskItem {
         startTime: json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
         endTime: json['endTime'] != null ? DateTime.parse(json['endTime']) : null,
         expectedDuration: json['expectedDuration'],
+        timerStartedAt: json['timerStartedAt'] != null ? DateTime.parse(json['timerStartedAt']) : null,
+        timerElapsedSeconds: json['timerElapsedSeconds'] is int ? json['timerElapsedSeconds'] as int : 0,
         calendarId: json['calendarId'],
         calendarEventId: json['calendarEventId'],
         createdAt: json['createdAt'] != null
@@ -75,6 +83,8 @@ class TaskItem {
     Object? startTime = const Object(),
     Object? endTime = const Object(),
     Object? expectedDuration = const Object(),
+    Object? timerStartedAt = const Object(),
+    int? timerElapsedSeconds,
     Object? calendarId = const Object(),
     Object? calendarEventId = const Object(),
     DateTime? createdAt,
@@ -90,6 +100,8 @@ class TaskItem {
       startTime: startTime == const Object() ? this.startTime : startTime as DateTime?,
       endTime: endTime == const Object() ? this.endTime : endTime as DateTime?,
       expectedDuration: expectedDuration == const Object() ? this.expectedDuration : expectedDuration as int?,
+      timerStartedAt: timerStartedAt == const Object() ? this.timerStartedAt : timerStartedAt as DateTime?,
+      timerElapsedSeconds: timerElapsedSeconds ?? this.timerElapsedSeconds,
       calendarId: calendarId == const Object() ? this.calendarId : calendarId as String?,
       calendarEventId: calendarEventId == const Object() ? this.calendarEventId : calendarEventId as String?,
       createdAt: createdAt ?? this.createdAt,

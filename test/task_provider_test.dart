@@ -51,6 +51,37 @@ void main() {
       expect(provider.allTasks.first.isCompleted, false);
     });
 
+    test('timer persists elapsed time across stop and reset', () {
+      final taskId = addTaskForTest('Timed task');
+      final startedAt = DateTime(2025, 1, 1, 10, 0);
+      final stoppedAt = startedAt.add(const Duration(minutes: 12, seconds: 30));
+
+      provider.startTimer(taskId, startedAt: startedAt);
+      expect(provider.isTimerRunning(taskId), true);
+      expect(provider.elapsedForTask(taskId, now: stoppedAt), const Duration(minutes: 12, seconds: 30));
+
+      provider.stopTimer(taskId, stoppedAt: stoppedAt);
+      expect(provider.isTimerRunning(taskId), false);
+      expect(provider.allTasks.first.timerElapsedSeconds, 750);
+
+      provider.resetTimer(taskId);
+      expect(provider.elapsedForTask(taskId), Duration.zero);
+      expect(provider.allTasks.first.timerElapsedSeconds, 0);
+    });
+
+    test('completing a running task stops and records its timer', () {
+      final taskId = addTaskForTest('Complete timed task');
+      final startedAt = DateTime.now().subtract(const Duration(minutes: 3));
+
+      provider.startTimer(taskId, startedAt: startedAt);
+      provider.toggleTask(taskId);
+
+      final task = provider.allTasks.first;
+      expect(task.isCompleted, true);
+      expect(task.timerStartedAt, isNull);
+      expect(task.timerElapsedSeconds, greaterThanOrEqualTo(180));
+    });
+
     test('updateTask changes title', () {
       final taskId = addTaskForTest('Old title');
 

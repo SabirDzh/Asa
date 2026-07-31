@@ -141,6 +141,9 @@ class _TaskDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final taskProvider = context.watch<TaskProvider>();
+    final isTimerRunning = taskProvider.isTimerRunning(task.id);
+    final elapsed = taskProvider.elapsedForTask(task.id);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
@@ -180,6 +183,12 @@ class _TaskDetailSheet extends StatelessWidget {
               _infoTile(Iconsax.folder_minus, '${settings.tr('folder')}: ${_folderName(context)}', textColor),
               _infoTile(Iconsax.clock, '${settings.tr('task_status')}: ${_statusText(context)}', textColor),
               _infoTile(Iconsax.timer_1, _timeInfo(context), textColor),
+              if (task.expectedDuration != null && task.expectedDuration! > 0)
+                _infoTile(
+                  isTimerRunning ? Iconsax.pause_circle : Iconsax.play_circle,
+                  '${settings.tr(isTimerRunning ? 'timer_running' : 'timer_ready')}: ${_formatDuration(elapsed.inMinutes)}',
+                  textColor,
+                ),
               if (!_isInStreakFolder)
                 _infoTile(
                   task.calendarEventId != null ? Iconsax.calendar : Iconsax.calendar_remove,
@@ -196,6 +205,26 @@ class _TaskDetailSheet extends StatelessWidget {
                 Navigator.pop(context);
                 showTaskTimeSheet(context, task);
               }, textColor),
+              if (task.expectedDuration != null && task.expectedDuration! > 0)
+                _actionTile(
+                  isTimerRunning ? Iconsax.pause_circle : Iconsax.play_circle,
+                  settings.tr(isTimerRunning ? 'timer_stop' : 'timer_start'),
+                  () {
+                    if (isTimerRunning) {
+                      taskProvider.stopTimer(task.id);
+                    } else {
+                      taskProvider.startTimer(task.id);
+                    }
+                  },
+                  textColor,
+                ),
+              if (elapsed > Duration.zero && !isTimerRunning)
+                _actionTile(
+                  Iconsax.refresh,
+                  settings.tr('timer_reset'),
+                  () => taskProvider.resetTimer(task.id),
+                  textSecondary,
+                ),
               if (!_isInStreakFolder)
                 if (task.calendarEventId != null)
                   _actionTile(Iconsax.calendar_remove, settings.tr('remove_from_calendar'), () {

@@ -20,8 +20,20 @@ void main() async {
   try {
     tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
   } catch (_) {
-    // Fall back to UTC if the platform timezone name is not in the IANA database.
-    tz.setLocalLocation(tz.UTC);
+    // Some platforms expose only an abbreviation (for example, "MSK"),
+    // which is not an IANA identifier. Keep the device's actual offset instead
+    // of silently shifting reminders to UTC.
+    final offset = DateTime.now().timeZoneOffset.inMilliseconds;
+    tz.setLocalLocation(
+      tz.Location(
+        'device-offset',
+        const <int>[],
+        const <int>[],
+        <tz.TimeZone>[
+          tz.TimeZone(offset, isDst: false, abbreviation: 'LOCAL'),
+        ],
+      ),
+    );
   }
   LoggerService.listenToFlutterErrors();
 
@@ -54,10 +66,23 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final tasks = context.read<TaskProvider>();
+    NotificationService.onStartTimerRequested = (taskId) async {
+      await tasks.ready;
+      tasks.startTimer(taskId);
+    };
+    _consumePendingTimerAction(tasks);
+  }
+
+  Future<void> _consumePendingTimerAction(TaskProvider tasks) async {
+    await tasks.ready;
+    final taskId = await NotificationService.consumePendingTimerStart();
+    if (taskId != null) tasks.startTimer(taskId);
   }
 
   @override
   void dispose() {
+    NotificationService.onStartTimerRequested = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -67,6 +92,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
     if (state != AppLifecycleState.resumed || !mounted) return;
     final settings = context.read<SettingsProvider>();
     final tasks = context.read<TaskProvider>();
+    _consumePendingTimerAction(tasks);
     HomeWidgetService.updateSettings(
       enabled: settings.showInWidget,
       mode: settings.widgetDisplayMode,

@@ -31,9 +31,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
 
-  // Duration/period are mutually exclusive; duration is the default.
-  bool _showDuration = true;
-  bool _showPeriod = false;
+  // A task may have both a period reminder and an expected duration.
 
   late final TextEditingController _durationController;
 
@@ -48,15 +46,6 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     if (widget.task.endTime != null) {
       final dt = widget.task.endTime!;
       _endTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
-    }
-
-    // If the task already has a saved mode, prefer that. Otherwise default to
-    // duration. When both are present (legacy data), duration wins.
-    if (_startTime != null || _endTime != null) {
-      if (_durationMinutes == null) {
-        _showDuration = false;
-        _showPeriod = true;
-      }
     }
 
     _durationController = TextEditingController(
@@ -77,7 +66,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
   }
 
   bool get _hasAnyValue {
-    if (_showDuration && _durationController.text.trim().isNotEmpty) return true;
+    if (_durationController.text.trim().isNotEmpty) return true;
     if (_startTime != null || _endTime != null) return true;
     return false;
   }
@@ -228,7 +217,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     final provider = context.read<TaskProvider>();
 
     int? duration;
-    if (_showDuration) {
+    {
       final text = _durationController.text.trim();
       if (text.isNotEmpty) {
         final parsed = _parseDuration(text);
@@ -258,7 +247,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       widget.task.id,
       startTime: start,
       endTime: end,
-      expectedDuration: _showDuration ? duration : null,
+      expectedDuration: duration,
     );
     Navigator.pop(context);
   }
@@ -317,50 +306,26 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                       style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        _modeChip(
-                          label: settings.tr('duration'),
-                          selected: _showDuration,
-                          onTap: () => setState(() {
-                            _showDuration = true;
-                            _showPeriod = false;
-                          }),
-                        ),
-                        const SizedBox(width: 8),
-                        _modeChip(
-                          label: settings.tr('time_period'),
-                          selected: _showPeriod,
-                          onTap: () => setState(() {
-                            _showDuration = false;
-                            _showPeriod = true;
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    if (_showDuration) ...[
-                      _sectionTitle(Iconsax.timer_1, settings.tr('duration')),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _durationController,
-                        keyboardType: TextInputType.text,
-                        inputFormatters: [textInputFormatter()],
-                        style: TextStyle(color: textColor, fontSize: 16),
-                        decoration: InputDecoration(
-                          hintText: '1:30',
-                          hintStyle: TextStyle(color: textSecondary),
-                          filled: true,
-                          fillColor: isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                            borderSide: BorderSide.none,
-                          ),
+                    _sectionTitle(Iconsax.timer_1, settings.tr('duration')),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _durationController,
+                      keyboardType: TextInputType.text,
+                      inputFormatters: [textInputFormatter()],
+                      style: TextStyle(color: textColor, fontSize: 16),
+                      decoration: InputDecoration(
+                        hintText: '1:30',
+                        hintStyle: TextStyle(color: textSecondary),
+                        filled: true,
+                        fillColor: isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                          borderSide: BorderSide.none,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
+                    const SizedBox(height: 20),
                     _sectionTitle(Iconsax.clock, settings.tr('time_period')),
                     const SizedBox(height: 8),
                     Row(
@@ -447,30 +412,6 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     );
   }
 
-  Widget _modeChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : (isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight),
-          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? AppColors.textDark : (isDark ? AppColors.textDark : AppColors.textLight),
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _WheelList extends StatefulWidget {

@@ -30,6 +30,17 @@ class TaskProvider with ChangeNotifier {
   final List<FolderItem> _folders = [];
   final _initCompleter = Completer<void>();
   Future<void> _saveQueue = Future<void>.value();
+  Timer? _saveDebounce;
+  bool _savePending = false;
+  bool _pendingSaveWaitsForReady = false;
+  Completer<void>? _pendingSaveCompleter;
+  Future<void>? _flushFuture;
+  int _persistenceWriteCount = 0;
+
+  static const _persistenceDebounce = Duration(milliseconds: 300);
+
+  @visibleForTesting
+  int get persistenceWriteCount => _persistenceWriteCount;
 
   String _searchQuery = '';
   TaskFilter _filter = TaskFilter.all;
@@ -83,15 +94,62 @@ class TaskProvider with ChangeNotifier {
   }
 
   // ── Persistence methods ─────────────────────────────────────
-  /// Serializes persistence writes so a slower earlier write cannot overwrite
-  /// a newer mutation with an older snapshot.
+  /// Coalesces rapid mutations into one snapshot, then serializes writes so a
+  /// slower earlier write cannot overwrite a newer mutation.
   Future<void> _saveToPrefs({bool waitForReady = true}) {
-    // Mutations are synchronous, so a call made during startup must capture
-    // its state only after initial data has been merged. Once initialized,
-    // capture immediately so queued writes retain their own coherent snapshot.
-    final capturedSnapshot =
-        !waitForReady || _initCompleter.isCompleted ? _snapshotState() : null;
-    _saveQueue = _saveQueue
+    _savePending = true;
+    _pendingSaveWaitsForReady = _pendingSaveWaitsForReady || waitForReady;
+    final completer = _pendingSaveCompleter ??= Completer<void>();
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(_persistenceDebounce, () {
+      unawaited(
+        flushPersistence().catchError((Object error, StackTrace stackTrace) {
+          LoggerService.instance.w(
+            'Debounced task persistence flush failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }),
+      );
+    });
+    return completer.future;
+  }
+
+  /// Flushes the latest pending mutation to storage immediately.
+  ///
+  /// Lifecycle callbacks can be interrupted by the operating system, so this
+  /// is best-effort. Normal mutations remain debounced to avoid serializing the
+  /// complete task list for every keystroke/reorder operation.
+  Future<void> flushPersistence() {
+    final inFlight = _flushFuture;
+    if (inFlight != null) return inFlight;
+
+    final future = _flushPersistenceLoop();
+    _flushFuture = future;
+    return future.whenComplete(() {
+      if (identical(_flushFuture, future)) _flushFuture = null;
+    });
+  }
+
+  Future<void> _flushPersistenceLoop() async {
+    do {
+      _saveDebounce?.cancel();
+      _saveDebounce = null;
+      await _flushPendingPersistence();
+      await _saveQueue;
+    } while (_savePending);
+  }
+
+  Future<void> _flushPendingPersistence() async {
+    if (!_savePending) return;
+
+    _savePending = false;
+    final waitForReady = _pendingSaveWaitsForReady;
+    _pendingSaveWaitsForReady = false;
+    final completer = _pendingSaveCompleter;
+    _pendingSaveCompleter = null;
+
+    final write = _saveQueue
         .catchError((Object error, StackTrace stackTrace) {
           LoggerService.instance.e(
             'Previous task persistence failed',
@@ -101,9 +159,28 @@ class TaskProvider with ChangeNotifier {
         })
         .then((_) async {
           if (waitForReady) await ready;
-          await _writeToPrefs(capturedSnapshot ?? _snapshotState());
+          await _writeToPrefs(_snapshotState());
         });
-    return _saveQueue;
+    _saveQueue = write;
+
+    try {
+      await write;
+      if (completer != null && !completer.isCompleted) {
+        completer.complete();
+      }
+    } on Object catch (error, stackTrace) {
+      // Most mutation methods intentionally do not await persistence. Keep
+      // those fire-and-forget calls handled while explicit flush/persist calls
+      // still receive the write error through [_saveQueue].
+      LoggerService.instance.e(
+        'Task persistence write failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (completer != null && !completer.isCompleted) {
+        completer.complete();
+      }
+    }
   }
 
   _PersistenceSnapshot _snapshotState() {
@@ -115,8 +192,18 @@ class TaskProvider with ChangeNotifier {
     );
   }
 
+  @override
+  void dispose() {
+    // Normal app shutdown is flushed from the lifecycle observer. Do not start
+    // asynchronous native work after ChangeNotifier disposal.
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    super.dispose();
+  }
+
   Future<void> _writeToPrefs(_PersistenceSnapshot snapshot) async {
     try {
+      _persistenceWriteCount++;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('saved_tasks', snapshot.tasksJson);
       await prefs.setString('saved_folders', snapshot.foldersJson);
@@ -791,7 +878,7 @@ class TaskProvider with ChangeNotifier {
   Future<void> persist() async {
     _foldersVersion++;
     notifyListeners();
-    await _saveToPrefs();
+    await flushPersistence();
   }
 
   void updateFolder(String id, String newName, {String? iconAsset}) {

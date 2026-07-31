@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -25,14 +27,9 @@ void main() async {
     // of silently shifting reminders to UTC.
     final offset = DateTime.now().timeZoneOffset.inMilliseconds;
     tz.setLocalLocation(
-      tz.Location(
-        'device-offset',
-        const <int>[],
-        const <int>[],
-        <tz.TimeZone>[
-          tz.TimeZone(offset, isDst: false, abbreviation: 'LOCAL'),
-        ],
-      ),
+      tz.Location('device-offset', const <int>[], const <int>[], <tz.TimeZone>[
+        tz.TimeZone(offset, isDst: false, abbreviation: 'LOCAL'),
+      ]),
     );
   }
   LoggerService.listenToFlutterErrors();
@@ -89,9 +86,26 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final tasks = context.read<TaskProvider>();
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(
+        tasks.flushPersistence().catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          LoggerService.instance.w(
+            'Background task persistence flush failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }),
+      );
+      return;
+    }
     if (state != AppLifecycleState.resumed || !mounted) return;
     final settings = context.read<SettingsProvider>();
-    final tasks = context.read<TaskProvider>();
     _consumePendingTimerAction(tasks);
     HomeWidgetService.updateSettings(
       enabled: settings.showInWidget,
@@ -111,10 +125,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       themeMode: settingsProvider.themeMode,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      builder: (context, child) => _ScaledApp(
-        scale: settingsProvider.appScale,
-        child: child!,
-      ),
+      builder:
+          (context, child) =>
+              _ScaledApp(scale: settingsProvider.appScale, child: child!),
       home: const SplashScreen(),
     );
   }
@@ -131,7 +144,8 @@ class _ScaledApp extends StatelessWidget {
   const _ScaledApp({required this.scale, required this.child});
 
   final double scale;
-  final Widget child;  @override
+  final Widget child;
+  @override
   Widget build(BuildContext context) {
     final data = MediaQuery.of(context);
     final effectiveScale = effectiveAppScale(context, scale);
@@ -141,10 +155,7 @@ class _ScaledApp extends StatelessWidget {
       return GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         behavior: HitTestBehavior.translucent,
-        child: RepaintBoundary(
-          key: ThemeSwitcher.boundaryKey,
-          child: child,
-        ),
+        child: RepaintBoundary(key: ThemeSwitcher.boundaryKey, child: child),
       );
     }
 

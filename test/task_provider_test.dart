@@ -385,6 +385,51 @@ void main() {
       expect(savedTasks, contains('Second'));
     });
 
+    test('coalesces rapid mutations into one persistence write', () async {
+      await provider.ready;
+      provider.addTask('First');
+      provider.addTask('Second');
+
+      await provider.flushPersistence();
+
+      expect(provider.persistenceWriteCount, 1);
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('saved_tasks');
+      expect(saved, contains('First'));
+      expect(saved, contains('Second'));
+    });
+
+    test('concurrent flush calls share one persistence write', () async {
+      await provider.ready;
+      provider.addTask('Concurrent flush');
+
+      final firstFlush = provider.flushPersistence();
+      final secondFlush = provider.flushPersistence();
+      await Future.wait([firstFlush, secondFlush]);
+
+      expect(provider.persistenceWriteCount, 1);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('saved_tasks'), contains('Concurrent flush'));
+    });
+
+    test(
+      'mutation after a completed flush is persisted by the next flush',
+      () async {
+        await provider.ready;
+        provider.addTask('Before flush');
+        await provider.flushPersistence();
+
+        provider.addTask('After flush');
+        await provider.flushPersistence();
+
+        final prefs = await SharedPreferences.getInstance();
+        final saved = prefs.getString('saved_tasks');
+        expect(saved, contains('Before flush'));
+        expect(saved, contains('After flush'));
+        expect(provider.persistenceWriteCount, 2);
+      },
+    );
+
     test(
       'does not overwrite loaded tasks when mutated before initialization',
       () async {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../features/settings/providers/settings_provider.dart';
@@ -12,6 +13,36 @@ import '../features/tasks/providers/task_provider.dart';
 /// data or settings). Updates are debounced so rapid changes (e.g. on app
 /// startup when both settings and task data are ready) are batched into a
 /// single platform call.
+class _WidgetSnapshot {
+  final int streak;
+  final int activeTasks;
+  final String? lastFolder;
+  final bool enabled;
+  final WidgetDisplayMode mode;
+
+  const _WidgetSnapshot({
+    required this.streak,
+    required this.activeTasks,
+    required this.lastFolder,
+    required this.enabled,
+    required this.mode,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    return other is _WidgetSnapshot &&
+        other.streak == streak &&
+        other.activeTasks == activeTasks &&
+        other.lastFolder == lastFolder &&
+        other.enabled == enabled &&
+        other.mode == mode;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(streak, activeTasks, lastFolder, enabled, mode);
+}
+
 class HomeWidgetService {
   HomeWidgetService._();
   static final HomeWidgetService instance = HomeWidgetService._();
@@ -25,6 +56,13 @@ class HomeWidgetService {
   DateTime? _lastForcedRefreshAt;
 
   Timer? _debounce;
+  Future<void>? _updateInFlight;
+  bool _updateQueued = false;
+  _WidgetSnapshot? _lastRequestedSnapshot;
+  int _generation = 0;
+
+  @visibleForTesting
+  Future<void> Function()? updateOverride;
 
   /// Debounce duration. Can be set to [Duration.zero] in tests to avoid
   /// leaking timers across test cases.
@@ -38,8 +76,7 @@ class HomeWidgetService {
   static void updateSettings({
     required bool enabled,
     required WidgetDisplayMode mode,
-  }) =>
-      instance._updateSettings(enabled: enabled, mode: mode);
+  }) => instance._updateSettings(enabled: enabled, mode: mode);
 
   /// Cancels any pending widget update. Useful in tests to avoid leaking
   /// timers between test cases.
@@ -85,9 +122,49 @@ class HomeWidgetService {
     _scheduleUpdate();
   }
 
-  void _scheduleUpdate() {
+  void _scheduleUpdate({bool force = false}) {
+    final snapshot = _currentSnapshot();
+    if (!force && snapshot == _lastRequestedSnapshot) return;
+    _lastRequestedSnapshot = snapshot;
+    _updateQueued = true;
     _debounce?.cancel();
-    _debounce = Timer(debounceDelay, _performUpdate);
+    _debounce = Timer(debounceDelay, () {
+      _debounce = null;
+      unawaited(_runQueuedUpdate());
+    });
+  }
+
+  _WidgetSnapshot _currentSnapshot() => _WidgetSnapshot(
+    streak: _lastStreak,
+    activeTasks: _lastActive,
+    lastFolder: _lastFolder,
+    enabled: _lastEnabled,
+    mode: _lastMode,
+  );
+
+  Future<void> _runQueuedUpdate() async {
+    if (!_updateQueued) return;
+    final inFlight = _updateInFlight;
+    if (inFlight != null) {
+      // The active update owns the platform channel. It will start the latest
+      // queued snapshot when it completes.
+      await inFlight;
+      return;
+    }
+
+    _updateQueued = false;
+    final snapshot = _currentSnapshot();
+    final generation = _generation;
+    final future = _performUpdate(snapshot, generation);
+    _updateInFlight = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_updateInFlight, future)) _updateInFlight = null;
+      if (_updateQueued && _debounce == null) {
+        unawaited(_runQueuedUpdate());
+      }
+    }
   }
 
   void _refresh() {
@@ -98,15 +175,18 @@ class HomeWidgetService {
       return;
     }
     _lastForcedRefreshAt = now;
-    _scheduleUpdate();
+    _scheduleUpdate(force: true);
   }
 
   void _cancelPendingUpdate() {
     _debounce?.cancel();
     _debounce = null;
+    _updateQueued = false;
+    _lastRequestedSnapshot = null;
   }
 
   void _resetForTests() {
+    _generation++;
     _cancelPendingUpdate();
     _lastStreak = -1;
     _lastActive = -1;
@@ -115,28 +195,45 @@ class HomeWidgetService {
     _lastMode = WidgetDisplayMode.activeTasks;
     _hasPublished = false;
     _lastForcedRefreshAt = null;
+    _lastRequestedSnapshot = null;
+    updateOverride = null;
+    _updateQueued = false;
   }
 
-  Future<void> _performUpdate() async {
-    _debounce?.cancel();
-    _debounce = null;
+  Future<void> _performUpdate(_WidgetSnapshot snapshot, int generation) async {
     try {
-      await HomeWidget.saveWidgetData<int>('streak', _lastStreak);
-      await HomeWidget.saveWidgetData<int>('active_tasks', _lastActive);
-      await HomeWidget.saveWidgetData<String?>(
-        'last_folder',
-        _lastFolder,
-      );
-      await HomeWidget.saveWidgetData<bool>('widget_enabled', _lastEnabled);
-      await HomeWidget.saveWidgetData<String>(
-        'widget_mode',
-        _lastMode.name,
-      );
-      await HomeWidget.updateWidget(androidName: 'AsaWidgetProvider');
-      await HomeWidget.updateWidget(androidName: 'AsaWidgetStatsProvider');
-      await HomeWidget.updateWidget(androidName: 'AsaWidgetTasksProvider');
-      _hasPublished = true;
+      final override = updateOverride;
+      if (override != null) {
+        await override();
+      } else {
+        await HomeWidget.saveWidgetData<int>('streak', snapshot.streak);
+        await HomeWidget.saveWidgetData<int>(
+          'active_tasks',
+          snapshot.activeTasks,
+        );
+        await HomeWidget.saveWidgetData<String?>(
+          'last_folder',
+          snapshot.lastFolder,
+        );
+        await HomeWidget.saveWidgetData<bool>(
+          'widget_enabled',
+          snapshot.enabled,
+        );
+        await HomeWidget.saveWidgetData<String>(
+          'widget_mode',
+          snapshot.mode.name,
+        );
+        await HomeWidget.updateWidget(androidName: 'AsaWidgetProvider');
+        await HomeWidget.updateWidget(androidName: 'AsaWidgetStatsProvider');
+        await HomeWidget.updateWidget(androidName: 'AsaWidgetTasksProvider');
+      }
+      if (generation == _generation) {
+        _hasPublished = true;
+      }
     } catch (_) {
+      if (generation == _generation && _lastRequestedSnapshot == snapshot) {
+        _lastRequestedSnapshot = null;
+      }
       // Widget updates are best-effort; don't crash the app.
     }
   }

@@ -96,13 +96,36 @@ class AvatarSection extends StatelessWidget {
                 iconTheme: const IconThemeData(color: Colors.white),
                 elevation: 0,
               ),
-              body: Center(
-                child: InteractiveViewer(
-                  child: Hero(
-                    tag: 'avatar_hero',
-                    child: Image.file(File(imagePath)),
-                  ),
-                ),
+              body: LayoutBuilder(
+                builder: (context, constraints) {
+                  final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+                  final decodeWidth =
+                      constraints.maxWidth.isFinite
+                          ? (constraints.maxWidth * pixelRatio).round()
+                          : null;
+                  final decodeHeight =
+                      constraints.maxHeight.isFinite
+                          ? (constraints.maxHeight * pixelRatio).round()
+                          : null;
+                  return Center(
+                    child: InteractiveViewer(
+                      child: Hero(
+                        tag: 'avatar_hero',
+                        child: Image.file(
+                          File(imagePath),
+                          cacheWidth:
+                              decodeWidth != null && decodeWidth > 0
+                                  ? decodeWidth
+                                  : null,
+                          cacheHeight:
+                              decodeHeight != null && decodeHeight > 0
+                                  ? decodeHeight
+                                  : null,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
       ),

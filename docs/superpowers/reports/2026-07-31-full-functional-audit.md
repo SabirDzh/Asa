@@ -142,7 +142,7 @@ No Android device was connected during Task 1. The following real-device scenari
 
 - **Task 3:** `task_detail_sheet.dart` omitted persisted quantity/description blocks and attachments. The read-only detail view now renders them through safe, validated attachment actions; regression coverage was added in `test/task_folder_popup_menu_test.dart`. Task 3 audit commit: `37f3250 test: audit task editor and timer workflows`.
 - **Task 4:** `SettingsProvider.languageCode` was not passed to `MaterialApp`, leaving built-in Flutter widgets without the selected app locale. Added `flutter_localizations`, supported `ru`/`en`, and standard Material localization delegates. Task 4 audit commit: `2650de9 test: audit settings and lifecycle workflows`.
-- **Task 5:** No reproducible production defect was found. The report records 53 passing pure/service tests and the native/device limitations; plaintext HMAC sync remains an explicitly documented unresolved confidentiality risk.
+- **Task 5:** No reproducible production defect was found. The report records 53 passing pure/service tests and the native/device limitations; plaintext HMAC sync remains an explicitly documented unresolved confidentiality risk. Task 5 audit commit: `30d8d26 test: audit data and integration workflows`.
 
 ## Blocked scenarios and unresolved risks
 

@@ -21,7 +21,7 @@
 |---|---|---|---|---|---|---|---|---|
 | Task/folder CRUD, search, filters, ordering | Covered by existing provider/model tests; detailed audit is Task 2 | Covered in existing provider/model tests; detailed audit is Task 2 | Detailed audit is Task 2 | Detailed audit is Task 2 | Baseline group passed: 153 tests | Android device not connected | PARTIAL — Task 2 pending | — |
 | Task editor, information blocks, attachments, time, manual timer | Pure/provider contracts and editor flows are covered; detail now renders saved blocks | Quantity/link/file/image bounds and malformed metadata are covered by model/service tests | Draft cancellation and picker UI remain harness-blocked | Timer persistence and planned-vs-actual semantics pass in provider/model tests | Task 3 gate: 72 tests passed; format/analyze/diff passed; editor/detail widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit task editor and timer workflows` |
-| Settings, theme, language, scale, notifications, avatar | Existing provider/service tests present; detailed audit is Task 4 | Detailed audit is Task 4 | Detailed audit is Task 4 | Detailed audit is Task 4 | Baseline group passed | Android device not connected | PARTIAL — Task 4 pending | — |
+| Settings, theme, language, scale, notifications, avatar | Provider/service contracts pass; language is wired into MaterialApp locale | Image validation and settings bounds are covered by focused tests | Settings widget flow and native permission/picker paths are harness/device-blocked | Lifecycle/native behavior remains device-blocked | Task 4 gate: 44 tests passed; format/analyze/diff passed; settings widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit settings and lifecycle workflows` |
 | Export/import, sync, logging, calendar, external integrations | Existing service tests present; detailed audit is Task 5 | Existing service tests present; detailed audit is Task 5 | Detailed audit is Task 5 | Detailed audit is Task 5 | Baseline group passed | Android device not connected | PARTIAL — Task 5 pending | — |
 | Android notifications, widgets, calendar, picker, APK install | Not run | Not run | Not run | Not run | Native device evidence pending | `adb devices -l`: no devices | BLOCKED | — |
 
@@ -63,6 +63,25 @@ The widget-test timeouts are not reported as passes and do not invalidate the in
 |---|---|---|---|---|---|---|---|---|
 | Task/folder CRUD, search, filters, ordering | CRUD, nested folders, movement, filters/search, soft-delete, streak protection | Length limits, invalid indices, cycles, malformed persistence | UI cancel/permission cases pending widget/device audit | Persistence and coalesced writes passed in existing tests | 66 Task 2 tests passed | Android unavailable | PASS for automated core; UI/device checks pending | `test: audit task and folder workflows` |
 
+## Task 4: Settings, theme, language, scale, notifications, avatar, and lifecycle evidence
+
+- Settings/provider/service gate: **PASS** — 44 tests passed, exit code 0.
+- Changed-file formatter check: **PASS** — `dart format --output=none --set-exit-if-changed lib/main.dart` returned exit code 0.
+- Changed-file analyzer check: **PASS** — `dart analyze lib/main.dart` reported `No issues found!`.
+- `git diff --check`: **PASS**.
+- Theme, language provider state, custom animation-speed history, avatar-path serialization, stable sync device ID, image signatures/size limits, and notification scheduling helpers are covered by focused tests.
+- Reproducible defect fixed: `SettingsProvider.languageCode` was not connected to the root `MaterialApp`; the app now supplies `locale`, supported `ru`/`en` locales, and `GlobalMaterialLocalizations.delegates`, so built-in Flutter widgets follow the selected language.
+- `flutter pub get` completed successfully after adding the Flutter SDK `flutter_localizations` dependency; `pubspec.lock` was updated accordingly.
+- `settings_screen_test.dart`: **BLOCKED**, timed out after 300 seconds with exit code 142. This prevents claiming full widget-level settings/language/large-text evidence.
+- Android permission, exact-alarm, native picker, avatar compression, widget, and lifecycle scenarios remain **BLOCKED** until a physical Android device is connected.
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Settings/provider/image/notification contracts | PASS | 44 focused tests |
+| Root MaterialApp locale integration | FAIL-fixed; static validation PASS | `lib/main.dart`, analyzer, pub get |
+| Settings widget interactions and large-text behavior | BLOCKED | `settings_screen_test.dart` timeout after 300s |
+| Native permissions, avatar picker/compression, lifecycle | BLOCKED | No Android device |
+
 ## Task 3: Task editor, information blocks, attachments, time, and manual timer evidence
 
 - Pure/model/provider/attachment/notification gate: **PASS** — 72 tests passed, exit code 0.
@@ -101,6 +120,7 @@ No Android device was connected during Task 1. The following real-device scenari
 ## Fixed defects
 
 - **Task 3:** `task_detail_sheet.dart` omitted persisted quantity/description blocks and attachments. The read-only detail view now renders them through safe, validated attachment actions; regression coverage was added in `test/task_folder_popup_menu_test.dart`. Task 3 audit commit: `37f3250 test: audit task editor and timer workflows`.
+- **Task 4:** `SettingsProvider.languageCode` was not passed to `MaterialApp`, leaving built-in Flutter widgets without the selected app locale. Added `flutter_localizations`, supported `ru`/`en`, and standard Material localization delegates. The exact Task 4 commit hash is recorded after commit creation.
 
 ## Blocked scenarios and unresolved risks
 

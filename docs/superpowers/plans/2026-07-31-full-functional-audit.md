@@ -283,11 +283,11 @@ Cover unsupported language code, out-of-range/NaN custom values, duplicate/LRU c
 
 Run app background/resume/paused transitions; confirm task persistence flush, pending notification action consumption, widget refresh throttling, no stale context use, no duplicate sync startup, and no data loss. Pump representative screens with large text (`TextScaler.linear(1.5)`) and verify no overflow where the test harness permits.
 
-- [ ] **Step 4: Fix regressions only when evidence shows a defect**
+- [x] **Step 4: Fix regressions only when evidence shows a defect**
 
-Add focused tests for every fix. Do not treat a platform permission denial as a test failure when the app correctly disables the feature and explains the limitation.
+Add focused tests for every fix. Do not treat a platform permission denial as a test failure when the app correctly disables the feature and explains the limitation. Fixed the reproducible localization integration gap by wiring `SettingsProvider.languageCode` into `MaterialApp.locale` with Flutter's standard localization delegates. Widget-level confirmation remains blocked by the existing 300-second harness timeout.
 
-- [ ] **Step 5: Review, validate, and commit**
+- [x] **Step 5: Review, validate, and commit**
 
 Run the exact settings-family gate:
 

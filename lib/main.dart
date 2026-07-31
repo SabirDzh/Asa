@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -164,6 +165,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
     final appScale = context.select<SettingsProvider, double>(
       (settings) => settings.appScale,
     );
+    final languageCode = context.select<SettingsProvider, String>(
+      (settings) => settings.languageCode,
+    );
 
     return MaterialApp(
       title: 'ASA',
@@ -171,6 +175,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       themeMode: themeMode,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
+      locale: Locale(languageCode),
+      supportedLocales: const [Locale('ru'), Locale('en')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       builder: (context, child) => _ScaledApp(scale: appScale, child: child!),
       home: const SplashScreen(),
     );

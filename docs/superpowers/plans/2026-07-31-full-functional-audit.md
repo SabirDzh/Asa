@@ -354,7 +354,7 @@ git commit -m "test: audit data and integration workflows"
 - Consumes: the signed arm64 APK, ADB, Android permissions, native widget/notification/calendar/file picker behavior.
 - Produces: device evidence or explicit blocked outcomes for every Android-only function.
 
-- [x] **Step 1: Install and launch the APK**
+- [ ] **Step 1: Install and launch the APK**
 
 Run:
 
@@ -367,13 +367,13 @@ adb logcat -c
 
 Record install/launch success, startup time, crashes, and relevant filtered logcat output without secrets.
 
-- [x] **Step 2: Execute the user journey matrix**
+- [ ] **Step 2: Execute the user journey matrix**
 
 On a clean test dataset verify: create/edit/delete/restore-visible behavior, folders/nesting/drag, search/filter, information blocks, image/file/link attachments, time period and manual timer, detail read-only restrictions, theme/language/scale, avatar, export/import, notification permission and a reminder scheduled 2–3 minutes ahead, notification `start_timer` action, app background/resume, widget enabled/disabled and both widget modes, calendar permission/event create/update/delete, sync toggle/name/secret, and app restart persistence.
 
 For each journey run the corresponding negative path: cancel dialog/picker, deny permission, offline/no-handler, invalid input, missing file, duplicate action, app killed during pending persistence, and repeated taps.
 
-- [x] **Step 3: Verify notification timing honestly**
+- [ ] **Step 3: Verify notification timing honestly**
 
 Use a future start time at least two minutes ahead. Capture whether the notification arrives, delivery delay, Android exact-alarm setting state, channel state, and whether the action starts the correct task timer. A notification that is delayed because exact alarms are denied is **PARTIAL/BLOCKED**, not a silent pass.
 
@@ -407,11 +407,11 @@ If no device is connected, commit the completed blocked matrix/report only after
 - Consumes: all task commits, test outputs, device logs, and the initial APK evidence.
 - Produces: final evidence-based report and the final signed arm64-v8a release APK.
 
-- [ ] **Step 1: Run independent code review**
+- [x] **Step 1: Run independent code review**
 
 Review the complete audit commit range for data loss, unsafe error handling, stale tests, unverified claims, accidental secrets, and scope drift. Resolve blockers before continuing.
 
-- [ ] **Step 2: Run final static and automated gates**
+- [x] **Step 2: Run final static and automated gates**
 
 Run:
 
@@ -427,11 +427,11 @@ perl -e 'alarm 300; exec @ARGV' -- flutter test --no-pub test/home_screen_test.d
 
 Do not report a timeout as a pass; include exact blocked files and durations.
 
-- [ ] **Step 3: Update plan/report evidence**
+- [x] **Step 3: Update plan/report evidence**
 
 For every task and matrix row, set `[x]` only when its stated evidence exists. Add final sections: passed checks/counts, failed-and-fixed defects with commit hashes, blocked device/harness checks, unresolved risks, and reproducible manual steps.
 
-- [ ] **Step 4: Build final arm64-v8a release APK**
+- [x] **Step 4: Build final arm64-v8a release APK**
 
 Run:
 

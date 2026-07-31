@@ -5,7 +5,9 @@
 **APK under test:** `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
 **Initial APK SHA-256:** `b89b228708e853216c11a1b331666f240a3517e4fe47d7a804894bc61fbc994a`
 **Initial APK size:** 21.8 MB
-**Initial APK evidence:** APK Signature Scheme v2 verified; native libraries contain only `arm64-v8a`.
+**Final APK SHA-256:** `1a6dcd124d99e891370d4baf9890eba43395100bdc43595c7c1a8c72ada544fc`
+**Final APK size:** 22.5 MB
+**Final APK evidence:** APK Signature Scheme v2 verified; one signer; native libraries contain only `lib/arm64-v8a/*`.
 **Audit baseline commit:** `b62146f`
 
 ## Result vocabulary
@@ -19,11 +21,11 @@
 
 | Function | Valid cases | Invalid/boundary cases | Cancel/permission cases | Lifecycle/offline cases | Automated evidence | Device evidence | Result | Defect/commit |
 |---|---|---|---|---|---|---|---|---|
-| Task/folder CRUD, search, filters, ordering | Covered by existing provider/model tests; detailed audit is Task 2 | Covered in existing provider/model tests; detailed audit is Task 2 | Detailed audit is Task 2 | Detailed audit is Task 2 | Baseline group passed: 153 tests | Android device not connected | PARTIAL — Task 2 pending | — |
-| Task editor, information blocks, attachments, time, manual timer | Pure/provider contracts and editor flows are covered; detail now renders saved blocks | Quantity/link/file/image bounds and malformed metadata are covered by model/service tests | Draft cancellation and picker UI remain harness-blocked | Timer persistence and planned-vs-actual semantics pass in provider/model tests | Task 3 gate: 72 tests passed; format/analyze/diff passed; editor/detail widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit task editor and timer workflows` |
-| Settings, theme, language, scale, notifications, avatar | Provider/service contracts pass; language is wired into MaterialApp locale | Image validation and settings bounds are covered by focused tests | Settings widget flow and native permission/picker paths are harness/device-blocked | Lifecycle/native behavior remains device-blocked | Task 4 gate: 44 tests passed; format/analyze/diff passed; settings widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit settings and lifecycle workflows` |
-| Export/import, sync, logging, calendar, external integrations | Pure export/import, HMAC, logger, and attachment contracts pass | Malformed JSON/UTF-8/lists, size limits, tampering, frame bounds, unsafe links and paths covered | Picker cancellation, share result, calendar permission and external handlers are native/device-blocked | Sync lifecycle pure tests pass; LAN and app-kill scenarios remain device-blocked | Task 5 gate: 53 tests passed; format/analyze/diff passed | Android device not connected | PASS automated contracts + BLOCKED native/device evidence | Task 5 audit deliverable |
-| Android notifications, widgets, calendar, picker, APK install | APK artifact and native declarations verified; runtime install/launch not possible | Device negative paths not executable | Runtime permissions, exact alarms, picker/calendar/share outcomes blocked | Background/resume, widget refresh, restart persistence and LAN sync blocked | Native Gradle gate passed; APK v2 signature verified | `adb devices -l`: no devices; only macOS/Chrome in `flutter devices` | BLOCKED runtime / PASS native compile | Task 6 blocked-matrix deliverable |
+| Task/folder CRUD, search, filters, ordering | Covered by provider/model tests and deterministic search/filter/reorder regressions | Invalid indices, length limits, cycles and malformed persistence covered | UI cancel/permission paths remain widget/device-blocked | Persistence and coalesced writes covered; device lifecycle remains blocked | Task 2 gate: 66 tests passed; format/analyze/diff passed | Android device not connected | PASS automated core + BLOCKED UI/device evidence | `d6b96d3 test: audit task and folder workflows` |
+| Task editor, information blocks, attachments, time, manual timer | Pure/provider contracts and editor flows are covered; detail now renders saved blocks | Quantity/link/file/image bounds and malformed metadata are covered by model/service tests | Draft cancellation and picker UI remain harness-blocked | Timer persistence and planned-vs-actual semantics pass in provider/model tests | Task 3 gate: 72 tests passed; format/analyze/diff passed; editor/detail widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `37f3250 test: audit task editor and timer workflows` |
+| Settings, theme, language, scale, notifications, avatar | Provider/service contracts pass; language is wired into MaterialApp locale | Image validation and settings bounds are covered by focused tests | Settings widget flow and native permission/picker paths are harness/device-blocked | Lifecycle/native behavior remains device-blocked | Task 4 gate: 44 tests passed; format/analyze/diff passed; settings widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `2650de9 test: audit settings and lifecycle workflows` |
+| Export/import, sync, logging, calendar, external integrations | Pure export/import, HMAC, logger, and attachment contracts pass | Malformed JSON/UTF-8/lists, size limits, tampering, frame bounds, unsafe links and paths covered | Picker cancellation, share result, calendar permission and external handlers are native/device-blocked | Sync lifecycle pure tests pass; LAN and app-kill scenarios remain device-blocked | Task 5 gate: 53 tests passed; format/analyze/diff passed | Android device not connected | PASS automated contracts + BLOCKED native/device evidence | `30d8d26 test: audit data and integration workflows` |
+| Android notifications, widgets, calendar, picker, APK install | APK artifact and native declarations verified; runtime install/launch not possible | Device negative paths not executable | Runtime permissions, exact alarms, picker/calendar/share outcomes blocked | Background/resume, widget refresh, restart persistence and LAN sync blocked | Native Gradle gate passed; APK v2 signature verified | `adb devices -l`: no devices; only macOS/Chrome in `flutter devices` | BLOCKED runtime / PASS native compile | `e47dd38 test: verify Android functional matrix` |
 
 ## Automated command evidence
 
@@ -41,6 +43,7 @@
 
 - Command: `flutter test --no-pub test/input_utils_test.dart test/task_model_test.dart test/task_provider_test.dart test/settings_provider_test.dart test/export_import_service_test.dart test/sync_service_test.dart test/notification_service_test.dart test/image_utils_test.dart test/task_attachment_service_test.dart test/logger_service_test.dart test/home_widget_service_test.dart -r compact`
 - Result: **PASS**, 153 tests passed, exit code 0.
+- Final combined pure/service gate: **PASS**, 155 tests passed, 0 failures, exit code 0.
 - Command: `perl -e 'alarm 300; exec @ARGV' -- flutter test --no-pub test/task_editor_sheet_test.dart -r compact`
 - Result: **BLOCKED**, timed out after 300 seconds, exit code 142 (`Alarm clock`).
 - Command: `perl -e 'alarm 300; exec @ARGV' -- flutter test --no-pub test/task_folder_popup_menu_test.dart -r compact`
@@ -124,18 +127,41 @@ The widget-test timeouts are not reported as passes and do not invalidate the in
 | Detail information-block rendering | FAIL-fixed; UI execution BLOCKED | Source fix + regression test; widget harness timeout |
 | Detail read-only restrictions | FAIL-fixed; UI execution BLOCKED | Existing menu assertions + source review; widget harness timeout |
 
+## Task 7: Final independent review, release gates, and final APK evidence
+
+- Independent review of the audit range from `b62146f` through `cc0353d` found no blocking data-loss, secret-handling, or scope-drift issue. Non-blocking risks remain explicitly listed below.
+- `git diff --check b62146f HEAD` — **PASS**.
+- `dart format --output=none --set-exit-if-changed .` — **PASS**; 70 files, 0 changes.
+- `dart analyze` — **PASS**; `No issues found!`.
+- `flutter pub deps --style=compact` — **PASS**.
+- Final pure/service test gate — **PASS**; 155 tests passed, 0 failures.
+- Final widget gate — **BLOCKED**; `settings_screen_test.dart` hung after its first scenario and the 300-second alarm terminated the group with exit code 142. The editor, popup, and folder-detail groups did not execute in that run. This is consistent with the previously recorded widget-harness limitation and is not reported as a pass.
+- Android native gate — **PASS**; `processDebugResources` and `compileDebugKotlin` completed with `BUILD SUCCESSFUL`.
+- Final build — **PASS**: `flutter build apk --target-platform android-arm64 --split-per-abi --release` produced `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (22.5 MB).
+- Final APK verification — **PASS**: v2 signature verified; SHA-256 `1a6dcd124d99e891370d4baf9890eba43395100bdc43595c7c1a8c72ada544fc`; ZIP inspection found only `lib/arm64-v8a/` native libraries.
+
+| Final gate | Result | Evidence |
+|---|---|---|
+| Independent audit review | PASS with documented risks | Review of audit range `b62146f..cc0353d` |
+| Static checks | PASS | diff-check, format, analyzer, dependency graph |
+| Pure/service tests | PASS | 155 tests, 0 failures |
+| Widget tests | BLOCKED | 300-second harness timeout, exit 142 |
+| Android native compile | PASS | Gradle resource/Kotlin gate |
+| Final arm64 APK | PASS | v2 signature, SHA-256, arm64-only native libs |
+
 ## Android device evidence
 
 Task 6 evidence (the checked plan steps represent attempted checks and documented outcomes; `BLOCKED` is not a runtime pass):
 
 - `adb devices -l` — **BLOCKED**: `List of devices attached` contained no devices.
 - `flutter devices` — **BLOCKED** for Android: only macOS desktop and Chrome web were connected; no Android device or emulator was available. Flutter also reported an unavailable wireless iPhone, which is not relevant to the Android matrix.
-- Existing APK: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`, approximately 21 MB.
+- Final APK: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`, 22.5 MB.
 - `apksigner verify --verbose` — **PASS**; APK Signature Scheme v2 verified, one signer, v1/v3/v4 not enabled.
 - `(cd android && ./gradlew :app:processDebugResources :app:compileDebugKotlin --no-daemon)` — **PASS**; `BUILD SUCCESSFUL` in 13 seconds, 4 tasks executed and 206 up-to-date.
 - Android package ID: `com.example.asa`.
 - Manifest declarations inspected: `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, and three exported home-screen widget receivers (`AsaWidgetProvider`, `AsaWidgetStatsProvider`, `AsaWidgetTasksProvider`).
 - `adb install`, launch, logcat, notification delivery/action, widget rendering, calendar, picker, avatar, and LAN sync could not be executed without a connected Android device; they remain **BLOCKED**, not passed.
+- The final APK was rebuilt after the localization change; its current verified SHA-256 is `1a6dcd124d99e891370d4baf9890eba43395100bdc43595c7c1a8c72ada544fc`.
 
 No Android device was connected during Task 6. The following real-device scenarios remain blocked until an Android device is available:
 
@@ -164,3 +190,4 @@ No Android device was connected during Task 6. The following real-device scenari
 - Exact-alarm denial may cause Android notification fallback to be inexact; this must be measured on-device rather than inferred from unit tests.
 - Native export/share, file-picker, calendar, and external-handler results are not proven without a physical Android run.
 - Sync currently authenticates payloads with HMAC but does not encrypt them on the LAN; deciding whether to add authenticated encryption is a separate security/product task.
+- The final APK has not been installed or exercised on a physical Android device because `adb devices -l` returned no attached devices.

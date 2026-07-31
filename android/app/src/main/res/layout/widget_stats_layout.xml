@@ -7,12 +7,15 @@
     android:background="@drawable/asa_widget_background"
     android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="12dp">
 
     <TextView
         android:id="@+id/widget_app_name"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
         android:text="@string/widget_app_name"
         android:textColor="#FFFFFF"
         android:textSize="12sp"
@@ -21,27 +24,29 @@
 
     <TextView
         android:id="@+id/widget_streak"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:ellipsize="end"
+        android:includeFontPadding="false"
         android:maxLines="1"
         android:text=""
         android:textColor="#FFFFFF"
         android:textSize="18sp"
         android:textStyle="bold"
-        tools:text="День 1" />
+        tools:text="День 12" />
 
     <TextView
         android:id="@+id/widget_active_tasks"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:ellipsize="end"
+        android:includeFontPadding="false"
         android:maxLines="1"
         android:text=""
         android:textColor="#B3FFFFFF"
         android:textSize="12sp"
-        tools:text="Нет активных задач" />
+        tools:text="3 активные задачи" />
 
 </LinearLayout>

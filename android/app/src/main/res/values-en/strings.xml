@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_app_name">ASA</string>
+    <string name="widget_description">ASA tasks and streak</string>
     <string name="widget_streak_format">Day %1$d</string>
-    <string name="widget_active_tasks_zero">No active tasks</string>
-    <string name="widget_active_tasks_one">1 active task</string>
-    <string name="widget_active_tasks_few">%1$d active tasks</string>
-    <string name="widget_active_tasks_many">%1$d active tasks</string>
+    <plurals name="widget_active_tasks">
+        <item quantity="zero">No active tasks</item>
+        <item quantity="one">%1$d active task</item>
+        <item quantity="other">%1$d active tasks</item>
+    </plurals>
     <string name="widget_disabled">Widget disabled</string>
     <string name="widget_last_folder">Last folder</string>
+    <string name="widget_content_description">%1$s. %2$s.</string>
 </resources>

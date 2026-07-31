@@ -21,6 +21,8 @@ class HomeWidgetService {
   String? _lastFolder;
   bool _lastEnabled = true;
   WidgetDisplayMode _lastMode = WidgetDisplayMode.activeTasks;
+  bool _hasPublished = false;
+  DateTime? _lastForcedRefreshAt;
 
   Timer? _debounce;
 
@@ -43,6 +45,14 @@ class HomeWidgetService {
   /// timers between test cases.
   static void cancelPendingUpdate() => instance._cancelPendingUpdate();
 
+  /// Requests a fresh native widget publish using the latest cached values.
+  /// This is used when the app resumes because the launcher may have cleared
+  /// its native widget state while the Flutter process was backgrounded.
+  /// Repeated resumes within a short window are throttled to avoid redundant
+  /// platform writes while still recovering from normal background/foreground
+  /// transitions.
+  static void refresh() => instance._refresh();
+
   /// Resets cached widget state between isolated widget tests.
   static void resetForTests() => instance._resetForTests();
 
@@ -51,7 +61,8 @@ class HomeWidgetService {
     final streak = provider.streakCount;
     final folder = provider.lastViewedFolderName;
 
-    if (active == _lastActive &&
+    if (_hasPublished &&
+        active == _lastActive &&
         streak == _lastStreak &&
         folder == _lastFolder) {
       return;
@@ -67,7 +78,7 @@ class HomeWidgetService {
     required bool enabled,
     required WidgetDisplayMode mode,
   }) {
-    if (enabled == _lastEnabled && mode == _lastMode) return;
+    if (_hasPublished && enabled == _lastEnabled && mode == _lastMode) return;
 
     _lastEnabled = enabled;
     _lastMode = mode;
@@ -77,6 +88,17 @@ class HomeWidgetService {
   void _scheduleUpdate() {
     _debounce?.cancel();
     _debounce = Timer(debounceDelay, _performUpdate);
+  }
+
+  void _refresh() {
+    final now = DateTime.now();
+    if (_hasPublished &&
+        _lastForcedRefreshAt != null &&
+        now.difference(_lastForcedRefreshAt!) < const Duration(seconds: 5)) {
+      return;
+    }
+    _lastForcedRefreshAt = now;
+    _scheduleUpdate();
   }
 
   void _cancelPendingUpdate() {
@@ -91,6 +113,8 @@ class HomeWidgetService {
     _lastFolder = null;
     _lastEnabled = true;
     _lastMode = WidgetDisplayMode.activeTasks;
+    _hasPublished = false;
+    _lastForcedRefreshAt = null;
   }
 
   Future<void> _performUpdate() async {
@@ -111,6 +135,7 @@ class HomeWidgetService {
       await HomeWidget.updateWidget(androidName: 'AsaWidgetProvider');
       await HomeWidget.updateWidget(androidName: 'AsaWidgetStatsProvider');
       await HomeWidget.updateWidget(androidName: 'AsaWidgetTasksProvider');
+      _hasPublished = true;
     } catch (_) {
       // Widget updates are best-effort; don't crash the app.
     }

@@ -386,6 +386,16 @@ Bottom sheets for theme, language, animation speed, app scale, widget mode, sync
 ### 11.1 Android
 
 * The `home_widget` plugin requires a native `AppWidgetProvider` and XML layouts in `android/app/src/main/`.
+* Three Android widgets share `AsaWidgetBaseProvider`: compact, tasks/folder, and stats variants. Each layout uses the same `widget_root`, `widget_streak`, and `widget_active_tasks` IDs.
+* The Flutter/native widget data contract is:
+  * `streak` — non-negative streak day count.
+  * `active_tasks` — non-negative active task count.
+  * `last_folder` — optional last viewed folder name; native rendering truncates it safely.
+  * `widget_enabled` — visibility state.
+  * `widget_mode` — `activeTasks`, `lastFolder`, or legacy `streak`.
+* `AsaWidgetBaseProvider` uses Android plurals, safe preference reads, bounded text, and a root TalkBack description. Missing or malformed values fall back to a useful active-task/streak state rather than crashing the launcher.
+* Widget metadata declares resize bounds and target cell sizes. Layouts use `match_parent`, one-line ellipsized text, and a minimum resize height that keeps the content readable on compact launchers.
+* `HomeWidgetService` debounces writes and coalesces the three provider updates. It publishes the initial state even when values match native defaults and requests a refresh when the app resumes, because launchers may clear native widget state while the process is backgrounded.
 * ABI split is configured in `android/app/build.gradle.kts` for `arm64-v8a` release builds.
 * Calendar and notification permissions are declared in `AndroidManifest.xml`.
 * App name and launcher icon are managed in the usual Android resources.

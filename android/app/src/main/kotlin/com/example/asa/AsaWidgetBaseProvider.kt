@@ -21,62 +21,103 @@ abstract class AsaWidgetBaseProvider(private val layoutResId: Int) : HomeWidgetP
         widgetData: SharedPreferences
     ) {
         appWidgetIds.forEach { widgetId ->
-            val views = RemoteViews(context.packageName, layoutResId).apply {
-                val enabled = widgetData.getBoolean("widget_enabled", true)
-                val mode = widgetData.getString("widget_mode", "streak")
-
-                if (!enabled) {
-                    setTextViewText(R.id.widget_streak, context.getString(R.string.widget_disabled))
-                    setTextViewText(R.id.widget_active_tasks, "")
-                } else {
-                    when (mode) {
-                        "activeTasks" -> renderActiveTasks(context, widgetData)
-                        "lastFolder" -> renderLastFolder(context, widgetData)
-                        else -> renderStreak(context, widgetData)
-                    }
-                }
-
-                val pendingIntent = HomeWidgetLaunchIntent.getActivity(
-                    context,
-                    MainActivity::class.java
-                )
-                setOnClickPendingIntent(R.id.widget_root, pendingIntent)
+            val views = RemoteViews(context.packageName, layoutResId)
+            try {
+                views.renderWidget(context, widgetData)
+            } catch (_: RuntimeException) {
+                // A malformed preference must not prevent the launcher from
+                // rendering the widget. Show a useful safe state instead.
+                views.renderDisabled(context)
             }
 
+            val pendingIntent = HomeWidgetLaunchIntent.getActivity(
+                context,
+                MainActivity::class.java
+            )
+            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
             appWidgetManager.updateAppWidget(widgetId, views)
         }
     }
 
-    private fun RemoteViews.renderStreak(context: Context, widgetData: SharedPreferences) {
-        val streak = widgetData.getInt("streak", 1)
-        val activeTasks = widgetData.getInt("active_tasks", 0)
-
-        setTextViewText(R.id.widget_streak, context.getString(R.string.widget_streak_format, streak))
-        setTextViewText(R.id.widget_active_tasks, activeTasksText(context, activeTasks))
-    }
-
-    private fun RemoteViews.renderActiveTasks(context: Context, widgetData: SharedPreferences) {
-        val activeTasks = widgetData.getInt("active_tasks", 0)
-
-        setTextViewText(R.id.widget_streak, activeTasks.toString())
-        setTextViewText(R.id.widget_active_tasks, activeTasksText(context, activeTasks))
-    }
-
-    private fun RemoteViews.renderLastFolder(context: Context, widgetData: SharedPreferences) {
-        val folderName = widgetData.getString("last_folder", null)
-            ?: context.getString(R.string.widget_last_folder)
-
-        setTextViewText(R.id.widget_streak, folderName)
-        setTextViewText(R.id.widget_active_tasks, "")
-    }
-
-    private fun activeTasksText(context: Context, activeTasks: Int): String {
-        return when {
-            activeTasks == 0 -> context.getString(R.string.widget_active_tasks_zero)
-            activeTasks % 100 in 11..14 -> context.getString(R.string.widget_active_tasks_many, activeTasks)
-            activeTasks % 10 == 1 -> context.getString(R.string.widget_active_tasks_one)
-            activeTasks % 10 in 2..4 -> context.getString(R.string.widget_active_tasks_few, activeTasks)
-            else -> context.getString(R.string.widget_active_tasks_many, activeTasks)
+    private fun RemoteViews.renderWidget(context: Context, widgetData: SharedPreferences) {
+        val enabled = widgetData.safeBoolean("widget_enabled", true)
+        if (!enabled) {
+            renderDisabled(context)
+            return
         }
+
+        val mode = widgetData.safeString("widget_mode", MODE_ACTIVE_TASKS)
+        val streak = widgetData.safeInt("streak", 1).coerceAtLeast(1)
+        val activeTasks = widgetData.safeInt("active_tasks", 0).coerceAtLeast(0)
+        val folderName = widgetData.safeString("last_folder", "")
+            .trim()
+            .ifEmpty { context.getString(R.string.widget_last_folder) }
+            .take(MAX_FOLDER_NAME_LENGTH)
+
+        val primaryText: String
+        val secondaryText: String
+        when (mode) {
+            MODE_LAST_FOLDER -> {
+                primaryText = folderName
+                secondaryText = activeTasksText(context, activeTasks)
+            }
+            MODE_STREAK -> {
+                primaryText = context.getString(R.string.widget_streak_format, streak)
+                secondaryText = activeTasksText(context, activeTasks)
+            }
+            else -> {
+                primaryText = activeTasksText(context, activeTasks)
+                secondaryText = context.getString(R.string.widget_streak_format, streak)
+            }
+        }
+
+        setTextViewText(R.id.widget_streak, primaryText)
+        setTextViewText(R.id.widget_active_tasks, secondaryText)
+        setContentDescription(
+            R.id.widget_root,
+            context.getString(R.string.widget_content_description, primaryText, secondaryText)
+        )
+    }
+
+    private fun RemoteViews.renderDisabled(context: Context) {
+        val disabled = context.getString(R.string.widget_disabled)
+        setTextViewText(R.id.widget_streak, disabled)
+        setTextViewText(R.id.widget_active_tasks, "")
+        setContentDescription(R.id.widget_root, disabled)
+    }
+
+    private fun activeTasksText(context: Context, activeTasks: Int): String =
+        context.resources.getQuantityString(
+            R.plurals.widget_active_tasks,
+            activeTasks,
+            activeTasks
+        )
+
+    private fun SharedPreferences.safeBoolean(key: String, defaultValue: Boolean): Boolean =
+        try {
+            getBoolean(key, defaultValue)
+        } catch (_: ClassCastException) {
+            defaultValue
+        }
+
+    private fun SharedPreferences.safeInt(key: String, defaultValue: Int): Int =
+        try {
+            getInt(key, defaultValue)
+        } catch (_: ClassCastException) {
+            defaultValue
+        }
+
+    private fun SharedPreferences.safeString(key: String, defaultValue: String): String =
+        try {
+            getString(key, defaultValue) ?: defaultValue
+        } catch (_: ClassCastException) {
+            defaultValue
+        }
+
+    private companion object {
+        const val MODE_ACTIVE_TASKS = "activeTasks"
+        const val MODE_STREAK = "streak"
+        const val MODE_LAST_FOLDER = "lastFolder"
+        const val MAX_FOLDER_NAME_LENGTH = 80
     }
 }

@@ -12,6 +12,7 @@ import 'features/tasks/providers/task_provider.dart';
 import 'features/splash/splash_screen.dart';
 
 import 'core/theme_switcher.dart';
+import 'core/home_widget_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,8 +42,38 @@ void main() async {
   );
 }
 
-class AsaApp extends StatelessWidget {
+class AsaApp extends StatefulWidget {
   const AsaApp({super.key});
+
+  @override
+  State<AsaApp> createState() => _AsaAppState();
+}
+
+class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    final settings = context.read<SettingsProvider>();
+    final tasks = context.read<TaskProvider>();
+    HomeWidgetService.updateSettings(
+      enabled: settings.showInWidget,
+      mode: settings.widgetDisplayMode,
+    );
+    HomeWidgetService.updateData(tasks);
+    HomeWidgetService.refresh();
+  }
 
   @override
   Widget build(BuildContext context) {

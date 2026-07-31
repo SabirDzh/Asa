@@ -11,10 +11,7 @@ class InputPasteOptions {
   final String tooltip;
   final String errorText;
 
-  const InputPasteOptions({
-    required this.tooltip,
-    required this.errorText,
-  });
+  const InputPasteOptions({required this.tooltip, required this.errorText});
 }
 
 void showInputSheet({
@@ -32,28 +29,30 @@ void showInputSheet({
   String? iconPickerTitle,
 }) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final inputBg = isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
+  final inputBg =
+      isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _InputSheetBody(
-      icon: icon,
-      hintText: hintText,
-      controller: controller,
-      inputBg: inputBg,
-      sheetBg: sheetBg,
-      paste: paste,
-      onSubmit: onSubmit,
-      folderIconAssets: folderIconAssets,
-      selectedIconAsset: selectedIconAsset,
-      onIconSelected: onIconSelected,
-      noIconLabel: noIconLabel,
-      iconLabels: iconLabels,
-      iconPickerTitle: iconPickerTitle,
-    ),
+    builder:
+        (ctx) => _InputSheetBody(
+          icon: icon,
+          hintText: hintText,
+          controller: controller,
+          inputBg: inputBg,
+          sheetBg: sheetBg,
+          paste: paste,
+          onSubmit: onSubmit,
+          folderIconAssets: folderIconAssets,
+          selectedIconAsset: selectedIconAsset,
+          onIconSelected: onIconSelected,
+          noIconLabel: noIconLabel,
+          iconLabels: iconLabels,
+          iconPickerTitle: iconPickerTitle,
+        ),
   );
 }
 
@@ -130,7 +129,8 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
             _handleBar(isDark: Theme.of(context).brightness == Brightness.dark),
             const SizedBox(height: 36),
             _inputRow(),
-            if (widget.folderIconAssets != null && widget.folderIconAssets!.isNotEmpty) ...[
+            if (widget.folderIconAssets != null &&
+                widget.folderIconAssets!.isNotEmpty) ...[
               const SizedBox(height: 16),
               if (widget.iconPickerTitle != null)
                 Padding(
@@ -138,7 +138,9 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
                   child: Text(
                     widget.iconPickerTitle!,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -165,9 +167,11 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
 
   Widget _inputRow() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final iconColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-    final hintColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final hintColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     Future<void> handlePaste() async {
       final text = await getClipboardText();
@@ -199,16 +203,10 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
               controller: widget.controller,
               autofocus: true,
               inputFormatters: [textInputFormatter()],
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: textColor, fontSize: 16),
               decoration: InputDecoration(
                 hintText: widget.hintText,
-                hintStyle: TextStyle(
-                  color: hintColor,
-                  fontSize: 16,
-                ),
+                hintStyle: TextStyle(color: hintColor, fontSize: 16),
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
@@ -250,7 +248,8 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
   Widget _iconPicker() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final activeColor = AppColors.primary;
-    final inactiveColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final inactiveColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return SizedBox(
       height: 56,
@@ -259,7 +258,8 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
         padding: const EdgeInsets.symmetric(horizontal: 4),
         children: [
           _iconTile(null, activeColor, inactiveColor),
-          for (final asset in widget.folderIconAssets!) _iconTile(asset, activeColor, inactiveColor),
+          for (final asset in widget.folderIconAssets!)
+            _iconTile(asset, activeColor, inactiveColor),
         ],
       ),
     );
@@ -277,30 +277,31 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
           decoration: BoxDecoration(
             color: isSelected ? activeColor.withValues(alpha: 0.15) : null,
             border: Border.all(
-              color: isSelected ? activeColor : inactiveColor.withValues(alpha: 0.3),
+              color:
+                  isSelected
+                      ? activeColor
+                      : inactiveColor.withValues(alpha: 0.3),
               width: 2,
             ),
             borderRadius: BorderRadius.circular(AppTheme.pillRadius),
           ),
           alignment: Alignment.center,
-          child: asset == null
-              ? Icon(Iconsax.folder_minus, color: inactiveColor, size: 24)
-              : SvgPicture.asset(
-                  asset,
-                  width: 24,
-                  height: 24,
-                  colorFilter: ColorFilter.mode(
-                    isSelected ? activeColor : inactiveColor,
-                    BlendMode.srcIn,
+          child:
+              asset == null
+                  ? Icon(Iconsax.folder_minus, color: inactiveColor, size: 24)
+                  : SvgPicture.asset(
+                    asset,
+                    width: 24,
+                    height: 24,
+                    colorFilter: ColorFilter.mode(
+                      isSelected ? activeColor : inactiveColor,
+                      BlendMode.srcIn,
+                    ),
                   ),
-                ),
         ),
       ),
     );
-    return Tooltip(
-      message: _iconLabel(asset),
-      child: tile,
-    );
+    return Tooltip(message: _iconLabel(asset), child: tile);
   }
 
   String _iconLabel(String? asset) {
@@ -326,18 +327,19 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
     // so that actions like Look Up / Share / Autofill remain available.
     // We identify the Paste item by its localized label; this is the same
     // identifier the framework uses when building the default menu.
-    final buttonItems = editableTextState.contextMenuButtonItems.map((item) {
-      if (item.label == pasteLabel) {
-        return ContextMenuButtonItem(
-          onPressed: () async {
-            editableTextState.hideToolbar();
-            await onPaste();
-          },
-          label: pasteLabel,
-        );
-      }
-      return item;
-    }).toList();
+    final buttonItems =
+        editableTextState.contextMenuButtonItems.map((item) {
+          if (item.label == pasteLabel) {
+            return ContextMenuButtonItem(
+              onPressed: () async {
+                editableTextState.hideToolbar();
+                await onPaste();
+              },
+              label: pasteLabel,
+            );
+          }
+          return item;
+        }).toList();
 
     return AdaptiveTextSelectionToolbar.buttonItems(
       anchors: editableTextState.contextMenuAnchors,

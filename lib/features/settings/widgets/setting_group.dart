@@ -5,17 +5,14 @@ class SettingGroup extends StatelessWidget {
   final String? title;
   final List<Widget> children;
 
-  const SettingGroup({
-    super.key,
-    this.title,
-    required this.children,
-  });
+  const SettingGroup({super.key, this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

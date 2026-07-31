@@ -14,20 +14,22 @@ void showSyncBottomSheet(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
   final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+  final textSecondary =
+      isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     enableDrag: true,
-    builder: (ctx) => _SyncBottomSheet(
-      settings: settings,
-      taskProvider: taskProvider,
-      sheetBg: sheetBg,
-      textColor: textColor,
-      textSecondary: textSecondary,
-    ),
+    builder:
+        (ctx) => _SyncBottomSheet(
+          settings: settings,
+          taskProvider: taskProvider,
+          sheetBg: sheetBg,
+          textColor: textColor,
+          textSecondary: textSecondary,
+        ),
   );
 }
 
@@ -77,7 +79,9 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: widget.sheetBg,
@@ -92,7 +96,11 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
               children: [
                 Text(
                   widget.settings.tr('sync'),
-                  style: TextStyle(color: widget.textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: widget.textColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -101,7 +109,9 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                   decoration: InputDecoration(
                     labelText: widget.settings.tr('sync_device_name'),
                     labelStyle: TextStyle(color: widget.textSecondary),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onSubmitted: (value) => _updateDeviceName(value),
                 ),
@@ -114,8 +124,12 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                     labelText: widget.settings.tr('sync_secret'),
                     labelStyle: TextStyle(color: widget.textSecondary),
                     hintText: widget.settings.tr('sync_secret_hint'),
-                    hintStyle: TextStyle(color: widget.textSecondary.withValues(alpha: 0.6)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    hintStyle: TextStyle(
+                      color: widget.textSecondary.withValues(alpha: 0.6),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onSubmitted: (value) => _updateSecret(value),
                 ),
@@ -125,7 +139,11 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                   children: [
                     Text(
                       widget.settings.tr('sync_peers'),
-                      style: TextStyle(color: widget.textColor, fontSize: 16, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: widget.textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: _refresh,
@@ -137,44 +155,60 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
                 const SizedBox(height: 8),
                 _peers.isEmpty
                     ? Text(
-                        widget.settings.tr('no_peers'),
-                        style: TextStyle(color: widget.textSecondary),
-                      )
+                      widget.settings.tr('no_peers'),
+                      style: TextStyle(color: widget.textSecondary),
+                    )
                     : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _peers.length,
-                        itemBuilder: (_, index) {
-                          final peer = _peers[index];
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: Text(peer.name, style: TextStyle(color: widget.textColor)),
+                      shrinkWrap: true,
+                      itemCount: _peers.length,
+                      itemBuilder: (_, index) {
+                        final peer = _peers[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Text(
+                              peer.name,
+                              style: TextStyle(color: widget.textColor),
                             ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: Text('${peer.host}:${peer.port}', style: TextStyle(color: widget.textSecondary)),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Text(
+                              '${peer.host}:${peer.port}',
+                              style: TextStyle(color: widget.textSecondary),
                             ),
-                            trailing: IconButton(
-                              icon: Icon(Iconsax.send_2, color: widget.textSecondary),
-                              onPressed: () async {
-                                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                                final ok = await SyncService.instance.sendToPeer(widget.taskProvider, peer);
-                                if (!mounted) return;
-                                scaffoldMessenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      ok
-                                          ? '${widget.settings.tr('sync_send_success')} ${peer.name}'
-                                          : widget.settings.tr('sync_send_failed'),
-                                    ),
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(
+                              Iconsax.send_2,
+                              color: widget.textSecondary,
+                            ),
+                            onPressed: () async {
+                              final scaffoldMessenger = ScaffoldMessenger.of(
+                                context,
+                              );
+                              final ok = await SyncService.instance.sendToPeer(
+                                widget.taskProvider,
+                                peer,
+                              );
+                              if (!mounted) return;
+                              scaffoldMessenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    ok
+                                        ? '${widget.settings.tr('sync_send_success')} ${peer.name}'
+                                        : widget.settings.tr(
+                                          'sync_send_failed',
+                                        ),
                                   ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
               ],
             ),
           ),

@@ -23,13 +23,11 @@ class SettingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-    final defaultIconColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final defaultIconColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     Widget content = Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 14,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Icon(icon, color: iconColor ?? defaultIconColor, size: 24),
@@ -58,10 +56,7 @@ class SettingRow extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: content,
-      ),
+      child: InkWell(onTap: onTap, child: content),
     );
   }
 }

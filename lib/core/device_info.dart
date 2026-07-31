@@ -14,7 +14,9 @@ Future<String> getDefaultDeviceName() async {
       final manufacturer = android.manufacturer.trim();
       final model = android.model.trim();
       final parts = <String>[
-        if (manufacturer.isNotEmpty && !model.toLowerCase().contains(manufacturer.toLowerCase())) manufacturer,
+        if (manufacturer.isNotEmpty &&
+            !model.toLowerCase().contains(manufacturer.toLowerCase()))
+          manufacturer,
         if (model.isNotEmpty) model,
       ];
       return parts.isNotEmpty ? parts.join(' ') : 'ASA Device';
@@ -36,7 +38,9 @@ Future<String> getDefaultDeviceName() async {
     }
     if (Platform.isWindows) {
       final windows = await deviceInfo.windowsInfo;
-      return windows.computerName.isNotEmpty ? windows.computerName : 'ASA Windows';
+      return windows.computerName.isNotEmpty
+          ? windows.computerName
+          : 'ASA Windows';
     }
     if (Platform.isLinux) {
       final linux = await deviceInfo.linuxInfo;

@@ -14,31 +14,37 @@ void showWidgetModeSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     enableDrag: true,
-    builder: (ctx) => Container(
-      decoration: BoxDecoration(
-        color: sheetBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            settings.tr('widget_mode'),
-            style: TextStyle(
-              color: textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+    builder:
+        (ctx) => Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(height: 16),
-          _modeTile(ctx, settings, WidgetDisplayMode.activeTasks, textColor),
-          _modeTile(ctx, settings, WidgetDisplayMode.lastFolder, textColor),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                settings.tr('widget_mode'),
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _modeTile(
+                ctx,
+                settings,
+                WidgetDisplayMode.activeTasks,
+                textColor,
+              ),
+              _modeTile(ctx, settings, WidgetDisplayMode.lastFolder, textColor),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
   );
 }
 
@@ -56,9 +62,8 @@ Widget _modeTile(
         settings.widgetModeLabel(mode),
         style: TextStyle(color: textColor, fontSize: 16),
       ),
-      trailing: isSelected
-          ? const Icon(Icons.check, color: AppColors.primary)
-          : null,
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         settings.setWidgetDisplayMode(mode);
         Navigator.pop(ctx);

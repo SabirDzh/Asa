@@ -18,8 +18,10 @@ class VersionService {
   static const String currentVersion = '1.1.0';
 
   static const String _lastPromptKey = 'update_last_prompted_at';
+
   /// Default interval between automatic update checks.
   static const Duration _checkInterval = Duration(hours: 12);
+
   /// Interval after the user postpones/reminds-later an update.
   static const Duration _postponeInterval = Duration(hours: 24);
 
@@ -28,20 +30,26 @@ class VersionService {
   /// dialog.
   ///
   /// Does nothing when [owner] or [repo] are empty.
-  static Future<void> checkAndPrompt(BuildContext context, SettingsProvider settings) async {
+  static Future<void> checkAndPrompt(
+    BuildContext context,
+    SettingsProvider settings,
+  ) async {
     if (owner.isEmpty || repo.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     final lastPrompted = prefs.getInt(_lastPromptKey) ?? 0;
     final lastPromptedAt = DateTime.fromMillisecondsSinceEpoch(lastPrompted);
-    final interval = (prefs.getBool('update_postponed') ?? false)
-        ? _postponeInterval
-        : _checkInterval;
+    final interval =
+        (prefs.getBool('update_postponed') ?? false)
+            ? _postponeInterval
+            : _checkInterval;
     if (DateTime.now().difference(lastPromptedAt) < interval) {
       return;
     }
 
     final info = await _fetchLatest();
-    if (info == null || info.version.trim().isEmpty || !_isNewer(info.version, currentVersion)) {
+    if (info == null ||
+        info.version.trim().isEmpty ||
+        !_isNewer(info.version, currentVersion)) {
       // No newer version: record the check so the next one happens
       // after the normal 12-hour interval.
       await prefs.setInt(_lastPromptKey, DateTime.now().millisecondsSinceEpoch);
@@ -58,9 +66,7 @@ class VersionService {
       final uri = Uri.parse(
         'https://api.github.com/repos/$owner/$repo/releases/latest',
       );
-      final response = await http
-          .get(uri)
-          .timeout(const Duration(seconds: 5));
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
       if (response.statusCode != 200) return null;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -90,16 +96,9 @@ class VersionService {
   /// its numeric semver parts. Non-numeric segments and pre-release/build
   /// metadata are ignored so that comparison focuses on major/minor/patch.
   static List<int> _toVersionParts(String version) {
-    final clean = version
-        .replaceFirst('v', '')
-        .split('-')
-        .first
-        .split('+')
-        .first;
-    return clean
-        .split('.')
-        .map((p) => int.tryParse(p) ?? 0)
-        .toList();
+    final clean =
+        version.replaceFirst('v', '').split('-').first.split('+').first;
+    return clean.split('.').map((p) => int.tryParse(p) ?? 0).toList();
   }
 
   static void _showUpdateDialog(
@@ -110,83 +109,90 @@ class VersionService {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFFFFFFF);
     final textColor = isDark ? Colors.white : Colors.black;
-    final textSecondary = isDark ? const Color(0xFF8E8E93) : const Color(0xFF6B7280);
+    final textSecondary =
+        isDark ? const Color(0xFF8E8E93) : const Color(0xFF6B7280);
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: bg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          settings.tr('update_available'),
-          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${settings.tr('version')} → ${info.version}',
-                style: TextStyle(color: textSecondary),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: bg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              settings.tr('update_available'),
+              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${settings.tr('version')} → ${info.version}',
+                    style: TextStyle(color: textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    settings.tr('update_notes'),
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    info.notes.isEmpty ? '—' : info.notes,
+                    style: TextStyle(color: textColor),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                settings.tr('update_notes'),
-                style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setInt(
+                    _lastPromptKey,
+                    DateTime.now().millisecondsSinceEpoch,
+                  );
+                  await prefs.setBool('update_postponed', true);
+                  if (!ctx.mounted) return;
+                  Navigator.of(ctx).pop();
+                },
+                child: Text(
+                  settings.tr('update_postpone'),
+                  style: const TextStyle(color: Color(0xFF8E8E93)),
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                info.notes.isEmpty ? '—' : info.notes,
-                style: TextStyle(color: textColor),
+              ElevatedButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setInt(
+                    _lastPromptKey,
+                    DateTime.now().millisecondsSinceEpoch,
+                  );
+                  await prefs.setBool('update_postponed', false);
+                  final uri = Uri.parse(info.url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                  if (!ctx.mounted) return;
+                  Navigator.of(ctx).pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(settings.tr('update_install')),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setInt(
-                _lastPromptKey,
-                DateTime.now().millisecondsSinceEpoch,
-              );
-              await prefs.setBool('update_postponed', true);
-              if (!ctx.mounted) return;
-              Navigator.of(ctx).pop();
-            },
-            child: Text(
-              settings.tr('update_postpone'),
-              style: const TextStyle(color: Color(0xFF8E8E93)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setInt(
-                _lastPromptKey,
-                DateTime.now().millisecondsSinceEpoch,
-              );
-              await prefs.setBool('update_postponed', false);
-              final uri = Uri.parse(info.url);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-              if (!ctx.mounted) return;
-              Navigator.of(ctx).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(settings.tr('update_install')),
-          ),
-        ],
-      ),
     );
   }
 }

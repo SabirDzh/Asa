@@ -20,151 +20,158 @@ void showDataManagementSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     enableDrag: true,
-    builder: (ctx) => Container(
-      decoration: BoxDecoration(
-        color: sheetBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(ctx).size.height * 0.7 + 6,
-      ),
-      padding: const EdgeInsets.all(20),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              settings.tr('data_management'),
-              style: TextStyle(
-                color: textColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildTile(
-              icon: Iconsax.export,
-              title: settings.tr('export_data'),
-              defaultColor: textColor,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final result = await ExportImportService.exportAndShare(taskProvider);
-                if (context.mounted) {
-                  final message = _formatResultMessage(
-                    success: result.success,
-                    error: result.error,
-                    successKey: 'export_success',
-                    failedKey: 'export_failed',
-                    settings: settings,
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
-                }
-              },
-            ),
-            _buildTile(
-              icon: Iconsax.import,
-              title: settings.tr('import_data'),
-              defaultColor: textColor,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final picked = await ExportImportService.pickImportFile();
-                if (picked == null || !context.mounted) return;
-
-                final preview = ExportImportService.previewImport(
-                  fileName: picked.name,
-                  fileSize: picked.size,
-                  bytes: picked.bytes!,
-                );
-
-                if (!context.mounted) return;
-                showImportPreviewBottomSheet(
-                  context,
-                  preview: preview,
-                  bytes: picked.bytes!,
-                  taskProvider: taskProvider,
-                  onResult: (result) {
-                    if (!context.mounted) return;
-                    if (result.cancelled) return;
-                    final message = _formatResultMessage(
-                      success: result.success,
-                      error: result.error,
-                      successKey: 'import_success',
-                      failedKey: 'import_failed',
-                      settings: settings,
+    builder:
+        (ctx) => Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.7 + 6,
+          ),
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  settings.tr('data_management'),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildTile(
+                  icon: Iconsax.export,
+                  title: settings.tr('export_data'),
+                  defaultColor: textColor,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final result = await ExportImportService.exportAndShare(
+                      taskProvider,
                     );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
+                    if (context.mounted) {
+                      final message = _formatResultMessage(
+                        success: result.success,
+                        error: result.error,
+                        successKey: 'export_success',
+                        failedKey: 'export_failed',
+                        settings: settings,
+                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
+                  },
+                ),
+                _buildTile(
+                  icon: Iconsax.import,
+                  title: settings.tr('import_data'),
+                  defaultColor: textColor,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final picked = await ExportImportService.pickImportFile();
+                    if (picked == null || !context.mounted) return;
+
+                    final preview = ExportImportService.previewImport(
+                      fileName: picked.name,
+                      fileSize: picked.size,
+                      bytes: picked.bytes!,
+                    );
+
+                    if (!context.mounted) return;
+                    showImportPreviewBottomSheet(
+                      context,
+                      preview: preview,
+                      bytes: picked.bytes!,
+                      taskProvider: taskProvider,
+                      onResult: (result) {
+                        if (!context.mounted) return;
+                        if (result.cancelled) return;
+                        final message = _formatResultMessage(
+                          success: result.success,
+                          error: result.error,
+                          successKey: 'import_success',
+                          failedKey: 'import_failed',
+                          settings: settings,
+                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(message)));
+                      },
                     );
                   },
-                );
-              },
+                ),
+                _buildTile(
+                  icon: Iconsax.send_2,
+                  title: settings.tr('send_logs'),
+                  defaultColor: textColor,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final ok = await LoggerService.instance.sendToTelegram();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok
+                                ? settings.tr('logs_sent')
+                                : settings.tr('logs_failed'),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                Divider(color: textColor.withAlpha(24), height: 16),
+                _buildTile(
+                  icon: Iconsax.trash,
+                  title: settings.tr('clear_tasks'),
+                  defaultColor: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmAction(context, settings.tr('clear_tasks'), () {
+                      taskProvider.clearAllTasks();
+                    });
+                  },
+                ),
+                _buildTile(
+                  icon: Iconsax.folder_minus,
+                  title: settings.tr('clear_folders'),
+                  defaultColor: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmAction(context, settings.tr('clear_folders'), () {
+                      taskProvider.clearAllFolders();
+                    });
+                  },
+                ),
+                _buildTile(
+                  icon: Iconsax.refresh,
+                  title: settings.tr('clear_all'),
+                  defaultColor: textColor,
+                  titleColor: Colors.redAccent,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmAction(context, settings.tr('clear_all'), () {
+                      taskProvider.clearAllData();
+                    });
+                  },
+                ),
+              ],
             ),
-            _buildTile(
-              icon: Iconsax.send_2,
-              title: settings.tr('send_logs'),
-              defaultColor: textColor,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final ok = await LoggerService.instance.sendToTelegram();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        ok ? settings.tr('logs_sent') : settings.tr('logs_failed'),
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-            Divider(color: textColor.withAlpha(24), height: 16),
-            _buildTile(
-              icon: Iconsax.trash,
-              title: settings.tr('clear_tasks'),
-              defaultColor: textColor,
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmAction(context, settings.tr('clear_tasks'), () {
-                  taskProvider.clearAllTasks();
-                });
-              },
-            ),
-            _buildTile(
-              icon: Iconsax.folder_minus,
-              title: settings.tr('clear_folders'),
-              defaultColor: textColor,
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmAction(context, settings.tr('clear_folders'), () {
-                  taskProvider.clearAllFolders();
-                });
-              },
-            ),
-            _buildTile(
-              icon: Iconsax.refresh,
-              title: settings.tr('clear_all'),
-              defaultColor: textColor,
-              titleColor: Colors.redAccent,
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmAction(context, settings.tr('clear_all'), () {
-                  taskProvider.clearAllData();
-                });
-              },
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
   );
 }
 
 /// Returns a text color that is readable against the given sheet background.
 Color _sheetTextColor(Color background) {
-  return background.computeLuminance() > 0.5 ? AppColors.textLight : AppColors.textDark;
+  return background.computeLuminance() > 0.5
+      ? AppColors.textLight
+      : AppColors.textDark;
 }
 
 /// Formats a success/failure message for export/import operations.
@@ -197,38 +204,46 @@ Widget _buildTile({
       leading: Icon(icon, color: titleColor ?? defaultColor),
       title: Text(
         title,
-        style: TextStyle(
-          color: titleColor ?? defaultColor,
-          fontSize: 16,
-        ),
+        style: TextStyle(color: titleColor ?? defaultColor, fontSize: 16),
       ),
       onTap: onTap,
     ),
   );
 }
 
-void _confirmAction(BuildContext context, String title, VoidCallback onConfirm) {
+void _confirmAction(
+  BuildContext context,
+  String title,
+  VoidCallback onConfirm,
+) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   showDialog(
     context: context,
     builder: (ctx) {
-      final cancelColor = Theme.of(ctx).brightness == Brightness.dark
-          ? AppColors.textSecondaryDark
-          : AppColors.textSecondaryLight;
+      final cancelColor =
+          Theme.of(ctx).brightness == Brightness.dark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight;
       return AlertDialog(
         title: Text(title),
         content: Text(settings.tr('confirm_clear')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(settings.tr('cancel'), style: TextStyle(color: cancelColor)),
+            child: Text(
+              settings.tr('cancel'),
+              style: TextStyle(color: cancelColor),
+            ),
           ),
           TextButton(
             onPressed: () {
               onConfirm();
               Navigator.pop(ctx);
             },
-            child: Text(settings.tr('delete'), style: const TextStyle(color: Colors.redAccent)),
+            child: Text(
+              settings.tr('delete'),
+              style: const TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       );

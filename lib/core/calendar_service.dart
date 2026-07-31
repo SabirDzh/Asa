@@ -37,9 +37,10 @@ class CalendarService {
     if (!await requestPermission()) return null;
 
     final start = tz.TZDateTime.from(date, tz.local);
-    final end = endTime != null
-        ? tz.TZDateTime.from(endTime, tz.local)
-        : start.add(const Duration(hours: 1));
+    final end =
+        endTime != null
+            ? tz.TZDateTime.from(endTime, tz.local)
+            : start.add(const Duration(hours: 1));
 
     final event = Event(
       calendarId,

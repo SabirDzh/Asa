@@ -28,32 +28,54 @@ void showThemeModeSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     enableDrag: true,
-    builder: (ctx) => Container(
-      decoration: BoxDecoration(
-        color: sheetBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            settings.tr('theme'),
-            style: TextStyle(
-              color: textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+    builder:
+        (ctx) => Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(height: 16),
-          _themeTile(ctx, settings, ThemeMode.light, 'theme_light', Iconsax.sun_1, textColor),
-          _themeTile(ctx, settings, ThemeMode.dark, 'theme_dark', Iconsax.moon, textColor),
-          _themeTile(ctx, settings, ThemeMode.system, 'theme_system', Iconsax.magicpen, textColor),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                settings.tr('theme'),
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _themeTile(
+                ctx,
+                settings,
+                ThemeMode.light,
+                'theme_light',
+                Iconsax.sun_1,
+                textColor,
+              ),
+              _themeTile(
+                ctx,
+                settings,
+                ThemeMode.dark,
+                'theme_dark',
+                Iconsax.moon,
+                textColor,
+              ),
+              _themeTile(
+                ctx,
+                settings,
+                ThemeMode.system,
+                'theme_system',
+                Iconsax.magicpen,
+                textColor,
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
   );
 }
 
@@ -74,9 +96,8 @@ Widget _themeTile(
         settings.tr(labelKey),
         style: TextStyle(color: textColor, fontSize: 16),
       ),
-      trailing: isSelected
-          ? const Icon(Icons.check, color: AppColors.primary)
-          : null,
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         if (settings.themeMode != mode) {
           ThemeSwitcher.switchTheme(

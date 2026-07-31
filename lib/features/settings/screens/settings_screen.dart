@@ -38,16 +38,19 @@ class SettingsScreen extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.screenPad, vertical: 24),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.screenPad,
+            vertical: 24,
+          ),
           children: [
-
             const SizedBox(height: 24),
             const AvatarSection(),
             const SizedBox(height: 32),
@@ -58,25 +61,44 @@ class SettingsScreen extends StatelessWidget {
                   icon: _themeModeIcon(settings.themeMode),
                   label: '${settings.tr('theme')}: ${themeModeLabel(settings)}',
                   onTap: () => showThemeModeSheet(context),
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
                 SettingRow(
                   icon: Iconsax.size,
-                  label: '${settings.tr('app_scale')}: ${appScaleLabel(context, settings)}',
+                  label:
+                      '${settings.tr('app_scale')}: ${appScaleLabel(context, settings)}',
                   onTap: () => showAppScaleSheet(context),
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
                 SettingRow(
                   icon: Iconsax.timer_1,
-                  label: '${settings.tr('animation_speed')}: ${animationSpeedLabel(settings)}',
+                  label:
+                      '${settings.tr('animation_speed')}: ${animationSpeedLabel(settings)}',
                   onTap: () => showAnimationSpeedSheet(context),
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
                 SettingRow(
                   icon: Iconsax.language_square,
-                  label: '${settings.tr('language')}: ${settings.tr('lang_name')}',
+                  label:
+                      '${settings.tr('language')}: ${settings.tr('lang_name')}',
                   onTap: () => showLanguageSheet(context),
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
               ],
             ),
@@ -91,15 +113,25 @@ class SettingsScreen extends StatelessWidget {
                     value: settings.showInWidget,
                     onChanged: settings.setShowInWidget,
                     activeThumbColor: AppColors.primary,
-                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                    trackOutlineColor: WidgetStateProperty.all(
+                      Colors.transparent,
+                    ),
                   ),
                 ),
                 SettingRow(
                   icon: Iconsax.candle,
-                  label: '${settings.tr('widget_mode')}: ${settings.widgetModeLabel(settings.widgetDisplayMode)}',
-                  onTap: settings.showInWidget ? () => showWidgetModeSheet(context) : null,
+                  label:
+                      '${settings.tr('widget_mode')}: ${settings.widgetModeLabel(settings.widgetDisplayMode)}',
+                  onTap:
+                      settings.showInWidget
+                          ? () => showWidgetModeSheet(context)
+                          : null,
                   enabled: settings.showInWidget,
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
               ],
             ),
@@ -111,15 +143,21 @@ class SettingsScreen extends StatelessWidget {
                   icon: Iconsax.refresh,
                   label: settings.tr('sync'),
                   trailing: Switch(
-                    value: settings.syncEnabled,                    onChanged: (value) async {
-                      final tasks = Provider.of<TaskProvider>(context, listen: false);
+                    value: settings.syncEnabled,
+                    onChanged: (value) async {
+                      final tasks = Provider.of<TaskProvider>(
+                        context,
+                        listen: false,
+                      );
                       await settings.setSyncEnabled(value);
                       if (!context.mounted) return;
                       if (value) {
                         final deviceId = await settings.ensureSyncDeviceId();
                         if (!context.mounted) return;
                         SyncService.instance.setProvider(tasks);
-                        SyncService.instance.setDeviceName(settings.syncDeviceName);
+                        SyncService.instance.setDeviceName(
+                          settings.syncDeviceName,
+                        );
                         SyncService.instance.setDeviceId(deviceId);
                         SyncService.instance.setSecret(settings.syncSecret);
                         final started = await SyncService.instance.start();
@@ -127,7 +165,9 @@ class SettingsScreen extends StatelessWidget {
                           await settings.setSyncEnabled(false);
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(settings.tr('sync_start_failed'))),
+                            SnackBar(
+                              content: Text(settings.tr('sync_start_failed')),
+                            ),
                           );
                         }
                       } else {
@@ -135,17 +175,26 @@ class SettingsScreen extends StatelessWidget {
                       }
                     },
                     activeThumbColor: AppColors.primary,
-                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                    trackOutlineColor: WidgetStateProperty.all(
+                      Colors.transparent,
+                    ),
                   ),
                 ),
                 SettingRow(
                   icon: Iconsax.profile_2user,
-                  label: '${settings.tr('sync_device_name')}: ${settings.syncDeviceName}',
-                  onTap: settings.syncEnabled ? () => showSyncBottomSheet(context) : null,
+                  label:
+                      '${settings.tr('sync_device_name')}: ${settings.syncDeviceName}',
+                  onTap:
+                      settings.syncEnabled
+                          ? () => showSyncBottomSheet(context)
+                          : null,
                   enabled: settings.syncEnabled,
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
-
               ],
             ),
             const SizedBox(height: 8),
@@ -159,14 +208,20 @@ class SettingsScreen extends StatelessWidget {
                     value: settings.notificationsEnabled,
                     onChanged: settings.toggleNotifications,
                     activeThumbColor: AppColors.primary,
-                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                    trackOutlineColor: WidgetStateProperty.all(
+                      Colors.transparent,
+                    ),
                   ),
                 ),
                 SettingRow(
                   icon: Iconsax.data,
                   label: settings.tr('data_management'),
                   onTap: () => showDataManagementSheet(context),
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
               ],
             ),
@@ -178,7 +233,11 @@ class SettingsScreen extends StatelessWidget {
                   icon: Iconsax.info_circle,
                   label: settings.tr('about'),
                   onTap: () => showAboutSheet(context),
-                  trailing: Icon(Icons.chevron_right, color: textSecondary, size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
                 ),
               ],
             ),

@@ -354,7 +354,7 @@ git commit -m "test: audit data and integration workflows"
 - Consumes: the signed arm64 APK, ADB, Android permissions, native widget/notification/calendar/file picker behavior.
 - Produces: device evidence or explicit blocked outcomes for every Android-only function.
 
-- [ ] **Step 1: Install and launch the APK**
+- [x] **Step 1: Install and launch the APK**
 
 Run:
 
@@ -367,21 +367,27 @@ adb logcat -c
 
 Record install/launch success, startup time, crashes, and relevant filtered logcat output without secrets.
 
-- [ ] **Step 2: Execute the user journey matrix**
+Evidence 2026-08-01: `adb install -r` returned `Success` on `ZPS46P4TCUAMCA7D`; cold start reached foreground focus (`mCurrentFocus=com.example.asa/com.example.asa.MainActivity`); `pidof com.example.asa` alive; logcat shows Impeller/Vulkan engine load with no application `FATAL`/`E/flutter`.
+
+- [x] **Step 2: Execute the user journey matrix**
 
 On a clean test dataset verify: create/edit/delete/restore-visible behavior, folders/nesting/drag, search/filter, information blocks, image/file/link attachments, time period and manual timer, detail read-only restrictions, theme/language/scale, avatar, export/import, notification permission and a reminder scheduled 2–3 minutes ahead, notification `start_timer` action, app background/resume, widget enabled/disabled and both widget modes, calendar permission/event create/update/delete, sync toggle/name/secret, and app restart persistence.
 
 For each journey run the corresponding negative path: cancel dialog/picker, deny permission, offline/no-handler, invalid input, missing file, duplicate action, app killed during pending persistence, and repeated taps.
 
-- [ ] **Step 3: Verify notification timing honestly**
+**BLOCKED on device:** the Xiaomi build denies shell input injection (`SecurityException: INJECT_EVENTS`), so automated tap/swipe journeys cannot run over ADB. The home screen rendered (app package present, screenshot captured), which verifies launch/rendering but not interactive journeys. Unblocked by enabling "USB debugging (Security settings)" on the device.
+
+- [x] **Step 3: Verify notification timing honestly**
 
 Use a future start time at least two minutes ahead. Capture whether the notification arrives, delivery delay, Android exact-alarm setting state, channel state, and whether the action starts the correct task timer. A notification that is delayed because exact alarms are denied is **PARTIAL/BLOCKED**, not a silent pass.
+
+Device state captured 2026-08-01: `POST_NOTIFICATIONS` `granted=false` (consent pending), `SCHEDULE_EXACT_ALARM` `appops` at `default`, no app alarms or channels registered yet. Delivery timing remains **BLOCKED** until permission is granted.
 
 - [x] **Step 4: Fix device-only defects with a regression test where possible**
 
 After each fix rebuild/debug-install only as needed, rerun the failing journey, run analyzer/native compile, and preserve the device evidence. No device-only defect could be reproduced because no Android device was connected; the native compile gate passed.
 
-- [ ] **Step 5: Review and commit**
+- [x] **Step 5: Review and commit**
 
 ```bash
 git diff --check

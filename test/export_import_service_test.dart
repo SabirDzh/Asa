@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/core/export_import_service.dart';
@@ -14,6 +15,13 @@ void main() {
     setUp(() {
       SharedPreferences.setMockInitialValues({});
       provider = TaskProvider();
+      // Keep the pure-Dart PBKDF2 derivation fast in tests.
+      ExportImportService.syncPbkdf2Iterations = 1000;
+    });
+
+    tearDown(() {
+      ExportImportService.syncPbkdf2Iterations = 210000;
+      ExportImportService.resetSyncCrypto();
     });
 
     test('buildSnapshot includes tasks and folders', () {
@@ -307,35 +315,56 @@ void main() {
       });
     });
 
-    test('buildSyncPayload without secret is plain JSON', () {
+    test('buildSyncPayload without secret is plain JSON', () async {
       provider.addTask('Task');
-      final bytes = ExportImportService.buildSyncPayload(provider);
+      final bytes = await ExportImportService.buildSyncPayload(provider);
       final decoded = _decode(bytes) as Map<String, dynamic>;
 
       expect(decoded.containsKey('payload'), false);
       expect(decoded['tasks'], isA<List<dynamic>>());
     });
 
-    test(
-      'buildSyncPayload with secret uses a MAC without exposing the secret',
-      () {
-        provider.addTask('Task');
-        final bytes = ExportImportService.buildSyncPayload(
-          provider,
-          secret: '1234',
-        );
-        final decoded = _decode(bytes) as Map<String, dynamic>;
-
-        expect(decoded['secret'], isNull);
-        expect(decoded['mac'], isA<String>());
-        expect((decoded['mac'] as String).length, 64);
-        expect(decoded['payload'], isA<String>());
-      },
-    );
-
-    test('importFromBytes accepts a valid MAC envelope', () async {
+    test('buildSyncPayload with secret produces an encrypted envelope '
+        'without exposing the payload or secret', () async {
       provider.addTask('Task');
-      final bytes = ExportImportService.buildSyncPayload(
+      final bytes = await ExportImportService.buildSyncPayload(
+        provider,
+        secret: '1234',
+      );
+      final decoded = _decode(bytes) as Map<String, dynamic>;
+
+      expect(decoded['secret'], isNull);
+      expect(decoded['mac'], isNull);
+      expect(decoded['alg'], 'aes-256-gcm');
+      expect(decoded['payload'], isA<String>());
+      // The plaintext JSON and the secret must not appear on the wire.
+      expect(utf8.decode(bytes), isNot(contains('Task')));
+      expect(utf8.decode(bytes), isNot(contains('1234')));
+    });
+
+    test('importFromBytes accepts a valid legacy HMAC envelope', () async {
+      provider.addTask('Task');
+      final payload = _json(
+        ExportImportService.buildSnapshot(provider).toJson(),
+      );
+      final hmac = Hmac(sha256, utf8.encode('1234'));
+      final mac = hmac.convert(utf8.encode(payload)).toString();
+      final envelope = SyncEnvelope(mac: mac, payload: payload);
+      final bytes = _utf8(envelope.toJson());
+
+      final result = await ExportImportService.importFromBytes(
+        TaskProvider(),
+        bytes,
+        expectedSecret: '1234',
+      );
+
+      expect(result.success, true);
+      expect(result.tasksImported, 1);
+    });
+
+    test('importFromBytes accepts a valid encrypted envelope', () async {
+      provider.addTask('Task');
+      final bytes = await ExportImportService.buildSyncPayload(
         provider,
         secret: '1234',
       );
@@ -350,14 +379,39 @@ void main() {
       expect(result.tasksImported, 1);
     });
 
-    test('importFromBytes rejects a tampered MAC envelope', () async {
+    test(
+      'importFromBytes rejects an encrypted envelope with wrong secret',
+      () async {
+        provider.addTask('Task');
+        final bytes = await ExportImportService.buildSyncPayload(
+          provider,
+          secret: '1234',
+        );
+
+        final result = await ExportImportService.importFromBytes(
+          TaskProvider(),
+          bytes,
+          expectedSecret: 'wrong',
+        );
+
+        expect(result.success, false);
+        expect(result.error, 'error_invalid_secret');
+      },
+    );
+
+    test('importFromBytes rejects a tampered encrypted envelope', () async {
       provider.addTask('Task');
       final decoded =
           _decode(
-                ExportImportService.buildSyncPayload(provider, secret: '1234'),
+                await ExportImportService.buildSyncPayload(
+                  provider,
+                  secret: '1234',
+                ),
               )
               as Map<String, dynamic>;
-      decoded['mac'] = '0' * 64;
+      // Corrupt the base64 payload while keeping it decodable.
+      final payload = decoded['payload'] as String;
+      decoded['payload'] = 'AAAA${payload.substring(4)}';
 
       final result = await ExportImportService.importFromBytes(
         TaskProvider(),
@@ -372,7 +426,7 @@ void main() {
     test('importFromBytes rejects an unauthenticated envelope', () async {
       provider.addTask('Task');
       final decoded =
-          _decode(ExportImportService.buildSyncPayload(provider))
+          _decode(await ExportImportService.buildSyncPayload(provider))
               as Map<String, dynamic>;
       final unauthenticated = <String, dynamic>{'payload': jsonEncode(decoded)};
 

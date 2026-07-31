@@ -235,7 +235,7 @@ class SyncService {
         timeout: const Duration(seconds: 5),
       );
       _activeSockets.add(socket);
-      final payload = ExportImportService.buildSyncPayload(
+      final payload = await ExportImportService.buildSyncPayload(
         provider,
         secret: _secret,
       );

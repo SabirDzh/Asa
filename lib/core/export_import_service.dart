@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart' as crypt;
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -128,17 +130,30 @@ class AsaDataSnapshot {
 }
 
 /// Wire-safe envelope for sync payloads.
+///
+/// Two formats are supported:
+///  * legacy authenticated envelopes carrying `mac` (HMAC-SHA256) and a plain
+///    JSON `payload`, still accepted for backward compatibility; and
+///  * encrypted envelopes carrying `alg` = `aes-256-gcm` whose `payload` is a
+///    base64 `nonce + ciphertext + tag` concatenation. The GCM tag both
+///    authenticates and provides confidentiality, so no separate MAC is sent.
 class SyncEnvelope {
   /// Legacy plaintext secret used by pre-HMAC payloads.
   final String? secret;
 
-  /// HMAC-SHA256 of [payload] for current payloads.
+  /// HMAC-SHA256 of [payload] for legacy payloads.
   final String? mac;
+
+  /// Symmetric algorithm used when [payload] is encrypted.
+  /// Only `aes-256-gcm` is supported.
+  final String? alg;
+
   final String payload;
 
-  const SyncEnvelope({this.secret, this.mac, required this.payload});
+  const SyncEnvelope({this.secret, this.mac, this.alg, required this.payload});
 
   Map<String, dynamic> toJson() => {
+    if (alg != null) 'alg': alg,
     if (secret != null) 'secret': secret,
     if (mac != null) 'mac': mac,
     'payload': payload,
@@ -168,6 +183,7 @@ class SyncEnvelope {
     return SyncEnvelope(
       secret: readOptionalString('secret'),
       mac: readOptionalString('mac'),
+      alg: readOptionalString('alg'),
       payload: payload,
     );
   }
@@ -386,8 +402,33 @@ class ExportImportService {
           errorKey: 'error_invalid_format',
         );
       }
+      if (decoded['alg'] != null && decoded['alg'] is! String) {
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: effectiveSize,
+          isValid: false,
+          errorKey: 'error_invalid_format',
+        );
+      }
       final envelope = SyncEnvelope.fromJson(decoded);
-      hasSecret = envelope.secret != null || envelope.mac != null;
+      hasSecret =
+          envelope.secret != null ||
+          envelope.mac != null ||
+          envelope.alg != null;
+      if (envelope.alg != null) {
+        // Encrypted sync envelopes are decrypted asynchronously by
+        // [importFromBytes]; the synchronous file-preview path rejects them.
+        return ImportPreview(
+          fileName: fileName,
+          fileSize: effectiveSize,
+          isValid: false,
+          errorKey:
+              expectedSecret == null
+                  ? 'error_missing_secret'
+                  : 'error_invalid_secret',
+          hasSecret: true,
+        );
+      }
       if (envelope.mac != null) {
         if (expectedSecret == null) {
           return ImportPreview(
@@ -531,6 +572,19 @@ class ExportImportService {
     List<int> bytes, {
     String? expectedSecret,
   }) async {
+    if (expectedSecret != null) {
+      try {
+        final decrypted = await _decryptEncryptedBytes(bytes, expectedSecret);
+        if (decrypted != null) {
+          // The AES-GCM tag already authenticates the payload, so the legacy
+          // MAC/plain-secret checks must not run again on the plaintext.
+          bytes = decrypted;
+          expectedSecret = null;
+        }
+      } on Exception {
+        return const ImportResult(error: 'error_invalid_secret');
+      }
+    }
     final preview = previewImport(
       fileName: '',
       fileSize: bytes.length,
@@ -603,18 +657,113 @@ class ExportImportService {
     }
   }
 
-  /// Builds a sync payload that optionally includes a shared [secret].
-  static List<int> buildSyncPayload(TaskProvider provider, {String? secret}) {
+  /// Builds a sync payload that optionally protects the snapshot with a
+  /// shared [secret].
+  ///
+  /// Without a secret the snapshot is sent as plain JSON. With a secret the
+  /// payload is encrypted with AES-256-GCM using a key derived from the secret
+  /// via PBKDF2-HMAC-SHA256, so task data is confidential while travelling
+  /// over the LAN.
+  static Future<List<int>> buildSyncPayload(
+    TaskProvider provider, {
+    String? secret,
+  }) async {
     final snapshot = buildSnapshot(provider);
     final payload = jsonEncode(snapshot.toJson());
     if (secret == null) {
       return utf8.encode(payload);
     }
-    final envelope = SyncEnvelope(
-      mac: _computeMac(secret, payload),
-      payload: payload,
-    );
+    final envelope = await _encryptSyncEnvelope(payload, secret);
     return utf8.encode(jsonEncode(envelope.toJson()));
+  }
+
+  /// Fixed app-wide salt for the sync key derivation so both ends derive the
+  /// same key from the same shared secret. Reusing one key across messages is
+  /// safe because AES-GCM generates a fresh random nonce per message.
+  static const String _syncSaltConstant = 'asa-sync-v1';
+
+  /// PBKDF2-HMAC-SHA256 iterations for the sync encryption key.
+  ///
+  /// Derived once per secret and cached, so the cost is paid only when the
+  /// secret first changes. Tests lower this value to keep the suite fast.
+  @visibleForTesting
+  static int syncPbkdf2Iterations = 210000;
+
+  static crypt.SecretKey? _cachedSyncKey;
+  static String? _cachedSyncKeySecret;
+
+  /// Clears the cached derived sync key. Used between tests.
+  @visibleForTesting
+  static void resetSyncCrypto() {
+    _cachedSyncKey = null;
+    _cachedSyncKeySecret = null;
+  }
+
+  static Future<crypt.SecretKey> _syncKey(String secret) async {
+    final cached = _cachedSyncKey;
+    if (_cachedSyncKeySecret == secret && cached != null) return cached;
+    final pbkdf2 = crypt.Pbkdf2(
+      macAlgorithm: crypt.Hmac.sha256(),
+      iterations: syncPbkdf2Iterations,
+      bits: 256,
+    );
+    final key = await pbkdf2.deriveKeyFromPassword(
+      password: secret,
+      nonce: utf8.encode(_syncSaltConstant),
+    );
+    _cachedSyncKey = key;
+    _cachedSyncKeySecret = secret;
+    return key;
+  }
+
+  static Future<SyncEnvelope> _encryptSyncEnvelope(
+    String payload,
+    String secret,
+  ) async {
+    final key = await _syncKey(secret);
+    final aes = crypt.AesGcm.with256bits();
+    final box = await aes.encrypt(utf8.encode(payload), secretKey: key);
+    return SyncEnvelope(
+      alg: 'aes-256-gcm',
+      payload: base64Encode(box.concatenation()),
+    );
+  }
+
+  static Future<String> _decryptSyncEnvelope(
+    SyncEnvelope envelope,
+    String secret,
+  ) async {
+    if (envelope.alg != 'aes-256-gcm') {
+      throw const FormatException('Unsupported sync encryption algorithm');
+    }
+    final aes = crypt.AesGcm.with256bits();
+    final key = await _syncKey(secret);
+    final box = crypt.SecretBox.fromConcatenation(
+      base64Decode(envelope.payload),
+      nonceLength: aes.nonceLength,
+      macLength: aes.macAlgorithm.macLength,
+    );
+    return utf8.decode(await aes.decrypt(box, secretKey: key));
+  }
+
+  /// Decrypts [bytes] when they form an AES-GCM sync envelope; returns null
+  /// for plain JSON or legacy HMAC payloads.
+  static Future<List<int>?> _decryptEncryptedBytes(
+    List<int> bytes,
+    String secret,
+  ) async {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(utf8.decode(bytes));
+    } on Exception {
+      return null;
+    }
+    if (decoded is! Map<String, dynamic> || decoded['alg'] is! String) {
+      return null;
+    }
+    final envelope = SyncEnvelope.fromJson(decoded);
+    final plaintext = await _decryptSyncEnvelope(envelope, secret);
+    return utf8.encode(plaintext);
   }
 
   static String _computeMac(String secret, String payload) {

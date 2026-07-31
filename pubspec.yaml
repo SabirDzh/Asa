@@ -33,6 +33,7 @@ dependencies:
   device_info_plus: ^11.1.2
   timezone: ^0.9.4
   flutter_svg: ^2.0.10
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:

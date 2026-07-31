@@ -46,6 +46,8 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
       provider = TaskProvider();
+      // Keep the pure-Dart PBKDF2 derivation fast in tests.
+      ExportImportService.syncPbkdf2Iterations = 1000;
     });
 
     tearDown(() async {
@@ -55,6 +57,8 @@ void main() {
       SyncService.instance.setDeviceId('');
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
+      ExportImportService.syncPbkdf2Iterations = 210000;
+      ExportImportService.resetSyncCrypto();
     });
 
     tearDownAll(_BonsoirMock.tearDown);
@@ -181,7 +185,7 @@ void main() {
       await SyncService.instance.start();
 
       final port = SyncService.instance.actualPort!;
-      final payload = ExportImportService.buildSyncPayload(
+      final payload = await ExportImportService.buildSyncPayload(
         provider,
         secret: 'wrong',
       );

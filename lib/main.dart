@@ -16,29 +16,9 @@ import 'features/splash/splash_screen.dart';
 import 'core/theme_switcher.dart';
 import 'core/home_widget_service.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  tz_data.initializeTimeZones();
-  try {
-    tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
-  } catch (_) {
-    // Some platforms expose only an abbreviation (for example, "MSK"),
-    // which is not an IANA identifier. Keep the device's actual offset instead
-    // of silently shifting reminders to UTC.
-    final offset = DateTime.now().timeZoneOffset.inMilliseconds;
-    tz.setLocalLocation(
-      tz.Location('device-offset', const <int>[], const <int>[], <tz.TimeZone>[
-        tz.TimeZone(offset, isDst: false, abbreviation: 'LOCAL'),
-      ]),
-    );
-  }
   LoggerService.listenToFlutterErrors();
-
-  try {
-    await NotificationService.init();
-  } catch (_) {
-    // Notifications are not critical; continue without them.
-  }
 
   runApp(
     MultiProvider(
@@ -63,12 +43,47 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_initializeNonCriticalServices());
+    });
     final tasks = context.read<TaskProvider>();
     NotificationService.onStartTimerRequested = (taskId) async {
       await tasks.ready;
       tasks.startTimer(taskId);
     };
     _consumePendingTimerAction(tasks);
+  }
+
+  Future<void> _initializeNonCriticalServices() async {
+    try {
+      tz_data.initializeTimeZones();
+      try {
+        tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
+      } catch (_) {
+        // Some platforms expose only an abbreviation (for example, "MSK"),
+        // which is not an IANA identifier. Keep the device's actual offset
+        // instead of silently shifting reminders to UTC.
+        final offset = DateTime.now().timeZoneOffset.inMilliseconds;
+        tz.setLocalLocation(
+          tz.Location(
+            'device-offset',
+            const <int>[],
+            const <int>[],
+            <tz.TimeZone>[
+              tz.TimeZone(offset, isDst: false, abbreviation: 'LOCAL'),
+            ],
+          ),
+        );
+      }
+      await NotificationService.init();
+      await NotificationService.rescheduleCachedTasks();
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Optional startup services failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Future<void> _consumePendingTimerAction(TaskProvider tasks) async {

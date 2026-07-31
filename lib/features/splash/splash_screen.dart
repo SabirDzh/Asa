@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/sync_service.dart';
+import '../../../core/logger_service.dart';
 import '../../../core/theme.dart';
 import '../../../core/version_service.dart';
 import '../settings/providers/settings_provider.dart';
@@ -26,19 +29,47 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     final settings = context.read<SettingsProvider>();
     final tasks = context.read<TaskProvider>();
-    _readyFuture = Future.wait([settings.ready, tasks.ready]).then((_) async {
-      if (settings.syncEnabled) {
-        final deviceId = await settings.ensureSyncDeviceId();
-        SyncService.instance.setProvider(tasks);
-        SyncService.instance.setDeviceName(settings.syncDeviceName);
-        SyncService.instance.setDeviceId(deviceId);
-        SyncService.instance.setSecret(settings.syncSecret);
-        final started = await SyncService.instance.start();
-        if (!started) {
-          await settings.setSyncEnabled(false);
-        }
-      }
+    _readyFuture = Future.wait([settings.ready, tasks.ready]);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        _startSyncInBackground(settings, tasks).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          // Sync is optional and must never turn a post-frame callback into an
+          // unhandled error or delay the first usable screen.
+          LoggerService.instance.w(
+            'Background sync startup failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }),
+      );
     });
+  }
+
+  Future<void> _startSyncInBackground(
+    SettingsProvider settings,
+    TaskProvider tasks,
+  ) async {
+    await _readyFuture;
+    if (!settings.syncEnabled) return;
+
+    final deviceId = await settings.ensureSyncDeviceId();
+    SyncService.instance.setProvider(tasks);
+    SyncService.instance.setDeviceName(settings.syncDeviceName);
+    SyncService.instance.setDeviceId(deviceId);
+    SyncService.instance.setSecret(settings.syncSecret);
+    final started = await SyncService.instance.start().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () async {
+        await SyncService.instance.stop();
+        return false;
+      },
+    );
+    if (!started && settings.syncEnabled) {
+      await settings.setSyncEnabled(false);
+    }
   }
 
   @override

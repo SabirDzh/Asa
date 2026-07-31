@@ -116,7 +116,27 @@ class TaskProvider with ChangeNotifier {
       if (foldersStr != null && foldersStr.isNotEmpty) {
         final List decoded = jsonDecode(foldersStr);
         _folders.clear();
-        _folders.addAll(decoded.map((e) => FolderItem.fromJson(e)));
+        for (final entry in decoded) {
+          try {
+            final folder = FolderItem.fromJson(entry);
+            // The streak folder is an app-owned invariant, not user data. Drop
+            // persisted copies so checkDailyStreak() recreates one canonical
+            // record, and detach any user folder that referenced it.
+            if (folder.id == 'system_streak_folder' || folder.isSystemStreak) {
+              continue;
+            }
+            if (folder.parentFolderId == 'system_streak_folder') {
+              folder.parentFolderId = null;
+            }
+            _folders.add(folder);
+          } catch (error, stackTrace) {
+            LoggerService.instance.w(
+              'Skipping malformed persisted folder',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }
+        }
       }
     } catch (_) {}
   }
@@ -252,6 +272,7 @@ class TaskProvider with ChangeNotifier {
         !_folders.any((f) => f.id == targetParentFolderId && !f.isDeleted)) {
       return;
     }
+    if (targetParentFolderId == 'system_streak_folder') return;
     if (_wouldCreateFolderCycle(folderId, targetParentFolderId)) return;
 
     final index = _folders.indexWhere((f) => f.id == folderId);
@@ -553,7 +574,8 @@ class TaskProvider with ChangeNotifier {
       throw Exception('Название длиннее 250 символов');
     }
     if (parentFolderId != null &&
-        !_folders.any((f) => f.id == parentFolderId && !f.isDeleted)) {
+        (!_folders.any((f) => f.id == parentFolderId && !f.isDeleted) ||
+            parentFolderId == 'system_streak_folder')) {
       return;
     }
     _folders.add(
@@ -566,6 +588,11 @@ class TaskProvider with ChangeNotifier {
 
   /// Adds a raw [folder] directly, used by import/sync flows.
   void addFolderRaw(FolderItem folder) {
+    if (folder.id == 'system_streak_folder' ||
+        folder.isSystemStreak ||
+        folder.parentFolderId == 'system_streak_folder') {
+      return;
+    }
     _folders.add(folder);
     _foldersVersion++;
     notifyListeners();
@@ -575,6 +602,11 @@ class TaskProvider with ChangeNotifier {
   /// Upserts a folder during import/sync, updating the existing record if it
   /// already exists. Returns true if the item was changed.
   bool upsertFolder(FolderItem folder) {
+    if (folder.id == 'system_streak_folder' ||
+        folder.isSystemStreak ||
+        folder.parentFolderId == 'system_streak_folder') {
+      return false;
+    }
     final index = _folders.indexWhere((f) => f.id == folder.id);
     if (index == -1) {
       _folders.add(folder);

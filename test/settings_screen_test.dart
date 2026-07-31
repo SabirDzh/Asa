@@ -7,11 +7,14 @@ import 'package:asa/features/settings/screens/settings_screen.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
+import 'package:asa/core/home_widget_service.dart';
 
 Widget createTestApp({bool standalone = true}) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(deviceNameProvider: () async => 'Test Device'),
+      ),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
     child: MaterialApp(
@@ -26,12 +29,18 @@ Future<void> pumpAndInit(WidgetTester tester, Widget widget) async {
   await tester.pumpWidget(widget);
   final settings = Provider.of<SettingsProvider>(tester.element(find.byType(SettingsScreen)), listen: false);
   await settings.ready;
-  await tester.pumpAndSettle();
+  await tester.pumpAndSettle(const Duration(milliseconds: 100));
 }
 
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    HomeWidgetService.instance.debounceDelay = Duration.zero;
+  });
+
+  tearDown(() {
+    HomeWidgetService.resetForTests();
+    HomeWidgetService.instance.debounceDelay = const Duration(milliseconds: 300);
   });
 
   testWidgets('renders all setting groups', (tester) async {

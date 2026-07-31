@@ -19,7 +19,7 @@ class SettingsProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
-  double _animationSpeed = 0.5;
+  double _animationSpeed = 1.0;
   double _appScale = 1.0;
   List<double> _customAnimationSpeeds = [];
   List<double> _customAppScales = [];
@@ -71,7 +71,7 @@ class SettingsProvider with ChangeNotifier {
       _themeMode = ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
-      _animationSpeed = prefs.getDouble('animationSpeed') ?? 0.5;
+      _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
       _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
       _customAnimationSpeeds = _loadDoubleList(prefs, 'customAnimationSpeeds');
       _customAppScales = _loadDoubleList(prefs, 'customAppScales');

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
@@ -166,6 +168,60 @@ void main() {
       provider.moveFolderToFolder(parentId, 'missing');
 
       expect(provider.folders.first.parentFolderId, null);
+    });
+
+    test('user folders cannot be placed inside the streak folder', () {
+      provider.addFolder('Root');
+      final rootId = provider.filteredFolders.first.id;
+
+      provider.addFolder('Invalid child', parentFolderId: 'system_streak_folder');
+      provider.moveFolderToFolder(rootId, 'system_streak_folder');
+
+      expect(provider.folders.where((f) => f.name == 'Invalid child'), isEmpty);
+      expect(provider.folders.firstWhere((f) => f.id == rootId).parentFolderId, null);
+    });
+
+    test('raw and upsert folder paths reject reserved streak records', () {
+      provider.addFolderRaw(FolderItem(id: 'system_streak_folder', name: 'Fake streak'));
+      provider.addFolderRaw(FolderItem(id: 'raw-system', name: 'System-shaped', isSystemStreak: true));
+      provider.addFolderRaw(FolderItem(
+        id: 'raw-child',
+        name: 'Child of streak',
+        parentFolderId: 'system_streak_folder',
+      ));
+
+      expect(provider.upsertFolder(FolderItem(id: 'system_streak_folder', name: 'Fake streak')), false);
+      expect(provider.upsertFolder(FolderItem(id: 'upsert-system', name: 'System-shaped', isSystemStreak: true)), false);
+      expect(provider.upsertFolder(FolderItem(
+        id: 'upsert-child',
+        name: 'Child of streak',
+        parentFolderId: 'system_streak_folder',
+      )), false);
+      expect(provider.folders.where((folder) => folder.id.startsWith('raw-')), isEmpty);
+    });
+
+    test('loading persisted streak corruption restores user folders to root', () async {
+      final persistedFolder = FolderItem(
+        id: 'user-child',
+        name: 'Recovered folder',
+        parentFolderId: 'system_streak_folder',
+      );
+      final persistedStreak = FolderItem(
+        id: 'system_streak_folder',
+        name: 'Fake streak',
+        isSystemStreak: true,
+      );
+      SharedPreferences.setMockInitialValues({
+        'saved_folders': '[${jsonEncode(persistedFolder.toJson())},${jsonEncode(persistedStreak.toJson())},{"id":"broken","name":42}]',
+      });
+
+      final restored = TaskProvider();
+      await restored.ready;
+
+      final recovered = restored.folders.firstWhere((folder) => folder.id == 'user-child');
+      expect(recovered.parentFolderId, isNull);
+      expect(restored.folders.where((folder) => folder.id == 'system_streak_folder'), hasLength(1));
+      expect(restored.folders.where((folder) => folder.name == 'Fake streak'), isEmpty);
     });
 
     test('clearAllFolders soft-deletes folders and their tasks', () {

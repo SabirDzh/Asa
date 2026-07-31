@@ -22,7 +22,7 @@ class AvatarSection extends StatelessWidget {
     if (format == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Неподдерживаемый формат. Используйте JPEG, PNG, GIF или WebP')),
+          SnackBar(content: Text(settings.tr('avatar_invalid_format'))),
         );
       }
       return;

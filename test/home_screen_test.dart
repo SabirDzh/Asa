@@ -28,7 +28,7 @@ void main() {
   });
 
   tearDown(() {
-    HomeWidgetService.cancelPendingUpdate();
+    HomeWidgetService.resetForTests();
     HomeWidgetService.instance.debounceDelay = const Duration(milliseconds: 300);
   });
 

@@ -43,6 +43,9 @@ class HomeWidgetService {
   /// timers between test cases.
   static void cancelPendingUpdate() => instance._cancelPendingUpdate();
 
+  /// Resets cached widget state between isolated widget tests.
+  static void resetForTests() => instance._resetForTests();
+
   void _updateData(TaskProvider provider) {
     final active = provider.tasks.where((t) => !t.isCompleted).length;
     final streak = provider.streakCount;
@@ -79,6 +82,15 @@ class HomeWidgetService {
   void _cancelPendingUpdate() {
     _debounce?.cancel();
     _debounce = null;
+  }
+
+  void _resetForTests() {
+    _cancelPendingUpdate();
+    _lastStreak = -1;
+    _lastActive = -1;
+    _lastFolder = null;
+    _lastEnabled = true;
+    _lastMode = WidgetDisplayMode.activeTasks;
   }
 
   Future<void> _performUpdate() async {

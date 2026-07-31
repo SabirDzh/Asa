@@ -58,6 +58,31 @@ void main() {
       expect(provider.folders.any((f) => f.id == 'f1'), true);
     });
 
+    test('import rejects reserved streak folders but keeps valid folders', () async {
+      final snapshot = AsaDataSnapshot(
+        version: '1.1.0',
+        exportedAt: 0,
+        tasks: [],
+        folders: [
+          FolderItem(id: 'valid', name: 'Valid folder').toJson(),
+          FolderItem(id: 'system-shaped', name: 'System-shaped', isSystemStreak: true).toJson(),
+          FolderItem(
+            id: 'nested-in-streak',
+            name: 'Nested in streak',
+            parentFolderId: 'system_streak_folder',
+          ).toJson(),
+        ],
+      );
+
+      await provider.ready;
+      final result = await ExportImportService.importFromSnapshot(provider, snapshot);
+
+      expect(result.success, true);
+      expect(result.foldersImported, 1);
+      expect(provider.folders.any((folder) => folder.id == 'valid'), true);
+      expect(provider.folders.where((folder) => folder.id != 'system_streak_folder'), hasLength(1));
+    });
+
     test('LWW merge prefers newer task', () async {
       provider.addTask('Local task');
       final localId = provider.tasks.first.id;

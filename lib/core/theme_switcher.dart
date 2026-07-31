@@ -76,6 +76,7 @@ class _ThemeTransitionOverlayState extends State<_ThemeTransitionOverlay> with S
   @override
   void dispose() {
     _controller.dispose();
+    widget.image.dispose();
     super.dispose();
   }
 

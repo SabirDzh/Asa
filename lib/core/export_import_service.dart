@@ -216,8 +216,10 @@ class ExportImportService {
     required List<int> bytes,
     String? expectedSecret,
   }) {
-    final ext = fileName.split('.').lastOrNull?.toLowerCase();
-    if (ext != 'json' && ext != 'asa') {
+    // Raw byte imports (including network sync) do not have a filename.
+    // File-based previews still validate the user-visible extension.
+    final ext = fileName.isEmpty ? null : fileName.split('.').lastOrNull?.toLowerCase();
+    if (ext != null && ext != 'json' && ext != 'asa') {
       return ImportPreview(
         fileName: fileName,
         fileSize: fileSize,

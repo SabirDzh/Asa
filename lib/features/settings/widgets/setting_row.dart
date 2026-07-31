@@ -3,6 +3,7 @@ import '../../../core/theme.dart';
 
 class SettingRow extends StatelessWidget {
   final IconData icon;
+  final Widget? iconWidget;
   final String label;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -12,6 +13,7 @@ class SettingRow extends StatelessWidget {
   const SettingRow({
     super.key,
     required this.icon,
+    this.iconWidget,
     required this.label,
     this.trailing,
     this.onTap,
@@ -30,7 +32,8 @@ class SettingRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, color: iconColor ?? defaultIconColor, size: 24),
+          iconWidget ??
+              Icon(icon, color: iconColor ?? defaultIconColor, size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: Padding(

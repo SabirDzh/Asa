@@ -18,7 +18,7 @@ The remediation implementation is complete and independently reviewed. The repos
 | Repository formatting | **Passed** | `dart format --output=none --set-exit-if-changed .`; formatting-only `3427d11` |
 | Import/avatar boundaries | **Passed** | `6e76e3d`; focused parser/image tests included in the 144-test non-widget suite |
 | Persistence/sync/diagnostics | **Passed** | `3e337b4`, `08c86f2`, `f959f22`, `2dd1116`; 144 focused non-widget tests passed |
-| Notification/widgets | **Passed** | `e9659b5`; notification/widget contracts and Android gate passed |
+| Notification/widgets | **Passed** | `e9659b5`; notification/widget contracts and Android gate passed; startup waits for loaded tasks and requests notification permission, while exact-alarm access is requested explicitly when enabling notifications |
 | Android native gate | **Passed** | `:app:processDebugResources :app:compileDebugKotlin --no-daemon` → `BUILD SUCCESSFUL` |
 | Android arm64 release | **Passed** | `flutter build apk --target-platform android-arm64 --split-per-abi --release`; `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (~21.6 MB) |
 | Web build | **Partial** | `flutter build web --no-tree-shake-icons` passed; ordinary build remains blocked by Flutter `IconTreeShakerException` |
@@ -30,7 +30,7 @@ The remediation implementation is complete and independently reviewed. The repos
 
 `422d567`, `6e76e3d`, `3e337b4`, `2dd1116`, `e9659b5`, `2250954`, `614aa05`, `94087c5`, `08c86f2`, `1eff7fe`, `e653dab`, `c7b7333`, `f959f22`, and the formatting gate `3427d11`.
 
-The later task-information commits are separate product work: `00676a3`, `a74254c`, `0e568ad`, `7ddb155`, `71d33e7`. The timer icon remains an entry point to the time editor; the detail sheet itself remains read-only.
+The later task-information commits are separate product work: `00676a3`, `a74254c`, `0e568ad`, `7ddb155`, `71d33e7`. The SVG timer icon remains an entry point to the time editor; the detail sheet itself remains read-only.
 
 ### Final review limitations
 

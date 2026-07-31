@@ -76,7 +76,30 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
         );
       }
       await NotificationService.init();
-      await NotificationService.rescheduleCachedTasks();
+      if (!mounted) return;
+      final settings = context.read<SettingsProvider>();
+      await settings.ready;
+      if (!mounted) return;
+      final tasks = context.read<TaskProvider>();
+      await tasks.ready;
+      if (!mounted) return;
+      if (settings.notificationsEnabled) {
+        // The default-enabled setting must still request Android runtime
+        // notification permission before reminders are scheduled. Exact-alarm
+        // access is requested later from the explicit notification setting,
+        // not on every app launch.
+        final granted = await NotificationService.requestPermission(
+          requestExactAlarms: false,
+        );
+        if (!granted && mounted) {
+          // Keep the setting honest when Android/iOS denies runtime access;
+          // otherwise reminders appear enabled but can never be delivered.
+          await settings.toggleNotifications(false);
+        }
+      }
+      // Sync the loaded task snapshot directly. The notification cache is
+      // populated by this call, avoiding a startup race with TaskProvider.
+      await NotificationService.syncTasks(tasks.allTasks);
     } on Object catch (error, stackTrace) {
       LoggerService.instance.w(
         'Optional startup services failed',

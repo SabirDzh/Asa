@@ -7,8 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../core/calendar_service.dart';
 import '../../../core/anchored_popup_menu.dart';
 import '../../../core/theme.dart';
-import '../../../core/input_utils.dart';
-import '../../../core/bottom_sheet.dart';
+import 'task_editor_sheet.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -76,32 +75,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   }
 
   void _showEditSheet(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final controller = TextEditingController(text: widget.task.title);
-    showInputSheet(
-      context: context,
-      icon: Iconsax.clipboard_tick,
-      hintText: settings.tr('edit_task'),
-      controller: controller,
-      paste: InputPasteOptions(
-        tooltip: settings.tr('paste'),
-        errorText: settings.tr('paste_error'),
-      ),
-      onSubmit: (val, sheetCtx) {
-        final v = sanitizeText(val);
-        if (v.isNotEmpty) {
-          try {
-            context.read<TaskProvider>().updateTask(widget.task.id, v);
-          } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString().replaceAll('Exception: ', '')),
-              ),
-            );
-          }
-        }
-        Navigator.pop(sheetCtx);
-      },
+    showTaskEditorSheet(
+      context,
+      folderId: widget.task.folderId,
+      task: widget.task,
     );
   }
 

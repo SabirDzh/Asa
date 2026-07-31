@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
@@ -80,6 +81,15 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 SettingRow(
                   icon: Iconsax.timer_1,
+                  iconWidget: SvgPicture.asset(
+                    'assets/icons/timer.svg',
+                    width: 24,
+                    height: 24,
+                    colorFilter: ColorFilter.mode(
+                      textSecondary,
+                      BlendMode.srcIn,
+                    ),
+                  ),
                   label:
                       '${settings.tr('animation_speed')}: ${animationSpeedLabel(settings)}',
                   onTap: () => showAnimationSpeedSheet(context),

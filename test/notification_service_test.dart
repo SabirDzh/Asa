@@ -36,6 +36,20 @@ void main() {
       expect(scheduled.minute, 30);
     });
 
+    test('moves an equal start time to the next day', () {
+      final now = DateTime(2026, 7, 31, 22, 1);
+      final scheduled = NotificationService.nextScheduledStart(
+        DateTime(2026, 7, 31, 22, 1),
+        now: now,
+      );
+
+      expect(scheduled.year, 2026);
+      expect(scheduled.month, 8);
+      expect(scheduled.day, 1);
+      expect(scheduled.hour, 22);
+      expect(scheduled.minute, 1);
+    });
+
     test('moves a passed start time to the next day', () {
       final now = DateTime(2026, 7, 31, 18, 0);
       final scheduled = NotificationService.nextScheduledStart(

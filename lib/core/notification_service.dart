@@ -124,7 +124,9 @@ class NotificationService {
   /// Requests notification permission and, on Android, exact alarm access when
   /// the platform exposes that setting. Scheduling falls back to inexact alarms
   /// if exact access is unavailable.
-  static Future<bool> requestPermission() async {
+  static Future<bool> requestPermission({
+    bool requestExactAlarms = true,
+  }) async {
     if (kIsWeb || !_initialized) return false;
 
     var granted = false;
@@ -134,7 +136,24 @@ class NotificationService {
               .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin
               >();
-      granted = await android?.requestNotificationsPermission() ?? false;
+      final notificationPermission =
+          await android?.requestNotificationsPermission();
+      // Android versions before API 33 return null because no runtime
+      // notification permission is required. Exact alarm access is separate
+      // and is intentionally best-effort: scheduling falls back to inexact
+      // alarms when the user declines it.
+      if (requestExactAlarms) {
+        try {
+          await android?.requestExactAlarmsPermission();
+        } on Object catch (error, stackTrace) {
+          LoggerService.instance.w(
+            'Exact alarm permission request failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      }
+      granted = notificationPermission ?? true;
     } else if (Platform.isIOS) {
       final iOS =
           _plugin

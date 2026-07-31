@@ -159,6 +159,8 @@ Both providers start async init in their constructors:
 
 ### 6.3 Task information blocks and attachments
 
+To add information to a task, create a task or open its row `…` menu and choose `Редактировать`; this opens the task editor. Tap `Добавить информацию`, then choose `Количество` or `Описание`. A description supports plain text plus `Добавить ссылку`, `Добавить изображение`, and `Добавить файл`.
+
 The task editor keeps a local draft until the user saves. It supports two block types:
 
 * **Quantity:** current value, target value, unit, and optional label. Values are finite, non-negative, capped at `1_000_000_000`, and reaching the target never auto-completes the task.
@@ -166,7 +168,7 @@ The task editor keeps a local draft until the user saves. It supports two block 
 
 Attachment limits are 10 MB per file and 20 attachments per task. Export/import/sync preserve metadata and local references only; binary files are not transferred between devices. The web/stub implementation supports metadata and links but does not persist local binary attachments. Missing local files render as unavailable and must not crash the UI.
 
-The task detail sheet is intentionally read-only. Editing and deleting are available from the task row `…` menu; setting time is available both from that menu and by tapping the time icon in the row.
+The task detail sheet is intentionally read-only. Editing (including descriptions, quantities, and attachments) and deleting are available from the task row `…` menu; setting time is available both from that menu and by tapping the SVG time icon in the row. The same SVG icon is used for the animation-speed setting.
 
 ### 6.4 Search & filters
 
@@ -474,6 +476,8 @@ flutter test
 ```
 
 For the current review evidence, the focused non-widget suite passes (144 tests). The full/widget suite currently has environment-level hangs in `folder_detail_screen_test.dart` and `task_folder_popup_menu_test.dart` after test startup; do not report the full suite as passing until those hangs are diagnosed.
+
+On Android, the app requests notification access at startup when notifications are enabled and synchronizes reminders only after the task provider has loaded. Exact-alarm access is requested from the explicit notification setting; if it is unavailable, scheduling falls back to an inexact alarm. If the start time has already passed today, a daily reminder is scheduled for the next day. A scheduled period such as 22:01–22:02 is the planned one-minute window; the manual elapsed timer is shown as actual time and remains 0:00 until the user starts it.
 
 The repository-wide formatter and analyzer gates pass:
 

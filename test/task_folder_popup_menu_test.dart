@@ -73,7 +73,7 @@ void main() {
     await tester.tap(find.text('Time task'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Длительность: 1:00'), findsOneWidget);
+    expect(find.textContaining('Плановая длительность: 1:00'), findsOneWidget);
     expect(find.textContaining('Период: 10:00 – 11:00'), findsOneWidget);
     expect(find.text('Редактировать'), findsNothing);
     expect(find.text('Установить время'), findsNothing);
@@ -122,6 +122,26 @@ void main() {
     expect(find.text('Установить время'), findsOneWidget);
     expect(find.text('Период'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('task edit action opens the information editor', (tester) async {
+    await tester.pumpWidget(
+      _TestApp(
+        child: TaskRow(
+          task: TaskItem(id: 'editable-task', title: 'Editable task'),
+          enableDrag: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Iconsax.more_square));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Редактировать'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('task-title-input')), findsOneWidget);
+    expect(find.byKey(const ValueKey('add-task-information')), findsOneWidget);
   });
 
   testWidgets('folder ellipsis opens the folder action menu', (tester) async {

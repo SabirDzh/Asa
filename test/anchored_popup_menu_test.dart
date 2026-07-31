@@ -23,6 +23,7 @@ void main() {
     final menuRect = tester.getRect(find.byKey(menuKey));
     expect(menuRect.top - anchorRect.bottom, closeTo(6, 0.01));
     expect(menuRect.top, greaterThan(anchorRect.bottom));
+    expect(menuRect.right, closeTo(anchorRect.right, 0.01));
   });
 
   testWidgets(
@@ -46,6 +47,7 @@ void main() {
       final menuRect = tester.getRect(find.byKey(menuKey));
       expect(anchorRect.top - menuRect.bottom, closeTo(6, 0.01));
       expect(menuRect.bottom, lessThan(anchorRect.top));
+      expect(menuRect.right, closeTo(anchorRect.right, 0.01));
     },
   );
 }

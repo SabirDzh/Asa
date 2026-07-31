@@ -41,61 +41,99 @@ void showAppScaleSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     enableDrag: true,
-    builder: (ctx) => Container(
-      decoration: BoxDecoration(
-        color: sheetBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            settings.tr('app_scale'),
-            style: TextStyle(
-              color: textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+    builder:
+        (ctx) => Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(height: 16),
-          if (_kSmallPreset >= range.min && _kSmallPreset <= range.max)
-            _scaleTile(ctx, settings, value: _kSmallPreset, labelKey: 'scale_small', textColor: textColor),
-          if (_kDefaultPreset >= range.min && _kDefaultPreset <= range.max)
-            _scaleTile(ctx, settings, value: _kDefaultPreset, labelKey: 'scale_default', textColor: textColor),
-          if (_kLargePreset >= range.min && _kLargePreset <= range.max)
-            _scaleTile(ctx, settings, value: _kLargePreset, labelKey: 'scale_large', textColor: textColor),
-          if (settings.customAppScales.isNotEmpty) ...[
-            Divider(color: textColor.withValues(alpha: 0.15), height: 16),
-            for (final scale in settings.customAppScales)
-              _scaleTile(
-                ctx,
-                settings,
-                value: scale,
-                labelKey: 'scale_custom',
-                textColor: textColor,
-                suffix: scale.toStringAsFixed(2),
-              ),
-          ],
-          Divider(color: textColor.withValues(alpha: 0.15), height: 16),
-          Material(
-            color: Colors.transparent,
-            child: ListTile(
-              leading: Icon(Iconsax.add, color: textColor, size: 24),
-              title: Text(
-                settings.tr('scale_custom'),
-                style: TextStyle(color: textColor, fontSize: 16),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showCustomScaleSheet(context, settings, range);
-              },
-            ),
+          padding: const EdgeInsets.all(20),
+          child: ListenableBuilder(
+            listenable: settings,
+            builder:
+                (context, _) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      settings.tr('app_scale'),
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_kSmallPreset >= range.min &&
+                        _kSmallPreset <= range.max)
+                      _scaleTile(
+                        ctx,
+                        settings,
+                        value: _kSmallPreset,
+                        labelKey: 'scale_small',
+                        textColor: textColor,
+                      ),
+                    if (_kDefaultPreset >= range.min &&
+                        _kDefaultPreset <= range.max)
+                      _scaleTile(
+                        ctx,
+                        settings,
+                        value: _kDefaultPreset,
+                        labelKey: 'scale_default',
+                        textColor: textColor,
+                      ),
+                    if (_kLargePreset >= range.min &&
+                        _kLargePreset <= range.max)
+                      _scaleTile(
+                        ctx,
+                        settings,
+                        value: _kLargePreset,
+                        labelKey: 'scale_large',
+                        textColor: textColor,
+                      ),
+                    if (settings.customAppScales.isNotEmpty) ...[
+                      Divider(
+                        color: textColor.withValues(alpha: 0.15),
+                        height: 16,
+                      ),
+                      for (final scale in settings.customAppScales)
+                        _scaleTile(
+                          ctx,
+                          settings,
+                          value: scale,
+                          labelKey: 'scale_custom',
+                          textColor: textColor,
+                          suffix: scale.toStringAsFixed(2),
+                          onLongPress:
+                              () => _confirmRemoveCustomScale(
+                                ctx,
+                                settings,
+                                scale,
+                              ),
+                        ),
+                    ],
+                    Divider(
+                      color: textColor.withValues(alpha: 0.15),
+                      height: 16,
+                    ),
+                    Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        leading: Icon(Iconsax.add, color: textColor, size: 24),
+                        title: Text(
+                          settings.tr('scale_custom'),
+                          style: TextStyle(color: textColor, fontSize: 16),
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _showCustomScaleSheet(context, settings, range);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
           ),
-        ],
-      ),
-    ),
+        ),
   );
 }
 
@@ -106,34 +144,69 @@ Widget _scaleTile(
   required String labelKey,
   required Color textColor,
   String? suffix,
+  VoidCallback? onLongPress,
 }) {
   final isSelected = (settings.appScale - value).abs() < _kStep / 2;
-  final label = suffix != null
-      ? '${settings.tr(labelKey)} ($suffix)'
-      : settings.tr(labelKey);
+  final label =
+      suffix != null
+          ? '${settings.tr(labelKey)} ($suffix)'
+          : settings.tr(labelKey);
   return Material(
     color: Colors.transparent,
     child: ListTile(
-      title: Text(
-        label,
-        style: TextStyle(color: textColor, fontSize: 16),
-      ),
-      trailing: isSelected
-          ? const Icon(Icons.check, color: AppColors.primary)
-          : null,
+      title: Text(label, style: TextStyle(color: textColor, fontSize: 16)),
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         settings.setAppScale(value);
         Navigator.pop(ctx);
       },
+      onLongPress: onLongPress,
     ),
   );
 }
 
-void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, AdaptiveAppScaleRange range) {
+Future<void> _confirmRemoveCustomScale(
+  BuildContext context,
+  SettingsProvider settings,
+  double scale,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: Text(settings.tr('delete_custom_value_title')),
+          content: Text(settings.tr('delete_custom_value_content')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(settings.tr('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(
+                settings.tr('delete'),
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+  );
+  if (confirmed == true) {
+    await settings.removeCustomAppScale(scale);
+  }
+}
+
+void _showCustomScaleSheet(
+  BuildContext context,
+  SettingsProvider settings,
+  AdaptiveAppScaleRange range,
+) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
   final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+  final textSecondary =
+      isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
   final divisions = ((range.max - range.min) / _kStep).round();
 
   showModalBottomSheet(
@@ -145,11 +218,15 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
       return StatefulBuilder(
         builder: (context, setState) {
           return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
             child: Container(
               decoration: BoxDecoration(
                 color: sheetBg,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               padding: const EdgeInsets.only(
                 top: AppTheme.sheetPadTop,
@@ -181,19 +258,19 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                   const SizedBox(height: 8),
                   Text(
                     '${range.min.toStringAsFixed(2)} – ${range.max.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: textSecondary,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: textSecondary, fontSize: 14),
                   ),
                   const SizedBox(height: 16),
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       activeTrackColor: AppColors.primary,
-                      inactiveTrackColor: isDark ? Colors.white24 : Colors.black12,
+                      inactiveTrackColor:
+                          isDark ? Colors.white24 : Colors.black12,
                       thumbColor: AppColors.primary,
                       overlayColor: AppColors.primary.withValues(alpha: 0.12),
-                      tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
+                      tickMarkShape: const RoundSliderTickMarkShape(
+                        tickMarkRadius: 2,
+                      ),
                       activeTickMarkColor: Colors.transparent,
                       inactiveTickMarkColor: Colors.transparent,
                     ),
@@ -217,7 +294,9 @@ void _showCustomScaleSheet(BuildContext context, SettingsProvider settings, Adap
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.pillRadius,
+                          ),
                         ),
                       ),
                       child: Text(settings.tr('save_btn')),

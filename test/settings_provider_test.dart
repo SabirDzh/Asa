@@ -66,6 +66,34 @@ void main() {
       expect(provider.animationSpeed, 2.0);
     });
 
+    test('removes custom animation speed and falls back when active', () async {
+      await provider.addCustomAnimationSpeed(1.5);
+      expect(provider.customAnimationSpeeds, contains(1.5));
+      expect(provider.animationSpeed, 1.5);
+
+      await provider.removeCustomAnimationSpeed(1.5);
+
+      expect(provider.customAnimationSpeeds, isNot(contains(1.5)));
+      expect(provider.animationSpeed, 1.0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList('customAnimationSpeeds'), isEmpty);
+    });
+
+    test(
+      'removes a non-active custom app scale without changing active scale',
+      () async {
+        await provider.addCustomAppScale(1.1, 0.8, 1.3);
+        await provider.addCustomAppScale(1.15, 0.8, 1.3);
+        expect(provider.appScale, 1.15);
+
+        await provider.removeCustomAppScale(1.1);
+
+        expect(provider.customAppScales, isNot(contains(1.1)));
+        expect(provider.customAppScales, contains(1.15));
+        expect(provider.appScale, 1.15);
+      },
+    );
+
     test('setAvatarPath stores and clears path', () {
       provider.setAvatarPath('/path/to/avatar.webp');
       expect(provider.avatarPath, '/path/to/avatar.webp');

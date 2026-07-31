@@ -13,6 +13,9 @@ class AppStrings {
       'edit_task': 'Редактировать задачу',
       'edit_folder': 'Редактировать папку',
       'delete_folder': 'Удалить папку',
+      'delete_custom_value_title': 'Удалить пользовательское значение?',
+      'delete_custom_value_content':
+          'Это значение будет удалено из списка сохранённых параметров.',
       'cancel': 'Отмена',
       'save': 'Сохранить',
       'empty_list': 'Список пуст',
@@ -180,6 +183,9 @@ class AppStrings {
       'edit_task': 'Edit task',
       'edit_folder': 'Edit folder',
       'delete_folder': 'Delete folder',
+      'delete_custom_value_title': 'Delete custom value?',
+      'delete_custom_value_content':
+          'This value will be removed from the saved settings.',
       'cancel': 'Cancel',
       'save': 'Save',
       'empty_list': 'List is empty',

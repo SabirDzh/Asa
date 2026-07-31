@@ -33,9 +33,11 @@ class SettingsProvider with ChangeNotifier {
   String? _syncSecret;
   bool _initialized = false;
   final _initCompleter = Completer<void>();
+  Future<void> _customValuesOperation = Future<void>.value();
 
-  SettingsProvider({Future<String> Function() deviceNameProvider = getDefaultDeviceName})
-      : _deviceNameProvider = deviceNameProvider {
+  SettingsProvider({
+    Future<String> Function() deviceNameProvider = getDefaultDeviceName,
+  }) : _deviceNameProvider = deviceNameProvider {
     init();
   }
 
@@ -57,7 +59,8 @@ class SettingsProvider with ChangeNotifier {
   String get syncDeviceId => _syncDeviceId;
   String? get syncSecret => _syncSecret;
 
-  bool get isDarkMode => _themeMode == ThemeMode.dark ||
+  bool get isDarkMode =>
+      _themeMode == ThemeMode.dark ||
       (_themeMode == ThemeMode.system &&
           SchedulerBinding.instance.platformDispatcher.platformBrightness ==
               Brightness.dark);
@@ -68,14 +71,40 @@ class SettingsProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final themeIndex = prefs.getInt('themeMode') ?? ThemeMode.system.index;
-      _themeMode = ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
+      _themeMode =
+          ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       NotificationService.setLanguage(_languageCode);
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
-      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
-      _customAnimationSpeeds = _loadDoubleList(prefs, 'customAnimationSpeeds');
-      _customAppScales = _loadDoubleList(prefs, 'customAppScales');
+      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(
+        kAbsoluteMinAppScale,
+        kAbsoluteMaxAppScale,
+      );
+      _customAnimationSpeeds = _loadDoubleList(
+        prefs,
+        'customAnimationSpeeds',
+        excludedValues: const [0.5, 1.0, 2.0],
+      );
+      final savedAnimationSpeeds = prefs.getStringList('customAnimationSpeeds');
+      if (savedAnimationSpeeds != null) {
+        await prefs.setStringList(
+          'customAnimationSpeeds',
+          _customAnimationSpeeds.map((value) => value.toString()).toList(),
+        );
+      }
+      _customAppScales = _loadDoubleList(
+        prefs,
+        'customAppScales',
+        excludedValues: const [0.8, 1.0, 1.2],
+      );
+      final savedAppScales = prefs.getStringList('customAppScales');
+      if (savedAppScales != null) {
+        await prefs.setStringList(
+          'customAppScales',
+          _customAppScales.map((value) => value.toString()).toList(),
+        );
+      }
       _avatarPath = prefs.getString('avatarPath');
       _showInWidget = prefs.getBool('showInWidget') ?? true;
       final oldMode = prefs.getInt('widgetDisplayMode');
@@ -89,11 +118,14 @@ class SettingsProvider with ChangeNotifier {
       prefs.setInt('widgetDisplayMode', _widgetDisplayMode.index);
       _syncEnabled = prefs.getBool('syncEnabled') ?? false;
       final savedName = prefs.getString('syncDeviceName');
-      _syncDeviceName = savedName != null && savedName.trim().isNotEmpty
-          ? savedName.trim()
-          : await _deviceNameProvider();
+      _syncDeviceName =
+          savedName != null && savedName.trim().isNotEmpty
+              ? savedName.trim()
+              : await _deviceNameProvider();
       _syncSecret = prefs.getString('syncSecret');
-      if (_syncSecret != null && _syncSecret!.trim().isEmpty) _syncSecret = null;
+      if (_syncSecret != null && _syncSecret!.trim().isEmpty) {
+        _syncSecret = null;
+      }
       timeDilation = _animationSpeed;
       // Ensure a stable device ID exists for sync. This is a local only
       // SharedPreferences read/write and completes quickly.
@@ -159,22 +191,25 @@ class SettingsProvider with ChangeNotifier {
 
   /// Saves a custom animation speed to the history (max 3 entries, LRU),
   /// then sets it as the active speed.
-  Future<void> addCustomAnimationSpeed(double speed) async {
-    final clamped = speed.clamp(0.1, 5.0);
-    _animationSpeed = clamped;
-    _customAnimationSpeeds = _addToCustomHistory(
-      _customAnimationSpeeds,
-      clamped,
-      const [0.5, 1.0, 2.0],
-    );
-    timeDilation = clamped;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('animationSpeed', clamped);
-    await prefs.setStringList(
-      'customAnimationSpeeds',
-      _customAnimationSpeeds.map((v) => v.toString()).toList(),
-    );
+  Future<void> addCustomAnimationSpeed(double speed) {
+    return _enqueueCustomValuesOperation(() async {
+      await ready;
+      final clamped = speed.clamp(0.1, 5.0);
+      _animationSpeed = clamped;
+      _customAnimationSpeeds = _addToCustomHistory(
+        _customAnimationSpeeds,
+        clamped,
+        const [0.5, 1.0, 2.0],
+      );
+      timeDilation = clamped;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('animationSpeed', clamped);
+      await prefs.setStringList(
+        'customAnimationSpeeds',
+        _customAnimationSpeeds.map((v) => v.toString()).toList(),
+      );
+    });
   }
 
   Future<void> setAppScale(double scale) async {
@@ -185,23 +220,77 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setDouble('appScale', clamped);
   }
 
+  /// Removes a saved custom animation speed. If it is active, use the normal
+  /// preset so the setting remains valid after deletion.
+  Future<void> removeCustomAnimationSpeed(double speed) {
+    return _enqueueCustomValuesOperation(() async {
+      await ready;
+      final updated =
+          _customAnimationSpeeds
+              .where((value) => (value - speed).abs() >= 0.01)
+              .toList();
+      if (updated.length == _customAnimationSpeeds.length) return;
+
+      _customAnimationSpeeds = updated;
+      if ((_animationSpeed - speed).abs() < 0.01) {
+        _animationSpeed = 1.0;
+        timeDilation = 1.0;
+      }
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('animationSpeed', _animationSpeed);
+      await prefs.setStringList(
+        'customAnimationSpeeds',
+        _customAnimationSpeeds.map((value) => value.toString()).toList(),
+      );
+    });
+  }
+
   /// Saves a custom app scale to the history (max 3 entries, LRU), then
   /// sets it as the active scale.
-  Future<void> addCustomAppScale(double scale, double min, double max) async {
-    final clamped = scale.clamp(min, max);
-    _appScale = clamped;
-    _customAppScales = _addToCustomHistory(
-      _customAppScales,
-      clamped,
-      const [0.8, 1.0, 1.2],
-    );
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('appScale', clamped);
-    await prefs.setStringList(
-      'customAppScales',
-      _customAppScales.map((v) => v.toString()).toList(),
-    );
+  Future<void> addCustomAppScale(double scale, double min, double max) {
+    return _enqueueCustomValuesOperation(() async {
+      await ready;
+      final clamped = scale.clamp(min, max);
+      _appScale = clamped;
+      _customAppScales = _addToCustomHistory(_customAppScales, clamped, const [
+        0.8,
+        1.0,
+        1.2,
+      ]);
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('appScale', clamped);
+      await prefs.setStringList(
+        'customAppScales',
+        _customAppScales.map((v) => v.toString()).toList(),
+      );
+    });
+  }
+
+  /// Removes a saved custom app scale. If it is active, use the default
+  /// preset so the setting remains valid after deletion.
+  Future<void> removeCustomAppScale(double scale) {
+    return _enqueueCustomValuesOperation(() async {
+      await ready;
+      final updated =
+          _customAppScales
+              .where((value) => (value - scale).abs() >= 0.01)
+              .toList();
+      if (updated.length == _customAppScales.length) return;
+
+      _customAppScales = updated;
+      if ((_appScale - scale).abs() < 0.01) {
+        _appScale = 1.0;
+      }
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('appScale', _appScale);
+      await prefs.setStringList(
+        'customAppScales',
+        _customAppScales.map((value) => value.toString()).toList(),
+      );
+    });
   }
 
   Future<void> setShowInWidget(bool value) async {
@@ -302,13 +391,30 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _enqueueCustomValuesOperation(
+    Future<void> Function() operation,
+  ) {
+    final next = _customValuesOperation.then((_) => operation());
+    _customValuesOperation = next.catchError((_) {});
+    return next;
+  }
+
   /// Loads a list of doubles from [prefs] under [key].
-  static List<double> _loadDoubleList(SharedPreferences prefs, String key) {
+  static List<double> _loadDoubleList(
+    SharedPreferences prefs,
+    String key, {
+    List<double> excludedValues = const [],
+  }) {
     final raw = prefs.getStringList(key);
     if (raw == null) return [];
     return raw
         .map((v) => double.tryParse(v))
         .whereType<double>()
+        .where(
+          (value) => excludedValues.every(
+            (excluded) => (value - excluded).abs() >= 0.01,
+          ),
+        )
         .toList();
   }
 
@@ -326,9 +432,11 @@ class SettingsProvider with ChangeNotifier {
     );
     if (isPreset) return history;
 
-    final updated = [value, ...history.where((v) => (v - value).abs() >= 0.01)]
-        .take(maxItems)
-        .toList();
+    final updated =
+        [
+          value,
+          ...history.where((v) => (v - value).abs() >= 0.01),
+        ].take(maxItems).toList();
     return updated;
   }
 }

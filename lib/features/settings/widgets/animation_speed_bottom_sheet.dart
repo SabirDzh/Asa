@@ -9,9 +9,10 @@ String animationSpeedLabel(SettingsProvider settings) {
   if (settings.animationSpeed == 0.5) return settings.tr('speed_fast');
   if (settings.animationSpeed == 1.0) return settings.tr('speed_normal');
   if (settings.animationSpeed == 2.0) return settings.tr('speed_slow');
-  final formatted = settings.animationSpeed == settings.animationSpeed.truncateToDouble()
-      ? settings.animationSpeed.toInt().toString()
-      : settings.animationSpeed.toStringAsFixed(1);
+  final formatted =
+      settings.animationSpeed == settings.animationSpeed.truncateToDouble()
+          ? settings.animationSpeed.toInt().toString()
+          : settings.animationSpeed.toStringAsFixed(1);
   return '${settings.tr('speed_custom')} ($formatted)';
 }
 
@@ -25,57 +26,75 @@ void showAnimationSpeedSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     enableDrag: true,
-    builder: (ctx) => Container(
-      decoration: BoxDecoration(
-        color: sheetBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            settings.tr('animation_speed'),
-            style: TextStyle(
-              color: textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+    builder:
+        (ctx) => Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(height: 16),
-          _speedTile(ctx, settings, 0.5, 'speed_fast', textColor),
-          _speedTile(ctx, settings, 1.0, 'speed_normal', textColor),
-          _speedTile(ctx, settings, 2.0, 'speed_slow', textColor),              if (settings.customAnimationSpeeds.isNotEmpty) ...[
-            Divider(color: textColor.withValues(alpha: 0.15), height: 16),
-            for (final speed in settings.customAnimationSpeeds)
-              _speedTile(
-                ctx,
-                settings,
-                speed,
-                'speed_custom',
-                textColor,
-                suffix: _formatSpeed(speed),
-              ),
-          ],
-          Divider(color: textColor.withValues(alpha: 0.15), height: 16),
-          Material(
-            color: Colors.transparent,
-            child: ListTile(
-              leading: Icon(Iconsax.add, color: textColor, size: 24),
-              title: Text(
-                settings.tr('speed_custom'),
-                style: TextStyle(color: textColor, fontSize: 16),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                showCustomSpeedSheet(context);
-              },
-            ),
+          padding: const EdgeInsets.all(20),
+          child: ListenableBuilder(
+            listenable: settings,
+            builder:
+                (context, _) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      settings.tr('animation_speed'),
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _speedTile(ctx, settings, 0.5, 'speed_fast', textColor),
+                    _speedTile(ctx, settings, 1.0, 'speed_normal', textColor),
+                    _speedTile(ctx, settings, 2.0, 'speed_slow', textColor),
+                    if (settings.customAnimationSpeeds.isNotEmpty) ...[
+                      Divider(
+                        color: textColor.withValues(alpha: 0.15),
+                        height: 16,
+                      ),
+                      for (final speed in settings.customAnimationSpeeds)
+                        _speedTile(
+                          ctx,
+                          settings,
+                          speed,
+                          'speed_custom',
+                          textColor,
+                          suffix: _formatSpeed(speed),
+                          onLongPress:
+                              () => _confirmRemoveCustomSpeed(
+                                ctx,
+                                settings,
+                                speed,
+                              ),
+                        ),
+                    ],
+                    Divider(
+                      color: textColor.withValues(alpha: 0.15),
+                      height: 16,
+                    ),
+                    Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        leading: Icon(Iconsax.add, color: textColor, size: 24),
+                        title: Text(
+                          settings.tr('speed_custom'),
+                          style: TextStyle(color: textColor, fontSize: 16),
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          showCustomSpeedSheet(context);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
           ),
-        ],
-      ),
-    ),
+        ),
   );
 }
 
@@ -86,27 +105,57 @@ Widget _speedTile(
   String labelKey,
   Color textColor, {
   String? suffix,
+  VoidCallback? onLongPress,
 }) {
   final isSelected = (settings.animationSpeed - value).abs() < 0.01;
-  final label = suffix != null
-      ? '${settings.tr(labelKey)} ($suffix)'
-      : settings.tr(labelKey);
+  final label =
+      suffix != null
+          ? '${settings.tr(labelKey)} ($suffix)'
+          : settings.tr(labelKey);
   return Material(
     color: Colors.transparent,
     child: ListTile(
-      title: Text(
-        label,
-        style: TextStyle(color: textColor, fontSize: 16),
-      ),
-      trailing: isSelected
-          ? const Icon(Icons.check, color: AppColors.primary)
-          : null,
+      title: Text(label, style: TextStyle(color: textColor, fontSize: 16)),
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         settings.setAnimationSpeed(value);
         Navigator.pop(ctx);
       },
+      onLongPress: onLongPress,
     ),
   );
+}
+
+Future<void> _confirmRemoveCustomSpeed(
+  BuildContext context,
+  SettingsProvider settings,
+  double speed,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: Text(settings.tr('delete_custom_value_title')),
+          content: Text(settings.tr('delete_custom_value_content')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(settings.tr('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(
+                settings.tr('delete'),
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+  );
+  if (confirmed == true) {
+    await settings.removeCustomAnimationSpeed(speed);
+  }
 }
 
 String _formatSpeed(double speed) {
@@ -124,7 +173,8 @@ void showCustomSpeedSheet(BuildContext context) {
   const maxSpeed = 5.0;
 
   final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-  final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+  final textSecondary =
+      isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
   showModalBottomSheet(
     context: context,
@@ -135,11 +185,15 @@ void showCustomSpeedSheet(BuildContext context) {
       return StatefulBuilder(
         builder: (context, setState) {
           return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
             child: Container(
               decoration: BoxDecoration(
                 color: sheetBg,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               padding: const EdgeInsets.only(
                 top: AppTheme.sheetPadTop,
@@ -171,19 +225,19 @@ void showCustomSpeedSheet(BuildContext context) {
                   const SizedBox(height: 8),
                   Text(
                     settings.tr('speed_range'),
-                    style: TextStyle(
-                      color: textSecondary,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: textSecondary, fontSize: 14),
                   ),
                   const SizedBox(height: 16),
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       activeTrackColor: AppColors.primary,
-                      inactiveTrackColor: isDark ? Colors.white24 : Colors.black12,
+                      inactiveTrackColor:
+                          isDark ? Colors.white24 : Colors.black12,
                       thumbColor: AppColors.primary,
                       overlayColor: AppColors.primary.withValues(alpha: 0.12),
-                      tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
+                      tickMarkShape: const RoundSliderTickMarkShape(
+                        tickMarkRadius: 2,
+                      ),
                       activeTickMarkColor: Colors.transparent,
                       inactiveTickMarkColor: Colors.transparent,
                     ),
@@ -207,7 +261,9 @@ void showCustomSpeedSheet(BuildContext context) {
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.pillRadius,
+                          ),
                         ),
                       ),
                       child: Text(settings.tr('save_btn')),

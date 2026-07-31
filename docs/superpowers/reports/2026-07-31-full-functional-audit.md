@@ -20,7 +20,7 @@
 | Function | Valid cases | Invalid/boundary cases | Cancel/permission cases | Lifecycle/offline cases | Automated evidence | Device evidence | Result | Defect/commit |
 |---|---|---|---|---|---|---|---|---|
 | Task/folder CRUD, search, filters, ordering | Covered by existing provider/model tests; detailed audit is Task 2 | Covered in existing provider/model tests; detailed audit is Task 2 | Detailed audit is Task 2 | Detailed audit is Task 2 | Baseline group passed: 153 tests | Android device not connected | PARTIAL — Task 2 pending | — |
-| Task editor, information blocks, attachments, time, manual timer | Existing focused tests present; detailed audit is Task 3 | Existing focused tests present; detailed audit is Task 3 | Detailed audit is Task 3 | Detailed audit is Task 3 | Baseline group passed; widget editor group blocked | Android device not connected | PARTIAL — Task 3 pending | — |
+| Task editor, information blocks, attachments, time, manual timer | Pure/provider contracts and editor flows are covered; detail now renders saved blocks | Quantity/link/file/image bounds and malformed metadata are covered by model/service tests | Draft cancellation and picker UI remain harness-blocked | Timer persistence and planned-vs-actual semantics pass in provider/model tests | Task 3 gate: 72 tests passed; format/analyze/diff passed; editor/detail widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit task editor and timer workflows` |
 | Settings, theme, language, scale, notifications, avatar | Existing provider/service tests present; detailed audit is Task 4 | Detailed audit is Task 4 | Detailed audit is Task 4 | Detailed audit is Task 4 | Baseline group passed | Android device not connected | PARTIAL — Task 4 pending | — |
 | Export/import, sync, logging, calendar, external integrations | Existing service tests present; detailed audit is Task 5 | Existing service tests present; detailed audit is Task 5 | Detailed audit is Task 5 | Detailed audit is Task 5 | Baseline group passed | Android device not connected | PARTIAL — Task 5 pending | — |
 | Android notifications, widgets, calendar, picker, APK install | Not run | Not run | Not run | Not run | Native device evidence pending | `adb devices -l`: no devices | BLOCKED | — |
@@ -63,6 +63,27 @@ The widget-test timeouts are not reported as passes and do not invalidate the in
 |---|---|---|---|---|---|---|---|---|
 | Task/folder CRUD, search, filters, ordering | CRUD, nested folders, movement, filters/search, soft-delete, streak protection | Length limits, invalid indices, cycles, malformed persistence | UI cancel/permission cases pending widget/device audit | Persistence and coalesced writes passed in existing tests | 66 Task 2 tests passed | Android unavailable | PASS for automated core; UI/device checks pending | `test: audit task and folder workflows` |
 
+## Task 3: Task editor, information blocks, attachments, time, and manual timer evidence
+
+- Pure/model/provider/attachment/notification gate: **PASS** — 72 tests passed, exit code 0.
+- Changed-file formatter check: **PASS** — `dart format --output=none --set-exit-if-changed` returned exit code 0.
+- Changed-file analyzer check: **PASS** — `No issues found!`.
+- `git diff --check`: **PASS**.
+- Quantity and description information blocks round-trip through `TaskItem` JSON; malformed blocks and malformed attachments are skipped without discarding valid data.
+- Attachment boundaries are covered: HTTP(S)-only links, unsafe schemes rejected, image signatures checked, byte and per-task count limits enforced, path traversal names reduced to safe basenames, missing/out-of-scope local files rejected.
+- Planned duration and actual timer remain separate: a 22:01–22:02 period is one minute planned duration while an untouched manual timer remains 0:00; overnight periods are supported.
+- Reproducible defect fixed: read-only task detail previously omitted saved information blocks. It now renders quantity values, description text, and safe attachment chips. Opening a chip uses the existing validated attachment service; the sheet exposes no edit, time, or delete controls.
+- Regression coverage was added to `test/task_folder_popup_menu_test.dart` for quantity/description/attachment visibility and read-only restrictions.
+- `task_editor_sheet.dart` widget test and `task_folder_popup_menu_test.dart` widget test: **BLOCKED**, each timed out after 300 seconds with exit code 142. Therefore end-to-end UI assertions are not claimed as passing despite static verification and the added regression test.
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Editor/model/provider valid and invalid contracts | PASS | 72 focused tests |
+| Attachment validation and unavailable-file safety | PASS | `test/task_attachment_service_test.dart`, model tests |
+| Time period and manual timer semantics | PASS | `test/task_model_test.dart`, `test/task_provider_test.dart`, `test/notification_service_test.dart` |
+| Detail information-block rendering | FAIL-fixed; UI execution BLOCKED | Source fix + regression test; widget harness timeout |
+| Detail read-only restrictions | FAIL-fixed; UI execution BLOCKED | Existing menu assertions + source review; widget harness timeout |
+
 ## Android device evidence
 
 No Android device was connected during Task 1. The following real-device scenarios remain blocked until an Android device is available:
@@ -79,11 +100,11 @@ No Android device was connected during Task 1. The following real-device scenari
 
 ## Fixed defects
 
-No production defect was fixed during Task 1. The task established baseline evidence and documented existing test/device limitations.
+- **Task 3:** `task_detail_sheet.dart` omitted persisted quantity/description blocks and attachments. The read-only detail view now renders them through safe, validated attachment actions; regression coverage was added in `test/task_folder_popup_menu_test.dart`. The source/test/report changes are ready for the Task 3 audit commit; its exact hash will be recorded after creation.
 
 ## Blocked scenarios and unresolved risks
 
 - Android real-device matrix is blocked by the absence of an ADB-connected Android device.
-- `task_editor_sheet_test.dart` and `task_folder_popup_menu_test.dart` each hang after test startup in the current widget harness and require separate harness diagnosis.
+- `task_editor_sheet_test.dart` and `task_folder_popup_menu_test.dart` each hang after test startup in the current widget harness and require separate harness diagnosis; Task 3's new detail regression is therefore not executable evidence yet.
 - Passing unit/service tests do not prove native notification delivery, calendar operations, widget rendering, picker behavior, or external URL/file opening.
 - Exact-alarm denial may cause Android notification fallback to be inexact; this must be measured on-device rather than inferred from unit tests.

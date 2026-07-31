@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/task_attachment_service.dart';
 import '../../../core/theme.dart';
 import '../../settings/providers/settings_provider.dart';
+import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 
@@ -83,6 +85,129 @@ class _TaskDetailSheet extends StatelessWidget {
     return buffer.toString();
   }
 
+  String _quantityText(TaskInfoBlock block, SettingsProvider settings) {
+    final name =
+        block.label.trim().isEmpty
+            ? settings.tr('quantity_block')
+            : block.label.trim();
+    final current = _formatNumber(block.currentValue);
+    final target = _formatNumber(block.targetValue);
+    return '$name: $current / $target ${block.unit.trim()}';
+  }
+
+  String _formatNumber(double value) {
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
+  }
+
+  Widget _buildInfoBlocks(BuildContext context, Color textColor) {
+    if (task.infoBlocks.isEmpty) return const SizedBox.shrink();
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+        _sectionHeader(
+          Iconsax.document_text,
+          settings.tr('add_information'),
+          textColor,
+        ),
+        const SizedBox(height: 8),
+        for (final block in task.infoBlocks)
+          _buildInfoBlock(context, block, settings, textColor),
+      ],
+    );
+  }
+
+  Widget _buildInfoBlock(
+    BuildContext context,
+    TaskInfoBlock block,
+    SettingsProvider settings,
+    Color textColor,
+  ) {
+    final title =
+        block.type == TaskInfoBlockType.quantity
+            ? _quantityText(block, settings)
+            : settings.tr('description_block');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: textColor.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionHeader(
+              block.type == TaskInfoBlockType.quantity
+                  ? Iconsax.chart_2
+                  : Iconsax.document_text,
+              title,
+              textColor,
+            ),
+            if (block.type == TaskInfoBlockType.description &&
+                block.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(block.text.trim(), style: TextStyle(color: textColor)),
+            ],
+            if (block.attachments.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final attachment in block.attachments)
+                    ActionChip(
+                      key: ValueKey('detail-attachment-${attachment.id}'),
+                      avatar: Icon(
+                        attachment.type == TaskAttachmentType.link
+                            ? Icons.link
+                            : Icons.attach_file,
+                        size: 18,
+                      ),
+                      label: Text(attachment.name),
+                      onPressed: () => _openAttachment(context, attachment),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(IconData icon, String text, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openAttachment(
+    BuildContext context,
+    TaskAttachment attachment,
+  ) async {
+    final opened = await openTaskAttachment(attachment);
+    if (!context.mounted || opened) return;
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(settings.tr('attachment_unavailable'))),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -150,6 +275,7 @@ class _TaskDetailSheet extends StatelessWidget {
                   textColor,
                 ),
                 _infoTile(Iconsax.timer_1, _timeInfo(context), textColor),
+                _buildInfoBlocks(context, textColor),
                 if (task.effectiveDurationMinutes != null &&
                     task.effectiveDurationMinutes! > 0)
                   _infoTile(

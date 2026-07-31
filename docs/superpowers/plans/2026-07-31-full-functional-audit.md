@@ -239,11 +239,11 @@ Test:
 - complete a running task and confirm timer stops and elapsed time is retained;
 - notification action start for an existing, deleted, completed, and missing task ID.
 
-- [ ] **Step 4: Fix reproducible failures and add regression tests**
+- [x] **Step 4: Fix reproducible failures and add regression tests**
 
-Preserve the separation between planned period and actual elapsed timer. Any fix must assert both values and avoid auto-starting the manual timer unless explicitly requested by product behavior.
+Preserve the separation between planned period and actual elapsed timer. Any fix must assert both values and avoid auto-starting the manual timer unless explicitly requested by product behavior. The detail sheet now renders saved quantity/description blocks and safe attachment chips without exposing edit, time, or delete controls.
 
-- [ ] **Step 5: Review, validate, and commit**
+- [x] **Step 5: Review, validate, and commit**
 
 Run the exact editor-family gate:
 

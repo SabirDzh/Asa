@@ -9,7 +9,7 @@ class AppColors {
   // Color 2: Surface / neutral containers
   // Light: clean white  |  Dark: elevated surface
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF2C2C2E);  // iOS-style dark surface
+  static const Color surfaceDark = Color(0xFF2C2C2E); // iOS-style dark surface
 
   // Color 3: Background
   static const Color bgLight = Color(0xFFF2F2F7);
@@ -38,16 +38,16 @@ class AppColors {
 class AppTheme {
   // ── Figma exact spacing constants ─────────────────────────
   static const double pillRadius = 28.0; // cr:28 on task rows
-  static const double fabRadius = 16.0;  // cr:16 on FAB
+  static const double fabRadius = 16.0; // cr:16 on FAB
   static const double menuRadius = 16.0; // cr:16 on context menus
   static const double checkRadius = 8.0; // cr:8 on empty checkbox
   static const double checkRadiusDone = 6.0; // cr:6 on done checkbox
   static const double sheetHandleRadius = 2.0;
 
   // ── Figma exact padding/gap constants ─────────────────────
-  static const double rowPadH = 20.0;   // left/right inside pill row
-  static const double rowPadV = 15.0;   // top/bottom inside pill row
-  static const double rowGap = 10.0;    // gap between row children
+  static const double rowPadH = 20.0; // left/right inside pill row
+  static const double rowPadV = 15.0; // top/bottom inside pill row
+  static const double rowGap = 10.0; // gap between row children
   static const double rowHeight = 56.0; // h of every row/pill
   static const double rowWidth = 328.0; // 360 - 16 - 16
   static const double screenPad = 16.0; // outer horizontal padding
@@ -59,14 +59,14 @@ class AppTheme {
   static const double fabSize = 56.0;
   static const double scrollHideThreshold = 2.0;
 
-  static const double sheetGap = 72.0;  // gap inside bottom sheet
+  static const double sheetGap = 72.0; // gap inside bottom sheet
   static const double sheetPadH = 16.0;
   static const double sheetPadTop = 20.0;
 
-  static const double menuItemGap = 6.0;  // gap between menu items
+  static const double menuItemGap = 6.0; // gap between menu items
   static const double menuItemPad = 10.0; // padding inside menu item
   static const double menuItemGapInner = 10.0; // gap icon–label in menu item
-  static const double popupMenuGap = 8.0; // gap between icon and popup menu
+  static const double popupMenuGap = 6.0; // gap between icon and popup menu
 
   // ── Themes ────────────────────────────────────────────────
   static ThemeData get lightTheme => _build(Brightness.light);
@@ -94,12 +94,11 @@ class AppTheme {
         error: Colors.redAccent,
         onError: Colors.white,
       ),
-      textTheme: (isDark ? baseTypography.white : baseTypography.black)
-          .apply(
-            fontFamily: 'Inter',
-            bodyColor: onSurface,
-            displayColor: onSurface,
-          ),
+      textTheme: (isDark ? baseTypography.white : baseTypography.black).apply(
+        fontFamily: 'Inter',
+        bodyColor: onSurface,
+        displayColor: onSurface,
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: bg,
         elevation: 0,
@@ -122,12 +121,16 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         border: InputBorder.none,
         hintStyle: TextStyle(
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          color:
+              isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
           fontSize: 16,
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFF323232),
+        backgroundColor:
+            isDark ? AppColors.surfaceDark : const Color(0xFF323232),
         contentTextStyle: const TextStyle(color: Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,

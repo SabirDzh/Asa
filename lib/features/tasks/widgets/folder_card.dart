@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
+import '../../../core/anchored_popup_menu.dart';
 import '../../../core/folder_icons.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
@@ -25,6 +26,8 @@ class FolderRow extends StatefulWidget {
 class _FolderRowState extends State<FolderRow> {
   bool _isDragHovered = false;
   final GlobalKey _rowKey = GlobalKey();
+  final GlobalKey _menuAnchorKey = GlobalKey();
+  final GlobalKey _menuKey = GlobalKey();
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -56,7 +59,9 @@ class _FolderRowState extends State<FolderRow> {
             );
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+              ),
             );
           }
         }
@@ -68,55 +73,48 @@ class _FolderRowState extends State<FolderRow> {
   void _showPopupMenu(BuildContext iconContext) async {
     final settings = Provider.of<SettingsProvider>(iconContext, listen: false);
     final isDark = Theme.of(iconContext).brightness == Brightness.dark;
-    
-    final RenderBox? renderBox = iconContext.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    final Offset offset = renderBox.localToGlobal(Offset.zero);
-    final size = MediaQuery.of(iconContext).size;
-    final Rect positionRect = offset & renderBox.size;
-    // Anchor the menu below the visible icon (excluding the touch padding)
-    // so the gap stays correct at any UI scale.
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromLTWH(
-        positionRect.right - 4,
-        positionRect.bottom - AppTheme.rowPadV + AppTheme.popupMenuGap,
-        4,
-        0,
-      ),
-      Offset.zero & size,
-    );
 
     final menuIconColor = Theme.of(iconContext).colorScheme.onSurface;
-    final String? value = await showMenu<String>(
+    final String? value = await showAnchoredPopupMenu<String>(
       context: iconContext,
-      position: position,
+      anchorContext: _menuAnchorKey.currentContext ?? iconContext,
+      menuKey: _menuKey,
+      gap: AppTheme.popupMenuGap,
       color: isDark ? AppColors.navDark : AppColors.navLight,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.menuRadius)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.menuRadius),
+      ),
       items: [
-        PopupMenuItem<String>(
+        AnchoredPopupMenuItem<String>(
           value: 'edit',
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Icon(Iconsax.edit_2, color: menuIconColor, size: 22),
               const SizedBox(width: 10),
-              Text(
-                settings.tr('edit'),
-                style: TextStyle(color: menuIconColor, fontSize: 16),
+              Flexible(
+                child: Text(
+                  settings.tr('edit'),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: menuIconColor, fontSize: 16),
+                ),
               ),
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        AnchoredPopupMenuItem<String>(
           value: 'delete',
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Icon(Iconsax.trash, color: menuIconColor, size: 22),
               const SizedBox(width: 10),
-              Text(
-                settings.tr('delete'),
-                style: TextStyle(color: menuIconColor, fontSize: 16),
+              Flexible(
+                child: Text(
+                  settings.tr('delete'),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: menuIconColor, fontSize: 16),
+                ),
               ),
             ],
           ),
@@ -130,28 +128,41 @@ class _FolderRowState extends State<FolderRow> {
     } else if (value == 'delete') {
       final isDark = Theme.of(iconContext).brightness == Brightness.dark;
       final bg = isDark ? AppColors.navDark : AppColors.navLight;
-      final text = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-      
+      final text =
+          isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
       final confirmed = await showDialog<bool>(
         context: iconContext,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: bg,
-          title: Text(settings.tr('confirm_delete_title'), style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight)),
-          content: Text(
-            settings.tr('confirm_delete_content'),
-            style: TextStyle(color: text),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(settings.tr('cancel'), style: TextStyle(color: text)),
+        builder:
+            (ctx) => AlertDialog(
+              backgroundColor: bg,
+              title: Text(
+                settings.tr('confirm_delete_title'),
+                style: TextStyle(
+                  color: isDark ? AppColors.textDark : AppColors.textLight,
+                ),
+              ),
+              content: Text(
+                settings.tr('confirm_delete_content'),
+                style: TextStyle(color: text),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(
+                    settings.tr('cancel'),
+                    style: TextStyle(color: text),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(
+                    settings.tr('delete'),
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(settings.tr('delete'), style: const TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
       );
 
       if (confirmed == true && iconContext.mounted) {
@@ -164,7 +175,8 @@ class _FolderRowState extends State<FolderRow> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     final rowChild = Material(
       key: _rowKey,
@@ -184,55 +196,65 @@ class _FolderRowState extends State<FolderRow> {
           duration: const Duration(milliseconds: 200),
           height: AppTheme.rowHeight,
           decoration: BoxDecoration(
-            color: _isDragHovered ? AppColors.primary.withValues(alpha: 0.25) : surface,
+            color:
+                _isDragHovered
+                    ? AppColors.primary.withValues(alpha: 0.25)
+                    : surface,
             borderRadius: BorderRadius.circular(AppTheme.pillRadius),
             border: Border.all(
               color: _isDragHovered ? AppColors.primary : Colors.transparent,
               width: 2,
             ),
           ),
-          padding: const EdgeInsets.only(
-            left: AppTheme.rowPadH,
-          ),
+          padding: const EdgeInsets.only(left: AppTheme.rowPadH),
           child: Row(
-          children: [
-            _folderIcon(textSecondary),
-            const SizedBox(width: AppTheme.rowGap),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: AppTheme.rowGap),
-                child: Text(
-                  widget.folder.name,
-                  style: TextStyle(
-                    color: textSecondary,
-                    fontSize: 16,
-                    fontWeight: widget.folder.isSystemStreak ? FontWeight.w600 : FontWeight.w400,
+            children: [
+              _folderIcon(textSecondary),
+              const SizedBox(width: AppTheme.rowGap),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                  child: Text(
+                    widget.folder.name,
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: 16,
+                      fontWeight:
+                          widget.folder.isSystemStreak
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-            if (!widget.folder.isSystemStreak)
-              Builder(
-                builder: (iconCtx) => GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _showPopupMenu(iconCtx),
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppTheme.rowGap,
-                      right: AppTheme.rowPadH,
-                      top: AppTheme.rowPadV,
-                      bottom: AppTheme.rowPadV,
-                    ),
-                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
-                  ),
-                ),
-              )
-            else
-              const SizedBox(width: AppTheme.rowPadH),
-          ],
+              if (!widget.folder.isSystemStreak)
+                Builder(
+                  builder:
+                      (iconCtx) => GestureDetector(
+                        key: _menuAnchorKey,
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _showPopupMenu(iconCtx),
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            left: AppTheme.rowGap,
+                            right: AppTheme.rowPadH,
+                            top: AppTheme.rowPadV,
+                            bottom: AppTheme.rowPadV,
+                          ),
+                          child: Icon(
+                            Iconsax.more_square,
+                            color: textSecondary,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                )
+              else
+                const SizedBox(width: AppTheme.rowPadH),
+            ],
+          ),
         ),
-      ),
       ),
     );
 
@@ -256,7 +278,9 @@ class _FolderRowState extends State<FolderRow> {
           final settings = context.read<SettingsProvider>();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${settings.tr('task_moved')} ${widget.folder.name}'),
+              content: Text(
+                '${settings.tr('task_moved')} ${widget.folder.name}',
+              ),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -265,7 +289,9 @@ class _FolderRowState extends State<FolderRow> {
           final settings = context.read<SettingsProvider>();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${settings.tr('folder_moved')} ${widget.folder.name}'),
+              content: Text(
+                '${settings.tr('folder_moved')} ${widget.folder.name}',
+              ),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -297,9 +323,7 @@ class _FolderRowState extends State<FolderRow> {
                 ),
               ],
             ),
-            padding: const EdgeInsets.only(
-              left: AppTheme.rowPadH,
-            ),
+            padding: const EdgeInsets.only(left: AppTheme.rowPadH),
             child: Row(
               children: [
                 _dragIcon(textSecondary),
@@ -326,7 +350,11 @@ class _FolderRowState extends State<FolderRow> {
                       top: AppTheme.rowPadV,
                       bottom: AppTheme.rowPadV,
                     ),
-                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
+                    child: Icon(
+                      Iconsax.more_square,
+                      color: textSecondary,
+                      size: 24,
+                    ),
                   )
                 else
                   const SizedBox(width: AppTheme.rowPadH),
@@ -335,21 +363,21 @@ class _FolderRowState extends State<FolderRow> {
           ),
         ),
       ),
-      childWhenDragging: Opacity(
-        opacity: 0.3,
-        child: dragTargetChild,
-      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: dragTargetChild),
       child: dragTargetChild,
     );
   }
 
-  Widget _dragIcon(Color textSecondary) => _buildFolderIcon(color: textSecondary);
+  Widget _dragIcon(Color textSecondary) =>
+      _buildFolderIcon(color: textSecondary);
 
-  Widget _folderIcon(Color textSecondary) =>
-      _buildFolderIcon(color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary);
+  Widget _folderIcon(Color textSecondary) => _buildFolderIcon(
+    color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary,
+  );
 
   Widget _buildFolderIcon({required Color color}) {
-    if (widget.folder.iconAsset != null && widget.folder.iconAsset!.isNotEmpty) {
+    if (widget.folder.iconAsset != null &&
+        widget.folder.iconAsset!.isNotEmpty) {
       return SvgPicture.asset(
         widget.folder.iconAsset!,
         width: 24,

@@ -295,6 +295,25 @@ void main() {
       );
     });
 
+    test('skips malformed persisted tasks and preserves valid ones', () async {
+      final validTask = TaskItem(id: 'valid-task', title: 'Valid task');
+      SharedPreferences.setMockInitialValues({
+        'saved_tasks': jsonEncode([
+          validTask.toJson(),
+          {'id': 'broken-task'},
+        ]),
+      });
+
+      final restored = TaskProvider();
+      await restored.ready;
+
+      expect(restored.allTasks.map((task) => task.id), contains('valid-task'));
+      expect(
+        restored.allTasks.where((task) => task.id == 'broken-task'),
+        isEmpty,
+      );
+    });
+
     test(
       'loading persisted streak corruption restores user folders to root',
       () async {

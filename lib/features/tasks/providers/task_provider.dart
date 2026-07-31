@@ -149,9 +149,17 @@ class TaskProvider with ChangeNotifier {
       if (tasksStr != null && tasksStr.isNotEmpty) {
         final List decoded = jsonDecode(tasksStr);
         for (final entry in decoded) {
-          final task = TaskItem.fromJson(entry);
-          if (!_tasks.any((existing) => existing.id == task.id)) {
-            _tasks.add(task);
+          try {
+            final task = TaskItem.fromJson(entry);
+            if (!_tasks.any((existing) => existing.id == task.id)) {
+              _tasks.add(task);
+            }
+          } catch (error, stackTrace) {
+            LoggerService.instance.w(
+              'Skipping malformed persisted task',
+              error: error,
+              stackTrace: stackTrace,
+            );
           }
         }
       }

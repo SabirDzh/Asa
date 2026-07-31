@@ -1,3 +1,5 @@
+import 'task_info_block.dart';
+
 class TaskItem {
   final String id;
   String title;
@@ -13,6 +15,7 @@ class TaskItem {
   String? calendarEventId;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<TaskInfoBlock> infoBlocks;
   bool isDeleted;
 
   TaskItem({
@@ -28,11 +31,13 @@ class TaskItem {
     this.timerElapsedSeconds = 0,
     this.calendarId,
     this.calendarEventId,
+    List<TaskInfoBlock> infoBlocks = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isDeleted = false,
   }) : createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+       updatedAt = updatedAt ?? DateTime.now(),
+       infoBlocks = List.unmodifiable(infoBlocks);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -47,6 +52,7 @@ class TaskItem {
     'timerElapsedSeconds': timerElapsedSeconds,
     'calendarId': calendarId,
     'calendarEventId': calendarEventId,
+    'infoBlocks': infoBlocks.map((block) => block.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'isDeleted': isDeleted,
@@ -72,6 +78,7 @@ class TaskItem {
             : 0,
     calendarId: json['calendarId'],
     calendarEventId: json['calendarEventId'],
+    infoBlocks: _readInfoBlocks(json['infoBlocks']),
     createdAt:
         json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
@@ -117,6 +124,7 @@ class TaskItem {
     int? timerElapsedSeconds,
     Object? calendarId = const Object(),
     Object? calendarEventId = const Object(),
+    List<TaskInfoBlock>? infoBlocks,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isDeleted,
@@ -148,10 +156,26 @@ class TaskItem {
           calendarEventId == const Object()
               ? this.calendarEventId
               : calendarEventId as String?,
+      infoBlocks: infoBlocks ?? this.infoBlocks,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
     );
+  }
+
+  static List<TaskInfoBlock> _readInfoBlocks(Object? value) {
+    if (value == null || value is! List) return const [];
+
+    final blocks = <TaskInfoBlock>[];
+    for (final entry in value) {
+      if (entry is! Map) continue;
+      try {
+        blocks.add(TaskInfoBlock.fromJson(Map<String, dynamic>.from(entry)));
+      } on Object {
+        // Preserve valid blocks when one legacy/custom block is malformed.
+      }
+    }
+    return blocks;
   }
 }
 

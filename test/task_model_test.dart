@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 
 void main() {
@@ -72,6 +73,109 @@ void main() {
         expectedDuration: 45,
       );
       expect(task.effectiveDurationMinutes, 45);
+    });
+
+    test('round-trips quantity and description blocks', () {
+      final task = TaskItem(
+        id: '1',
+        title: 'Read a book',
+        infoBlocks: [
+          TaskInfoBlock.quantity(
+            id: 'pages',
+            label: 'Pages',
+            currentValue: 12,
+            targetValue: 120,
+            unit: 'pages',
+          ),
+          TaskInfoBlock.description(
+            id: 'notes',
+            text: 'Read chapter 1',
+            attachments: [
+              const TaskAttachment(
+                id: 'link-1',
+                type: TaskAttachmentType.link,
+                name: 'Source',
+                value: 'https://example.com/book',
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final restored = TaskItem.fromJson(task.toJson());
+      expect(restored.infoBlocks, hasLength(2));
+      expect(restored.infoBlocks.first.targetValue, 120);
+      expect(
+        restored.infoBlocks.last.attachments.single.value,
+        'https://example.com/book',
+      );
+    });
+
+    test('old task JSON defaults missing infoBlocks to an empty list', () {
+      final task = TaskItem.fromJson({'id': 'legacy', 'title': 'Old task'});
+      expect(task.infoBlocks, isEmpty);
+    });
+
+    test(
+      'malformed information blocks are skipped without losing valid blocks',
+      () {
+        final task = TaskItem.fromJson({
+          'id': 'mixed',
+          'title': 'Mixed task',
+          'infoBlocks': [
+            {'id': 'valid', 'type': 'description', 'text': 'Keep me'},
+            {'id': 'broken', 'type': 'unknown'},
+          ],
+        });
+        expect(task.infoBlocks.map((block) => block.id), ['valid']);
+      },
+    );
+
+    test('skips malformed attachments without losing valid descriptions', () {
+      final task = TaskItem.fromJson({
+        'id': 'attachments',
+        'title': 'Attachment task',
+        'infoBlocks': [
+          {
+            'id': 'notes',
+            'type': 'description',
+            'text': 'Keep this description',
+            'attachments': [
+              {1: 'not a valid attachment'},
+              {
+                'id': 'valid-link',
+                'type': 'link',
+                'name': 'Source',
+                'value': 'https://example.com',
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(task.infoBlocks.single.text, 'Keep this description');
+      expect(task.infoBlocks.single.attachments.single.id, 'valid-link');
+    });
+
+    test('rejects invalid quantities and unsafe links', () {
+      expect(
+        () => TaskInfoBlock.quantity(
+          id: 'invalid',
+          currentValue: 2,
+          targetValue: 1,
+          unit: 'pages',
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => TaskAttachment.fromJson({
+          'id': 'unsafe',
+          'type': 'link',
+          'name': 'Unsafe',
+          'value': 'javascript:alert(1)',
+        }),
+        throwsFormatException,
+      );
     });
   });
 

@@ -1,5 +1,6 @@
 const int kMaxTaskInfoValue = 1000000000;
 const int kMaxTaskDescriptionLength = 10000;
+const int kMaxTaskAttachmentsPerTask = 20;
 
 /// The kinds of structured information a task can contain.
 enum TaskInfoBlockType { quantity, description }
@@ -31,7 +32,8 @@ class TaskAttachment {
     if (type == null) {
       throw FormatException('Unknown attachment type: $typeName');
     }
-    if (type == TaskAttachmentType.link && !_isAllowedLink(value)) {
+    if (type == TaskAttachmentType.link &&
+        !isAllowedTaskAttachmentLink(value)) {
       throw const FormatException('Only http and https links are allowed');
     }
 
@@ -61,7 +63,8 @@ class TaskAttachment {
   }) {
     final nextType = type ?? this.type;
     final nextValue = value ?? this.value;
-    if (nextType == TaskAttachmentType.link && !_isAllowedLink(nextValue)) {
+    if (nextType == TaskAttachmentType.link &&
+        !isAllowedTaskAttachmentLink(nextValue)) {
       throw const FormatException('Only http and https links are allowed');
     }
     return TaskAttachment(
@@ -72,13 +75,6 @@ class TaskAttachment {
       mimeType:
           mimeType == const Object() ? this.mimeType : mimeType as String?,
     );
-  }
-
-  static bool _isAllowedLink(String value) {
-    final uri = Uri.tryParse(value);
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
   }
 }
 
@@ -131,6 +127,9 @@ class TaskInfoBlock {
     if (text.length > kMaxTaskDescriptionLength) {
       throw const FormatException('Description is too long');
     }
+    if (attachments.length > kMaxTaskAttachmentsPerTask) {
+      throw const FormatException('Too many description attachments');
+    }
     return TaskInfoBlock._(
       id: id,
       type: TaskInfoBlockType.description,
@@ -171,6 +170,9 @@ class TaskInfoBlock {
             throw const FormatException(
               'Description attachments must be a list',
             );
+          }
+          if (rawAttachments.length > kMaxTaskAttachmentsPerTask) {
+            throw const FormatException('Too many description attachments');
           }
           for (final entry in rawAttachments) {
             if (entry is! Map) {
@@ -248,6 +250,13 @@ class TaskInfoBlock {
       throw const FormatException('Invalid quantity information block');
     }
   }
+}
+
+bool isAllowedTaskAttachmentLink(String value) {
+  final uri = Uri.tryParse(value.trim());
+  return uri != null &&
+      (uri.scheme == 'http' || uri.scheme == 'https') &&
+      uri.host.isNotEmpty;
 }
 
 String _requiredString(Map<String, dynamic> json, String key) {

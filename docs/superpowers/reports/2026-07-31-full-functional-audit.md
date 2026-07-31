@@ -100,7 +100,7 @@ No Android device was connected during Task 1. The following real-device scenari
 
 ## Fixed defects
 
-- **Task 3:** `task_detail_sheet.dart` omitted persisted quantity/description blocks and attachments. The read-only detail view now renders them through safe, validated attachment actions; regression coverage was added in `test/task_folder_popup_menu_test.dart`. The source/test/report changes are ready for the Task 3 audit commit; its exact hash will be recorded after creation.
+- **Task 3:** `task_detail_sheet.dart` omitted persisted quantity/description blocks and attachments. The read-only detail view now renders them through safe, validated attachment actions; regression coverage was added in `test/task_folder_popup_menu_test.dart`. Task 3 audit commit: `37f3250 test: audit task editor and timer workflows`.
 
 ## Blocked scenarios and unresolved risks
 

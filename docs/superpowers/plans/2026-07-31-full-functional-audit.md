@@ -325,9 +325,9 @@ Check no-secret plain payload, correct HMAC payload, wrong secret, missing secre
 
 Confirm sync secrets, tokens, paths, raw payloads, and stack traces are redacted; logger buffer bounds hold; Telegram unavailable/disabled returns a safe result. For calendar, test permission granted/denied, no writable calendars, create/update/delete, overnight period, missing event, and native API failure. For links/files/images, test valid open and unavailable external handler/file.
 
-- [ ] **Step 4: Fix reproducible integration/data defects**
+- [x] **Step 4: Fix reproducible integration/data defects**
 
-Use dependency injection or pure helpers for deterministic tests. Do not fake successful native permission or share/calendar delivery; mark unavailable native outcomes **BLOCKED** with the exact platform limitation.
+Use dependency injection or pure helpers for deterministic tests. Do not fake successful native permission or share/calendar delivery; mark unavailable native outcomes **BLOCKED** with the exact platform limitation. No reproducible source defect was found in the focused Task 5 evidence, so no production change was introduced.
 
 - [ ] **Step 5: Review, validate, and commit**
 

@@ -22,7 +22,7 @@
 | Task/folder CRUD, search, filters, ordering | Covered by existing provider/model tests; detailed audit is Task 2 | Covered in existing provider/model tests; detailed audit is Task 2 | Detailed audit is Task 2 | Detailed audit is Task 2 | Baseline group passed: 153 tests | Android device not connected | PARTIAL — Task 2 pending | — |
 | Task editor, information blocks, attachments, time, manual timer | Pure/provider contracts and editor flows are covered; detail now renders saved blocks | Quantity/link/file/image bounds and malformed metadata are covered by model/service tests | Draft cancellation and picker UI remain harness-blocked | Timer persistence and planned-vs-actual semantics pass in provider/model tests | Task 3 gate: 72 tests passed; format/analyze/diff passed; editor/detail widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit task editor and timer workflows` |
 | Settings, theme, language, scale, notifications, avatar | Provider/service contracts pass; language is wired into MaterialApp locale | Image validation and settings bounds are covered by focused tests | Settings widget flow and native permission/picker paths are harness/device-blocked | Lifecycle/native behavior remains device-blocked | Task 4 gate: 44 tests passed; format/analyze/diff passed; settings widget group blocked after 300s | Android device not connected | FAIL-fixed + BLOCKED UI/device evidence | `test: audit settings and lifecycle workflows` |
-| Export/import, sync, logging, calendar, external integrations | Existing service tests present; detailed audit is Task 5 | Existing service tests present; detailed audit is Task 5 | Detailed audit is Task 5 | Detailed audit is Task 5 | Baseline group passed | Android device not connected | PARTIAL — Task 5 pending | — |
+| Export/import, sync, logging, calendar, external integrations | Pure export/import, HMAC, logger, and attachment contracts pass | Malformed JSON/UTF-8/lists, size limits, tampering, frame bounds, unsafe links and paths covered | Picker cancellation, share result, calendar permission and external handlers are native/device-blocked | Sync lifecycle pure tests pass; LAN and app-kill scenarios remain device-blocked | Task 5 gate: 53 tests passed; format/analyze/diff passed | Android device not connected | PASS automated contracts + BLOCKED native/device evidence | Task 5 audit deliverable |
 | Android notifications, widgets, calendar, picker, APK install | Not run | Not run | Not run | Not run | Native device evidence pending | `adb devices -l`: no devices | BLOCKED | — |
 
 ## Automated command evidence
@@ -62,6 +62,27 @@ The widget-test timeouts are not reported as passes and do not invalidate the in
 | Function | Valid cases | Invalid/boundary cases | Cancel/permission cases | Lifecycle/offline cases | Automated evidence | Device evidence | Result | Defect/commit |
 |---|---|---|---|---|---|---|---|---|
 | Task/folder CRUD, search, filters, ordering | CRUD, nested folders, movement, filters/search, soft-delete, streak protection | Length limits, invalid indices, cycles, malformed persistence | UI cancel/permission cases pending widget/device audit | Persistence and coalesced writes passed in existing tests | 66 Task 2 tests passed | Android unavailable | PASS for automated core; UI/device checks pending | `test: audit task and folder workflows` |
+
+## Task 5: Data management, export/import, sync, logging, calendar, and external integrations evidence
+
+- Pure export/import/sync/logger/attachment gate: **PASS** — 53 tests passed, exit code 0.
+- Task-family formatter check: **PASS** — `dart format --output=none --set-exit-if-changed` returned exit code 0.
+- Task-family analyzer check: **PASS** — no issues found.
+- `git diff --check`: **PASS**.
+- Export/import evidence covers snapshots with information-block metadata, LWW newer/older merges, soft-delete propagation, reserved streak-folder rejection, malformed JSON/UTF-8/object/list validation, file-size and extension boundaries, cancellation contracts, and HMAC envelope validation.
+- Sync evidence covers secret trimming, peer self-filtering, concurrent startup, loopback send/receive, oversized frame rejection, and wrong-secret rejection.
+- Logger evidence covers eager redaction of message/error/stack trace, secret rotation retention, and bounded fatal-error buffering.
+- Attachment evidence covers safe HTTP(S) links, bounded binary storage, image signatures, basename sanitization, missing-file handling, and path boundary rejection.
+- Native share sheet, file picker delivery, calendar permission/event CRUD, and external URL/file handlers were not claimed as passing because no Android device/native integration run was available.
+- Security limitation recorded: HMAC authenticates sync payloads but does not encrypt task data on the local TCP transport. This remains an unresolved confidentiality risk and is not silently presented as end-to-end secure sync.
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Export/import validation and merge semantics | PASS | Focused export/import tests |
+| HMAC sync envelope and bounded TCP frame handling | PASS | Focused sync tests |
+| Logger redaction and bounded buffer | PASS | Focused logger tests |
+| Native picker/share/calendar/external handlers | BLOCKED | No Android device/native runner |
+| Sync confidentiality | UNRESOLVED RISK | Current HMAC design authenticates but does not encrypt payload |
 
 ## Task 4: Settings, theme, language, scale, notifications, avatar, and lifecycle evidence
 
@@ -121,6 +142,7 @@ No Android device was connected during Task 1. The following real-device scenari
 
 - **Task 3:** `task_detail_sheet.dart` omitted persisted quantity/description blocks and attachments. The read-only detail view now renders them through safe, validated attachment actions; regression coverage was added in `test/task_folder_popup_menu_test.dart`. Task 3 audit commit: `37f3250 test: audit task editor and timer workflows`.
 - **Task 4:** `SettingsProvider.languageCode` was not passed to `MaterialApp`, leaving built-in Flutter widgets without the selected app locale. Added `flutter_localizations`, supported `ru`/`en`, and standard Material localization delegates. Task 4 audit commit: `2650de9 test: audit settings and lifecycle workflows`.
+- **Task 5:** No reproducible production defect was found. The report records 53 passing pure/service tests and the native/device limitations; plaintext HMAC sync remains an explicitly documented unresolved confidentiality risk.
 
 ## Blocked scenarios and unresolved risks
 
@@ -128,3 +150,5 @@ No Android device was connected during Task 1. The following real-device scenari
 - `task_editor_sheet_test.dart` and `task_folder_popup_menu_test.dart` each hang after test startup in the current widget harness and require separate harness diagnosis; Task 3's new detail regression is therefore not executable evidence yet.
 - Passing unit/service tests do not prove native notification delivery, calendar operations, widget rendering, picker behavior, or external URL/file opening.
 - Exact-alarm denial may cause Android notification fallback to be inexact; this must be measured on-device rather than inferred from unit tests.
+- Native export/share, file-picker, calendar, and external-handler results are not proven without a physical Android run.
+- Sync currently authenticates payloads with HMAC but does not encrypt them on the LAN; deciding whether to add authenticated encryption is a separate security/product task.

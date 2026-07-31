@@ -196,8 +196,12 @@ class TaskProvider with ChangeNotifier {
         stackTrace: stackTrace,
       );
       if (completer != null && !completer.isCompleted) {
+        // Mutation callers intentionally ignore this internal future; they
+        // must not receive an unhandled rejected Future. Explicit callers of
+        // flushPersistence() still receive the original write error below.
         completer.complete();
       }
+      rethrow;
     }
   }
 

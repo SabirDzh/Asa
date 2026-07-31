@@ -15,9 +15,7 @@ Widget createTestApp() {
       ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
-    child: const MaterialApp(
-      home: HomeScreen(),
-    ),
+    child: const MaterialApp(home: HomeScreen()),
   );
 }
 
@@ -27,12 +25,16 @@ void main() {
     HomeWidgetService.instance.debounceDelay = Duration.zero;
   });
 
-  tearDown(() {
-    HomeWidgetService.resetForTests();
-    HomeWidgetService.instance.debounceDelay = const Duration(milliseconds: 300);
+  tearDown(() async {
+    await HomeWidgetService.resetForTests();
+    HomeWidgetService.instance.debounceDelay = const Duration(
+      milliseconds: 300,
+    );
   });
 
-  testWidgets('renders home screen with streak folder and search bar', (tester) async {
+  testWidgets('renders home screen with streak folder and search bar', (
+    tester,
+  ) async {
     await tester.pumpWidget(createTestApp());
     await tester.pumpAndSettle();
 

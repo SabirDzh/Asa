@@ -91,7 +91,11 @@ class HomeWidgetService {
   static void refresh() => instance._refresh();
 
   /// Resets cached widget state between isolated widget tests.
-  static void resetForTests() => instance._resetForTests();
+  ///
+  /// Awaiting an active native update prevents platform calls from leaking
+  /// into the next isolated test while the generation guard prevents the
+  /// completed operation from publishing stale state after reset.
+  static Future<void> resetForTests() => instance._resetForTests();
 
   void _updateData(TaskProvider provider) {
     final active = provider.tasks.where((t) => !t.isCompleted).length;
@@ -185,9 +189,11 @@ class HomeWidgetService {
     _lastRequestedSnapshot = null;
   }
 
-  void _resetForTests() {
+  Future<void> _resetForTests() async {
     _generation++;
     _cancelPendingUpdate();
+    final inFlight = _updateInFlight;
+    if (inFlight != null) await inFlight;
     _lastStreak = -1;
     _lastActive = -1;
     _lastFolder = null;

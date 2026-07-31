@@ -26,8 +26,8 @@ void main() {
     HomeWidgetService.instance.debounceDelay = Duration.zero;
   });
 
-  tearDown(() {
-    HomeWidgetService.resetForTests();
+  tearDown(() async {
+    await HomeWidgetService.resetForTests();
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
     );

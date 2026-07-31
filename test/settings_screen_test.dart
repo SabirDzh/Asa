@@ -13,21 +13,24 @@ Widget createTestApp({bool standalone = true}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(
-        create: (_) => SettingsProvider(deviceNameProvider: () async => 'Test Device'),
+        create:
+            (_) =>
+                SettingsProvider(deviceNameProvider: () async => 'Test Device'),
       ),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
     child: MaterialApp(
-      home: Scaffold(
-        body: SettingsScreen(standalone: standalone),
-      ),
+      home: Scaffold(body: SettingsScreen(standalone: standalone)),
     ),
   );
 }
 
 Future<void> pumpAndInit(WidgetTester tester, Widget widget) async {
   await tester.pumpWidget(widget);
-  final settings = Provider.of<SettingsProvider>(tester.element(find.byType(SettingsScreen)), listen: false);
+  final settings = Provider.of<SettingsProvider>(
+    tester.element(find.byType(SettingsScreen)),
+    listen: false,
+  );
   await settings.ready;
   await tester.pumpAndSettle(const Duration(milliseconds: 100));
 }
@@ -38,9 +41,11 @@ void main() {
     HomeWidgetService.instance.debounceDelay = Duration.zero;
   });
 
-  tearDown(() {
-    HomeWidgetService.resetForTests();
-    HomeWidgetService.instance.debounceDelay = const Duration(milliseconds: 300);
+  tearDown(() async {
+    await HomeWidgetService.resetForTests();
+    HomeWidgetService.instance.debounceDelay = const Duration(
+      milliseconds: 300,
+    );
   });
 
   testWidgets('renders all setting groups', (tester) async {
@@ -83,7 +88,11 @@ void main() {
     await pumpAndInit(tester, createTestApp());
 
     final aboutFinder = find.text('О приложении');
-    await tester.scrollUntilVisible(aboutFinder, 100, scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(
+      aboutFinder,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(aboutFinder);
     await tester.pumpAndSettle();
@@ -96,7 +105,11 @@ void main() {
     await pumpAndInit(tester, createTestApp());
 
     final dataFinder = find.text('Управление данными');
-    await tester.scrollUntilVisible(dataFinder, 100, scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(
+      dataFinder,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(dataFinder);
     await tester.pump();

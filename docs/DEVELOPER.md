@@ -63,7 +63,7 @@ lib/
 │   ├── scroll_hide_mixin.dart         # Scroll-aware FAB hide/show
 │   ├── sync_service.dart              # mDNS/TCP P2P sync engine
 │   ├── theme.dart                     # Colors, theme data, spacing constants
-│   ├── theme_switcher.dart          # Animated theme transition overlay
+│   ├── theme_switcher.dart           # Animated theme transition overlay
 │   └── version_service.dart           # GitHub release update checker
 └── features/
     ├── settings/
@@ -178,7 +178,7 @@ Search is lower-cased and matched against names/titles. `setSearchQuery` trigger
 Public API you will use most often:
 
 ```dart
-void addTask(String title, {String? folderId, DateTime? startTime, DateTime? endTime, int? expectedDuration});
+void addTask(String title, {String? folderId, DateTime? startTime, DateTime? endTime});
 void addFolder(String name, {String? parentFolderId, String? iconAsset});
 void updateTask(String id, String newTitle);
 void updateFolder(String id, String newName, {String? iconAsset});
@@ -190,7 +190,7 @@ void moveFolderToFolder(String folderId, String? targetParentFolderId);
 void reorderRootFolders(int oldIndex, int newIndex);
 void reorderSubfolders(String parentFolderId, int oldIndex, int newIndex);
 void reorderFolderTasks(String folderId, int oldIndex, int newIndex);
-void setTaskTime(String id, {DateTime? startTime, DateTime? endTime, int? expectedDuration});
+void setTaskTime(String id, {DateTime? startTime, DateTime? endTime});
 Future<void> linkTaskToCalendar(String id, String calendarId, DateTime date);
 Future<void> unlinkTaskFromCalendar(String id);
 ```
@@ -218,7 +218,7 @@ Calendar events are stored on the task as `calendarId` + `calendarEventId`. The 
 
 [`lib/core/notification_service.dart`](../lib/core/notification_service.dart)
 
-Thin wrapper around `flutter_local_notifications`. Currently shows a one-time test notification and supports toggling notifications on/off in settings. Future reminders would extend this service.
+Thin wrapper around `flutter_local_notifications`. It schedules daily task-start reminders only for active tasks with a non-zero period, cancels reminders when the period is incomplete or the task is completed/deleted, and exposes a notification action that persists a request to start the task timer. Permission and platform guards are handled by the service; testable ID/payload helpers are covered by `test/notification_service_test.dart`.
 
 ### 7.5 HomeWidgetService
 
@@ -263,7 +263,7 @@ Validation checks: extension, size (<10 MB), UTF-8, JSON shape, required keys, s
 
 ### 7.7 SyncService
 
-[`lib/core/sync_service.dart`](../lib/core/sync_service_service.dart)
+[`lib/core/sync_service.dart`](../lib/core/sync_service.dart)
 
 Local-network P2P over mDNS + TCP sockets:
 
@@ -534,16 +534,25 @@ When adding new providers or services, add matching tests and prefer injecting d
 # Analyze
 flutter analyze
 
-# Format all Dart files
-dart format .
+# Check formatting without changing files
+dart format --output=none --set-exit-if-changed .
+
+# Check patch whitespace
+ git diff --check
 
 # Run tests
 flutter test
 
-# Build release APK (arm64-v8a)
+# Verify Android resources and native widget providers
+(cd android && ./gradlew :app:processDebugResources :app:compileDebugKotlin --no-daemon)
+
+# Build debug APK
+flutter build apk --debug
+
+# Build release APK (arm64-v8a; signing is required for distribution)
 flutter build apk --target-platform android-arm64 --split-per-abi --release
 
-# Build iOS release
+# Build iOS release (requires macOS/Xcode signing setup)
 flutter build ios --release
 ```
 

@@ -8,6 +8,7 @@ import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/features/tasks/screens/home_screen.dart';
 import 'package:asa/core/home_widget_service.dart';
+import 'home_widget_channel_mock.dart';
 
 Widget createTestApp() {
   return MultiProvider(
@@ -23,6 +24,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
+    installHomeWidgetChannelMock();
   });
 
   tearDown(() async {
@@ -30,6 +32,7 @@ void main() {
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
     );
+    removeHomeWidgetChannelMock();
   });
 
   testWidgets('renders home screen with streak folder and search bar', (

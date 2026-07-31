@@ -9,6 +9,7 @@ import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/screens/folder_detail_screen.dart';
 import 'package:asa/core/home_widget_service.dart';
+import 'home_widget_channel_mock.dart';
 
 Widget createTestApp(FolderItem folder) {
   return MultiProvider(
@@ -24,6 +25,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
+    installHomeWidgetChannelMock();
   });
 
   tearDown(() async {
@@ -31,6 +33,7 @@ void main() {
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
     );
+    removeHomeWidgetChannelMock();
   });
 
   testWidgets('renders empty folder state', (tester) async {

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:asa/core/anchored_popup_menu.dart';
 import 'package:asa/core/home_widget_service.dart';
+import 'home_widget_channel_mock.dart';
 import 'package:asa/core/theme.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/tasks/models/task_info_block.dart';
@@ -18,6 +19,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
+    installHomeWidgetChannelMock();
   });
 
   tearDown(() async {
@@ -25,6 +27,7 @@ void main() {
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
     );
+    removeHomeWidgetChannelMock();
   });
 
   testWidgets('task ellipsis opens the task action menu', (tester) async {

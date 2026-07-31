@@ -8,6 +8,7 @@ import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/core/home_widget_service.dart';
+import 'home_widget_channel_mock.dart';
 
 Widget createTestApp({bool standalone = true}) {
   return MultiProvider(
@@ -39,6 +40,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
+    installHomeWidgetChannelMock();
   });
 
   tearDown(() async {
@@ -46,6 +48,7 @@ void main() {
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
     );
+    removeHomeWidgetChannelMock();
   });
 
   testWidgets('renders all setting groups', (tester) async {

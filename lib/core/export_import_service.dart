@@ -684,24 +684,32 @@ class ExportImportService {
 
   /// PBKDF2-HMAC-SHA256 iterations for the sync encryption key.
   ///
-  /// Derived once per secret and cached, so the cost is paid only when the
-  /// secret first changes. Tests lower this value to keep the suite fast.
+  /// Follows the OWASP (2026) guidance for PBKDF2-HMAC-SHA256. The key is
+  /// derived once per secret and cached, so the pure-Dart cost is paid only
+  /// when the secret first changes. Tests lower this value to keep the suite
+  /// fast.
   @visibleForTesting
-  static int syncPbkdf2Iterations = 210000;
+  static int syncPbkdf2Iterations = 600000;
 
   static crypt.SecretKey? _cachedSyncKey;
   static String? _cachedSyncKeySecret;
+  static int? _cachedSyncKeyIterations;
 
   /// Clears the cached derived sync key. Used between tests.
   @visibleForTesting
   static void resetSyncCrypto() {
     _cachedSyncKey = null;
     _cachedSyncKeySecret = null;
+    _cachedSyncKeyIterations = null;
   }
 
   static Future<crypt.SecretKey> _syncKey(String secret) async {
     final cached = _cachedSyncKey;
-    if (_cachedSyncKeySecret == secret && cached != null) return cached;
+    if (cached != null &&
+        _cachedSyncKeySecret == secret &&
+        _cachedSyncKeyIterations == syncPbkdf2Iterations) {
+      return cached;
+    }
     final pbkdf2 = crypt.Pbkdf2(
       macAlgorithm: crypt.Hmac.sha256(),
       iterations: syncPbkdf2Iterations,
@@ -713,6 +721,7 @@ class ExportImportService {
     );
     _cachedSyncKey = key;
     _cachedSyncKeySecret = secret;
+    _cachedSyncKeyIterations = syncPbkdf2Iterations;
     return key;
   }
 

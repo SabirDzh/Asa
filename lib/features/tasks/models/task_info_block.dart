@@ -127,9 +127,6 @@ class TaskInfoBlock {
     if (text.length > kMaxTaskDescriptionLength) {
       throw const FormatException('Description is too long');
     }
-    if (attachments.length > kMaxTaskAttachmentsPerTask) {
-      throw const FormatException('Too many description attachments');
-    }
     return TaskInfoBlock._(
       id: id,
       type: TaskInfoBlockType.description,
@@ -170,9 +167,6 @@ class TaskInfoBlock {
             throw const FormatException(
               'Description attachments must be a list',
             );
-          }
-          if (rawAttachments.length > kMaxTaskAttachmentsPerTask) {
-            throw const FormatException('Too many description attachments');
           }
           for (final entry in rawAttachments) {
             if (entry is! Map) {

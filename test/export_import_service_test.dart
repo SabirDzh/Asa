@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/core/export_import_service.dart';
+import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 
@@ -26,6 +27,37 @@ void main() {
       expect(snapshot.folders.length, 1);
       expect(snapshot.folders.first['name'], 'Work');
     });
+
+    test(
+      'buildSnapshot preserves task block metadata without binary bytes',
+      () {
+        provider.addTask(
+          'Read a book',
+          infoBlocks: [
+            TaskInfoBlock.description(
+              id: 'book-notes',
+              text: 'Read chapter one',
+              attachments: [
+                const TaskAttachment(
+                  id: 'book-link',
+                  type: TaskAttachmentType.link,
+                  name: 'Book source',
+                  value: 'https://example.com/book',
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final snapshot = ExportImportService.buildSnapshot(provider);
+        final encoded = jsonEncode(snapshot.toJson());
+
+        expect(encoded, contains('Read chapter one'));
+        expect(encoded, contains('https://example.com/book'));
+        expect(encoded, isNot(contains('base64')));
+        expect(encoded, isNot(contains('bytes')));
+      },
+    );
 
     test('importFromFile reports cancelled when no file is picked', () {
       const result = ImportResult(cancelled: true);

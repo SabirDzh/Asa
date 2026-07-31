@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import 'package:uuid/uuid.dart';
 
@@ -260,8 +261,9 @@ class TaskProvider with ChangeNotifier {
         for (final entry in decoded) {
           try {
             final task = TaskItem.fromJson(entry);
-            if (!_tasks.any((existing) => existing.id == task.id)) {
-              _tasks.add(task);
+            final normalizedTask = _normalizeImportedTask(task);
+            if (!_tasks.any((existing) => existing.id == normalizedTask.id)) {
+              _tasks.add(normalizedTask);
             }
           } catch (error, stackTrace) {
             LoggerService.instance.w(
@@ -604,11 +606,13 @@ class TaskProvider with ChangeNotifier {
     String? folderId,
     DateTime? startTime,
     DateTime? endTime,
+    List<TaskInfoBlock> infoBlocks = const [],
   }) {
     if (title.isEmpty) return;
     if (title.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
+    _validateInfoBlocks(infoBlocks);
     _tasks.add(
       TaskItem(
         id: _uuid.v4(),
@@ -620,6 +624,7 @@ class TaskProvider with ChangeNotifier {
             startTime != null && endTime != null
                 ? TaskItem.durationForPeriod(startTime, endTime)
                 : null,
+        infoBlocks: infoBlocks,
         updatedAt: DateTime.now(),
       ),
     );
@@ -629,6 +634,7 @@ class TaskProvider with ChangeNotifier {
 
   /// Adds a raw [task] directly, used by import/sync flows.
   void addTaskRaw(TaskItem task) {
+    _validateInfoBlocks(task.infoBlocks);
     _tasks.add(task);
     _notifyTasksChanged();
     _saveToPrefs();
@@ -637,13 +643,14 @@ class TaskProvider with ChangeNotifier {
   /// Upserts a task during import/sync, updating the existing record if it
   /// already exists. Returns true if the item was changed.
   bool upsertTask(TaskItem task) {
-    final index = _tasks.indexWhere((t) => t.id == task.id);
+    final normalizedTask = _normalizeImportedTask(task);
+    final index = _tasks.indexWhere((t) => t.id == normalizedTask.id);
     if (index == -1) {
-      _tasks.add(task);
+      _tasks.add(normalizedTask);
       return true;
     }
-    if (task.updatedAt.isAfter(_tasks[index].updatedAt)) {
-      _tasks[index] = task;
+    if (normalizedTask.updatedAt.isAfter(_tasks[index].updatedAt)) {
+      _tasks[index] = normalizedTask;
       return true;
     }
     return false;
@@ -693,20 +700,99 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  void updateTask(String id, String newTitle) {
+  void updateTask(
+    String id,
+    String newTitle, {
+    List<TaskInfoBlock>? infoBlocks,
+  }) {
     if (newTitle.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
+    if (infoBlocks != null) _validateInfoBlocks(infoBlocks);
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
       _tasks[index] = _tasks[index].copyWith(
         title: newTitle,
+        infoBlocks: infoBlocks,
         updatedAt: DateTime.now(),
       );
       _notifyTasksChanged();
       _saveToPrefs();
       syncTaskCalendarEvent(id).catchError((_) {});
     }
+  }
+
+  void updateTaskInfoBlocks(String taskId, List<TaskInfoBlock> blocks) {
+    _validateInfoBlocks(blocks);
+    final index = _tasks.indexWhere((task) => task.id == taskId);
+    if (index == -1 || _tasks[index].isDeleted) return;
+    _tasks[index] = _tasks[index].copyWith(
+      infoBlocks: blocks,
+      updatedAt: DateTime.now(),
+    );
+    _notifyTasksChanged();
+    _saveToPrefs();
+  }
+
+  void adjustQuantityBlock(String taskId, String blockId, double delta) {
+    if (!delta.isFinite) return;
+    final index = _tasks.indexWhere((task) => task.id == taskId);
+    if (index == -1 || _tasks[index].isDeleted) return;
+
+    final blocks = _tasks[index].infoBlocks;
+    final blockIndex = blocks.indexWhere(
+      (block) =>
+          block.id == blockId && block.type == TaskInfoBlockType.quantity,
+    );
+    if (blockIndex == -1) return;
+
+    final block = blocks[blockIndex];
+    final nextValue =
+        (block.currentValue + delta).clamp(0.0, block.targetValue).toDouble();
+    final updatedBlocks = List<TaskInfoBlock>.of(blocks);
+    updatedBlocks[blockIndex] = block.copyWith(currentValue: nextValue);
+    _tasks[index] = _tasks[index].copyWith(
+      infoBlocks: updatedBlocks,
+      updatedAt: DateTime.now(),
+    );
+    _notifyTasksChanged();
+    _saveToPrefs();
+  }
+
+  void _validateInfoBlocks(List<TaskInfoBlock> blocks) {
+    final attachmentCount = blocks.fold<int>(
+      0,
+      (total, block) => total + block.attachments.length,
+    );
+    if (attachmentCount > kMaxTaskAttachmentsPerTask) {
+      throw const FormatException('Too many task attachments');
+    }
+  }
+
+  TaskItem _normalizeImportedTask(TaskItem task) {
+    var remaining = kMaxTaskAttachmentsPerTask;
+    var truncated = false;
+    final normalizedBlocks = <TaskInfoBlock>[];
+
+    for (final block in task.infoBlocks) {
+      if (block.type != TaskInfoBlockType.description) {
+        normalizedBlocks.add(block);
+        continue;
+      }
+      final keepCount = block.attachments.length.clamp(0, remaining);
+      if (keepCount != block.attachments.length) truncated = true;
+      normalizedBlocks.add(
+        block.copyWith(attachments: block.attachments.take(keepCount).toList()),
+      );
+      remaining -= keepCount;
+    }
+
+    if (!truncated) return task;
+    LoggerService.instance.w('Trimmed task attachments to the supported limit');
+    return task.copyWith(
+      infoBlocks: normalizedBlocks,
+      updatedAt: task.updatedAt,
+    );
   }
 
   /// Links the task to a calendar event on [calendarId] at [date].

@@ -157,6 +157,25 @@ void main() {
       expect(task.infoBlocks.single.attachments.single.id, 'valid-link');
     });
 
+    test('retains all decoded attachments for provider normalization', () {
+      final attachments = List.generate(
+        kMaxTaskAttachmentsPerTask + 1,
+        (index) => {
+          'id': 'file-$index',
+          'type': 'file',
+          'name': 'file-$index.pdf',
+          'value': '/app/task_attachments/file-$index.pdf',
+        },
+      );
+      final block = TaskInfoBlock.fromJson({
+        'id': 'notes',
+        'type': 'description',
+        'attachments': attachments,
+      });
+
+      expect(block.attachments, hasLength(kMaxTaskAttachmentsPerTask + 1));
+    });
+
     test('rejects invalid quantities and unsafe links', () {
       expect(
         () => TaskInfoBlock.quantity(

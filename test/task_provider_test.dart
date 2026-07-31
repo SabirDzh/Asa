@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 
@@ -107,6 +108,80 @@ void main() {
 
       expect(
         () => provider.updateTask(taskId, 'a' * 251),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test(
+      'addTask persists information blocks and title updates preserve them',
+      () async {
+        await provider.ready;
+        final block = TaskInfoBlock.quantity(
+          id: 'water',
+          targetValue: 3,
+          unit: 'glasses',
+        );
+        provider.addTask('Drink water', infoBlocks: [block]);
+        final taskId = provider.tasks.single.id;
+
+        provider.updateTask(taskId, 'Drink more water');
+        await provider.persist();
+
+        expect(provider.tasks.single.infoBlocks.single.id, 'water');
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('saved_tasks'), contains('water'));
+      },
+    );
+
+    test(
+      'adjustQuantityBlock clamps to target without completing the task',
+      () {
+        final block = TaskInfoBlock.quantity(
+          id: 'pages',
+          currentValue: 9,
+          targetValue: 10,
+          unit: 'pages',
+        );
+        provider.addTask('Read', infoBlocks: [block]);
+        final taskId = provider.tasks.single.id;
+
+        provider.adjustQuantityBlock(taskId, 'pages', 5);
+
+        expect(provider.tasks.single.infoBlocks.single.currentValue, 10);
+        expect(provider.tasks.single.isCompleted, isFalse);
+
+        provider.adjustQuantityBlock(taskId, 'pages', -20);
+        expect(provider.tasks.single.infoBlocks.single.currentValue, 0);
+      },
+    );
+
+    test('rejects more than the task-wide attachment limit across blocks', () {
+      final attachments = List.generate(
+        kMaxTaskAttachmentsPerTask,
+        (index) => TaskAttachment(
+          id: 'file-$index',
+          type: TaskAttachmentType.file,
+          name: 'file-$index.pdf',
+          value: '/app/task_attachments/file-$index.pdf',
+        ),
+      );
+      final blocks = [
+        TaskInfoBlock.description(
+          id: 'notes-1',
+          attachments: attachments.sublist(0, 10),
+        ),
+        TaskInfoBlock.description(
+          id: 'notes-2',
+          attachments: attachments.sublist(10),
+        ),
+        TaskInfoBlock.description(
+          id: 'notes-3',
+          attachments: [attachments.first],
+        ),
+      ];
+
+      expect(
+        () => provider.addTask('Too many references', infoBlocks: blocks),
         throwsA(isA<Exception>()),
       );
     });
@@ -311,6 +386,43 @@ void main() {
       expect(
         restored.allTasks.where((task) => task.id == 'broken-task'),
         isEmpty,
+      );
+    });
+
+    test('skips persisted tasks over the total attachment limit', () async {
+      final attachments = List.generate(
+        kMaxTaskAttachmentsPerTask,
+        (index) => TaskAttachment(
+          id: 'stored-$index',
+          type: TaskAttachmentType.file,
+          name: 'stored-$index.pdf',
+          value: '/app/task_attachments/stored-$index.pdf',
+        ),
+      );
+      final oversizedTask = TaskItem(
+        id: 'oversized-task',
+        title: 'Oversized task',
+        infoBlocks: [
+          TaskInfoBlock.description(id: 'notes-1', attachments: attachments),
+          TaskInfoBlock.description(
+            id: 'notes-2',
+            attachments: [attachments.first],
+          ),
+        ],
+      );
+      SharedPreferences.setMockInitialValues({
+        'saved_tasks': jsonEncode([oversizedTask.toJson()]),
+      });
+
+      final restored = TaskProvider();
+      await restored.ready;
+
+      expect(restored.allTasks, hasLength(1));
+      expect(
+        restored.allTasks.single.infoBlocks
+            .expand((block) => block.attachments)
+            .length,
+        kMaxTaskAttachmentsPerTask,
       );
     });
 

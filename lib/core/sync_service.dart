@@ -99,6 +99,7 @@ class SyncService {
   /// Sets the shared secret used to authenticate sync payloads.
   void setSecret(String? secret) {
     final trimmed = secret?.trim();
+    LoggerService.instance.registerSecret(trimmed);
     _secret = (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
   }
 

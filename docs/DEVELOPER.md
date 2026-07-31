@@ -154,6 +154,7 @@ Both providers start async init in their constructors:
 * `TaskProvider._saveToPrefs()` encodes `_tasks` and `_folders` as JSON strings in `SharedPreferences`.
 * Keys: `saved_tasks`, `saved_folders`.
 * Settings are persisted per-field under their own keys (see `SettingsProvider`).
+* **Security limitation:** `SharedPreferences` is not encrypted storage. The optional `syncSecret` currently survives restarts in plaintext application preferences. Treat it as a local convenience secret, not a high-value credential; migrate sensitive keys to platform secure storage (for example, `flutter_secure_storage`) before relying on it for stronger at-rest protection.
 
 ### 6.3 Search & filters
 
@@ -270,6 +271,7 @@ Local-network P2P over mDNS + TCP sockets:
 * Includes a stable `deviceId` in TXT attributes to avoid self-discovery.
 * Sends JSON payload length-prefixed (`[4 bytes length][payload]`).
 * Receives data, validates sync secret, and merges via `ExportImportService`.
+* Incoming TCP frames are length-prefixed, bounded to 10 MB, timeout-protected, and closed after one frame. When a secret is configured, the payload must pass HMAC validation; malformed or unauthenticated frames are rejected.
 
 Lifecycle in `SplashScreen`:
 
@@ -293,6 +295,8 @@ Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, 
 [`lib/core/logger_service.dart`](../lib/core/logger_service.dart)
 
 Buffered logger. Configured at compile time with `--dart-define=TELEGRAM_BOT_TOKEN=... --dart-define=TELEGRAM_CHAT_ID=...`. If not configured, logs only go to the console and an in-memory buffer. Maximum buffer size is 500 entries.
+
+Sync secrets registered by `SettingsProvider`/`SyncService` are eagerly replaced with `[REDACTED]` before messages, exceptions, stack traces, console output, or Telegram payloads enter the buffer. Old registered values remain in the redaction set after rotation so delayed asynchronous errors cannot disclose a previous secret. Every non-empty registered value is redacted, including short secrets, so configured credentials are never intentionally left visible in diagnostics.
 
 Unhandled Flutter errors are caught by `listenToFlutterErrors()` in `main.dart`.
 

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/app_strings.dart';
 import '../../../core/device_info.dart';
 import '../../../core/home_widget_service.dart';
+import '../../../core/logger_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/scale_utils.dart';
 
@@ -124,6 +125,7 @@ class SettingsProvider with ChangeNotifier {
               ? savedName.trim()
               : await _deviceNameProvider();
       _syncSecret = prefs.getString('syncSecret');
+      LoggerService.instance.registerSecret(_syncSecret);
       if (_syncSecret != null && _syncSecret!.trim().isEmpty) {
         _syncSecret = null;
       }
@@ -355,6 +357,7 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> setSyncSecret(String? secret) async {
     final trimmed = secret?.trim();
+    LoggerService.instance.registerSecret(trimmed);
     _syncSecret = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();

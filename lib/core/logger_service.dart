@@ -11,8 +11,8 @@ class LogEntry {
   final DateTime timestamp;
   final LogLevel level;
   final String message;
-  final Object? error;
-  final StackTrace? stackTrace;
+  final String? error;
+  final String? stackTrace;
 
   LogEntry({
     required this.timestamp,
@@ -25,7 +25,9 @@ class LogEntry {
   @override
   String toString() {
     final buffer = StringBuffer();
-    buffer.write('${_levelLabel(level)} ${timestamp.toIso8601String()} $message');
+    buffer.write(
+      '${_levelLabel(level)} ${timestamp.toIso8601String()} $message',
+    );
     if (error != null) {
       buffer.write('\nERROR: $error');
     }
@@ -55,13 +57,19 @@ class LogEntry {
 /// When no token is configured, Telegram sending is skipped and logs are only
 /// printed to the console and buffered.
 class LoggerService {
-  LoggerService._();
+  LoggerService._() {
+    registerSecret(_token);
+    registerSecret(_chatId);
+  }
+
   static final LoggerService instance = LoggerService._();
 
   static const String _token = String.fromEnvironment('TELEGRAM_BOT_TOKEN');
   static const String _chatId = String.fromEnvironment('TELEGRAM_CHAT_ID');
 
   final _buffer = <LogEntry>[];
+  final _redactedSecrets = <String>{};
+  static const _redactionMarker = '[REDACTED]';
   final _maxBufferSize = 500;
 
   /// Whether Telegram integration is active.
@@ -70,13 +78,57 @@ class LoggerService {
   /// All buffered entries (oldest first).
   List<LogEntry> get logs => List.unmodifiable(_buffer);
 
-  void log(LogLevel level, String message, {Object? error, StackTrace? stackTrace}) {
+  /// Registers a secret for eager redaction in future log entries.
+  ///
+  /// Previously registered values are intentionally retained so a rotated
+  /// secret cannot leak from a later asynchronous error.
+  void registerSecret(String? secret) {
+    final normalized = secret?.trim();
+    if (normalized == null || normalized.isEmpty) return;
+    _redactedSecrets.add(normalized);
+    for (var i = 0; i < _buffer.length; i++) {
+      final entry = _buffer[i];
+      _buffer[i] = LogEntry(
+        timestamp: entry.timestamp,
+        level: entry.level,
+        message: _redact(entry.message),
+        error: entry.error == null ? null : _redact(entry.error!),
+        stackTrace:
+            entry.stackTrace == null ? null : _redact(entry.stackTrace!),
+      );
+    }
+  }
+
+  /// Replaces registered non-empty secrets in arbitrary diagnostic text.
+  static String redactSensitive(String message, Iterable<String> secrets) {
+    final candidates =
+        secrets
+            .map((secret) => secret.trim())
+            .where((secret) => secret.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
+    var redacted = message;
+    for (final secret in candidates) {
+      redacted = redacted.replaceAll(secret, _redactionMarker);
+    }
+    return redacted;
+  }
+
+  String _redact(String value) => redactSensitive(value, _redactedSecrets);
+
+  void log(
+    LogLevel level,
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     final entry = LogEntry(
       timestamp: DateTime.now().toUtc(),
       level: level,
-      message: message,
-      error: error,
-      stackTrace: stackTrace,
+      message: _redact(message),
+      error: error == null ? null : _redact(error.toString()),
+      stackTrace: stackTrace == null ? null : _redact(stackTrace.toString()),
     );
 
     _buffer.add(entry);
@@ -114,16 +166,14 @@ class LoggerService {
 
     try {
       final text = _buffer.map((e) => e.toString()).join('\n---\n');
-      final truncated = text.length > 4000 ? '${text.substring(0, 4000)}...' : text;
+      final truncated =
+          text.length > 4000 ? '${text.substring(0, 4000)}...' : text;
 
       final uri = Uri.parse('https://api.telegram.org/bot$_token/sendMessage');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'chat_id': _chatId,
-          'text': _escapeHtml(truncated),
-        }),
+        body: jsonEncode({'chat_id': _chatId, 'text': _escapeHtml(truncated)}),
       );
 
       if (response.statusCode == 200 && clear) {
@@ -131,21 +181,33 @@ class LoggerService {
       }
       return response.statusCode == 200;
     } on Exception catch (error, stackTrace) {
-      log(LogLevel.error, 'Failed to send logs to Telegram', error: error, stackTrace: stackTrace);
+      log(
+        LogLevel.error,
+        'Failed to send logs to Telegram',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }
 
   /// Reports an unhandled error/fatal condition to Telegram immediately.
-  Future<bool> reportError(String message, {Object? error, StackTrace? stackTrace}) async {
+  Future<bool> reportError(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+  }) async {
     final entry = LogEntry(
       timestamp: DateTime.now().toUtc(),
       level: LogLevel.fatal,
-      message: message,
-      error: error,
-      stackTrace: stackTrace,
+      message: _redact(message),
+      error: error == null ? null : _redact(error.toString()),
+      stackTrace: stackTrace == null ? null : _redact(stackTrace.toString()),
     );
     _buffer.add(entry);
+    while (_buffer.length > _maxBufferSize) {
+      _buffer.removeAt(0);
+    }
 
     if (!telegramEnabled) {
       return false;
@@ -159,12 +221,19 @@ class LoggerService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_id': _chatId,
-          'text': _escapeHtml(text.length > 4000 ? text.substring(0, 4000) : text),
+          'text': _escapeHtml(
+            text.length > 4000 ? text.substring(0, 4000) : text,
+          ),
         }),
       );
       return response.statusCode == 200;
     } on Exception catch (error, stackTrace) {
-      log(LogLevel.error, 'Failed to report error to Telegram', error: error, stackTrace: stackTrace);
+      log(
+        LogLevel.error,
+        'Failed to report error to Telegram',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }

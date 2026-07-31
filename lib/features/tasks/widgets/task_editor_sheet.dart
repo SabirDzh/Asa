@@ -218,12 +218,19 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      key: key,
-      minTileHeight: 56,
-      leading: Icon(icon, color: color),
-      title: Text(label, style: TextStyle(color: color)),
-      onTap: onTap,
+    // ListTile paints its ink splash on the nearest Material ancestor. The
+    // chooser sheet wraps its content in a ColoredBox (Container color), so the
+    // ListTile must own a Material above that colored box or the splash and
+    // pressed highlight would be invisible.
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        key: key,
+        minTileHeight: 56,
+        leading: Icon(icon, color: color),
+        title: Text(label, style: TextStyle(color: color)),
+        onTap: onTap,
+      ),
     );
   }
 

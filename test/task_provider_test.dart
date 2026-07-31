@@ -356,7 +356,8 @@ void main() {
       provider.addTask('First');
       provider.addTask('Second');
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await provider.ready;
+      await provider.persist();
       final prefs = await SharedPreferences.getInstance();
       final savedTasks = prefs.getString('saved_tasks');
 
@@ -364,6 +365,31 @@ void main() {
       expect(savedTasks, contains('First'));
       expect(savedTasks, contains('Second'));
     });
+
+    test(
+      'does not overwrite loaded tasks when mutated before initialization',
+      () async {
+        final existing =
+            TaskItem(id: 'existing', title: 'Loaded task').toJson();
+        SharedPreferences.setMockInitialValues({
+          'saved_tasks': jsonEncode([existing]),
+        });
+
+        final restored = TaskProvider();
+        restored.addTask('Added during startup');
+        await restored.ready;
+        await restored.persist();
+
+        expect(
+          restored.allTasks.map((task) => task.title),
+          containsAll(<String>['Loaded task', 'Added during startup']),
+        );
+        final prefs = await SharedPreferences.getInstance();
+        final saved = prefs.getString('saved_tasks');
+        expect(saved, contains('Loaded task'));
+        expect(saved, contains('Added during startup'));
+      },
+    );
 
     group('upsertTask / upsertFolder', () {
       test('upsertTask adds a new task', () {
@@ -426,6 +452,30 @@ void main() {
 
         expect(changed, true);
         expect(provider.folders.first.name, 'Newer');
+      });
+
+      test('upsertFolder breaks an incoming hierarchy cycle at the root', () {
+        provider.addFolder('Parent');
+        final parentId =
+            provider.folders.firstWhere((f) => f.name == 'Parent').id;
+        provider.addFolder('Child', parentFolderId: parentId);
+        final childId =
+            provider.folders.firstWhere((f) => f.name == 'Child').id;
+
+        final changed = provider.upsertFolder(
+          FolderItem(
+            id: parentId,
+            name: 'Parent from remote',
+            parentFolderId: childId,
+            updatedAt: DateTime.now().add(const Duration(days: 1)),
+          ),
+        );
+
+        expect(changed, true);
+        expect(
+          provider.folders.firstWhere((f) => f.id == parentId).parentFolderId,
+          isNull,
+        );
       });
     });
   });

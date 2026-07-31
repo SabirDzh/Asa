@@ -52,9 +52,15 @@ class SyncService {
   Stream<String> get status => _statusController.stream;
 
   final List<SyncPeer> _peers = [];
+  final Set<Socket> _activeSockets = <Socket>{};
+  final Map<Socket, Timer> _socketTimeouts = <Socket, Timer>{};
+  Future<bool>? _startFuture;
+  int _lifecycleGeneration = 0;
   bool _running = false;
   int? _actualPort;
   List<String> _localAddresses = [];
+
+  static const _incomingFrameTimeout = Duration(seconds: 10);
 
   bool get isRunning => _running;
   int? get actualPort => _actualPort;
@@ -98,11 +104,32 @@ class SyncService {
 
   /// Starts the sync server and mDNS discovery.
   Future<bool> start() async {
+    final inFlight = _startFuture;
+    if (inFlight != null) return inFlight;
     if (_running) return true;
-    _running = true;
 
+    final startFuture = _startInternal();
+    _startFuture = startFuture;
+    try {
+      return await startFuture;
+    } finally {
+      if (identical(_startFuture, startFuture)) _startFuture = null;
+    }
+  }
+
+  Future<bool> _startInternal() async {
+    final generation = ++_lifecycleGeneration;
+    _running = true;
     final serverStarted = await _startServer();
+    if (!_isCurrentGeneration(generation)) {
+      await _cleanupStaleStart();
+      return false;
+    }
     final discoveryStarted = serverStarted && await _startDiscovery();
+    if (!_isCurrentGeneration(generation)) {
+      await _cleanupStaleStart();
+      return false;
+    }
     if (!serverStarted || !discoveryStarted) {
       await stop();
       _statusController.add('failed');
@@ -114,32 +141,103 @@ class SyncService {
     return true;
   }
 
-  /// Stops all sync operations.
-  Future<void> stop() async {
-    _running = false;
-    await _server?.close();
+  bool _isCurrentGeneration(int generation) =>
+      generation == _lifecycleGeneration && _running;
+
+  Future<void> _cleanupStaleStart() async {
+    final server = _server;
+    final broadcast = _broadcast;
+    final discoverySubscription = _discoverySubscription;
+    final discovery = _discovery;
     _server = null;
     _actualPort = null;
-    await _broadcast?.stop();
     _broadcast = null;
     _currentService = null;
-    await _discoverySubscription?.cancel();
     _discoverySubscription = null;
-    await _discovery?.stop();
     _discovery = null;
+
+    final activeSockets = List<Socket>.from(_activeSockets);
+    for (final socket in activeSockets) {
+      _socketTimeouts.remove(socket)?.cancel();
+      socket.destroy();
+    }
+    _activeSockets.clear();
+
+    await _stopResource('stale sync server', server?.close);
+    await _stopResource('stale sync broadcast', broadcast?.stop);
+    await _stopResource(
+      'stale sync discovery subscription',
+      discoverySubscription?.cancel,
+    );
+    await _stopResource('stale sync discovery', discovery?.stop);
+  }
+
+  /// Stops all sync operations.
+  Future<void> stop() async {
+    _lifecycleGeneration++;
+    _running = false;
+    final server = _server;
+    final broadcast = _broadcast;
+    final discoverySubscription = _discoverySubscription;
+    final discovery = _discovery;
+    _server = null;
+    _actualPort = null;
+    _broadcast = null;
+    _currentService = null;
+    _discoverySubscription = null;
+    _discovery = null;
+
+    final activeSockets = List<Socket>.from(_activeSockets);
+    for (final socket in activeSockets) {
+      _socketTimeouts.remove(socket)?.cancel();
+      socket.destroy();
+    }
+    _activeSockets.clear();
+
+    await _stopResource('sync server', server?.close);
+    await _stopResource('sync broadcast', broadcast?.stop);
+    await _stopResource(
+      'sync discovery subscription',
+      discoverySubscription?.cancel,
+    );
+    await _stopResource('sync discovery', discovery?.stop);
+
     _peers.clear();
     _peersController.add(List.unmodifiable(_peers));
     _statusController.add('stopped');
     LoggerService.instance.i('Sync service stopped');
   }
 
+  Future<void> _stopResource(
+    String name,
+    Future<void> Function()? close,
+  ) async {
+    if (close == null) return;
+    try {
+      await close();
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Failed to stop $name',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   /// Sends the current data snapshot to [peer].
   Future<bool> sendToPeer(TaskProvider provider, SyncPeer peer) async {
     Socket? socket;
     try {
-      socket = await Socket.connect(peer.host, peer.port,
-          timeout: const Duration(seconds: 5));
-      final payload = ExportImportService.buildSyncPayload(provider, secret: _secret);
+      socket = await Socket.connect(
+        peer.host,
+        peer.port,
+        timeout: const Duration(seconds: 5),
+      );
+      _activeSockets.add(socket);
+      final payload = ExportImportService.buildSyncPayload(
+        provider,
+        secret: _secret,
+      );
       final length = payload.length;
       final frame = <int>[
         (length >> 24) & 0xFF,
@@ -150,14 +248,20 @@ class SyncService {
       ];
       socket.add(frame);
       await socket.flush();
-      await socket.done.timeout(const Duration(seconds: 5), onTimeout: () {});
+      // The frame is complete once flush resolves; signal EOF instead of
+      // waiting for the peer to close first (which otherwise adds a 5s delay).
+      await socket.close();
       LoggerService.instance.i('Sent sync data to ${peer.name}');
       return true;
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Failed to send sync to ${peer.name}',
-          error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Failed to send sync to ${peer.name}',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return false;
     } finally {
+      if (socket != null) _activeSockets.remove(socket);
       socket?.destroy();
     }
   }
@@ -167,50 +271,126 @@ class SyncService {
       _server = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
       _actualPort = _server!.port;
 
-      _server!.listen((socket) async {
-        final chunks = <int>[];
-        int? expectedLength;
-        const maxPayloadSize = 10 * 1024 * 1024; // 10 MB
-        socket.listen((data) {
-          chunks.addAll(data);
-          if (expectedLength == null && chunks.length >= 4) {
-            expectedLength = (chunks[0] << 24) | (chunks[1] << 16) | (chunks[2] << 8) | chunks[3];
-            if (expectedLength! <= 0 || expectedLength! > maxPayloadSize) {
-              LoggerService.instance.w('Sync payload size $expectedLength rejected');
-              socket.close();
-              return;
-            }
+      _server!.listen(
+        (socket) {
+          _activeSockets.add(socket);
+          final chunks = <int>[];
+          int? expectedLength;
+          var frameHandled = false;
+          const maxPayloadSize = 10 * 1024 * 1024; // 10 MB
+
+          void cleanupSocket() {
+            _socketTimeouts.remove(socket)?.cancel();
+            _activeSockets.remove(socket);
           }
-          if (expectedLength != null && chunks.length >= expectedLength! + 4) {
-            final payload = chunks.sublist(4, expectedLength! + 4);
-            final provider = _provider;
-            if (provider == null) {
-              LoggerService.instance.w('Incoming sync data ignored: no TaskProvider registered');
-            } else {
-              _handleIncomingData(payload, provider).catchError((Object error, StackTrace stackTrace) {
-                LoggerService.instance.e('Incoming sync handling failed', error: error, stackTrace: stackTrace);
-              });
-            }
-            chunks.removeRange(0, expectedLength! + 4);
-            expectedLength = null;
+
+          void rejectFrame(String reason) {
+            if (frameHandled) return;
+            frameHandled = true;
+            cleanupSocket();
+            LoggerService.instance.w('Incoming sync frame rejected: $reason');
+            socket.destroy();
           }
-        }, onDone: () {
-          socket.close();
-        });
-      });
+
+          void armTimeout() {
+            _socketTimeouts[socket]?.cancel();
+            _socketTimeouts[socket] = Timer(_incomingFrameTimeout, () {
+              rejectFrame('frame read timeout');
+            });
+          }
+
+          armTimeout();
+          socket.listen(
+            (data) {
+              if (frameHandled) return;
+              armTimeout();
+              chunks.addAll(data);
+              if (chunks.length > maxPayloadSize + 4) {
+                rejectFrame('frame exceeds limit');
+                return;
+              }
+              if (expectedLength == null && chunks.length >= 4) {
+                expectedLength =
+                    (chunks[0] << 24) |
+                    (chunks[1] << 16) |
+                    (chunks[2] << 8) |
+                    chunks[3];
+                if (expectedLength! <= 0 || expectedLength! > maxPayloadSize) {
+                  rejectFrame('invalid payload size');
+                  return;
+                }
+              }
+              if (expectedLength != null &&
+                  chunks.length >= expectedLength! + 4) {
+                frameHandled = true;
+                final payload = chunks.sublist(4, expectedLength! + 4);
+                final provider = _provider;
+                cleanupSocket();
+                socket.destroy();
+                if (provider == null) {
+                  LoggerService.instance.w(
+                    'Incoming sync data ignored: no TaskProvider registered',
+                  );
+                } else {
+                  _handleIncomingData(payload, provider).catchError((
+                    Object error,
+                    StackTrace stackTrace,
+                  ) {
+                    LoggerService.instance.e(
+                      'Incoming sync handling failed',
+                      error: error,
+                      stackTrace: stackTrace,
+                    );
+                  });
+                }
+              }
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              if (!frameHandled) {
+                frameHandled = true;
+                cleanupSocket();
+                LoggerService.instance.w(
+                  'Incoming sync connection failed',
+                  error: error,
+                  stackTrace: stackTrace,
+                );
+                socket.destroy();
+              }
+            },
+            onDone: () {
+              cleanupSocket();
+              if (!frameHandled) socket.destroy();
+            },
+            cancelOnError: true,
+          );
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          LoggerService.instance.e(
+            'Sync server connection failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        },
+      );
 
       _currentService = BonsoirService(
         name: _deviceName,
         type: _serviceType,
         port: _actualPort!,
-        attributes: <String, String>{if (_deviceId.isNotEmpty) 'did': _deviceId},
+        attributes: <String, String>{
+          if (_deviceId.isNotEmpty) 'did': _deviceId,
+        },
       );
       _broadcast = BonsoirBroadcast(service: _currentService!);
       await _broadcast!.ready;
       await _broadcast!.start();
       return true;
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Sync server failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Sync server failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }
@@ -224,14 +404,20 @@ class SyncService {
         name: _deviceName,
         type: _serviceType,
         port: _actualPort!,
-        attributes: <String, String>{if (_deviceId.isNotEmpty) 'did': _deviceId},
+        attributes: <String, String>{
+          if (_deviceId.isNotEmpty) 'did': _deviceId,
+        },
       );
       _broadcast = BonsoirBroadcast(service: _currentService!);
       await _broadcast!.ready;
       await _broadcast!.start();
       LoggerService.instance.i('Sync broadcast updated to $_deviceName');
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Failed to update sync broadcast', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Failed to update sync broadcast',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -265,29 +451,50 @@ class SyncService {
       await _discovery!.start();
       return true;
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Sync discovery failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Sync discovery failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }
 
-  Future<void> _handleIncomingData(List<int> data, TaskProvider provider) async {
+  Future<void> _handleIncomingData(
+    List<int> data,
+    TaskProvider provider,
+  ) async {
     try {
-      final result = await ExportImportService.importFromBytes(provider, data, expectedSecret: _secret);
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        data,
+        expectedSecret: _secret,
+      );
       if (result.success) {
-        LoggerService.instance.i('Merged sync data: ${result.tasksImported} tasks, ${result.foldersImported} folders');
-        _statusController.add('merged:${result.tasksImported}:${result.foldersImported}');
+        LoggerService.instance.i(
+          'Merged sync data: ${result.tasksImported} tasks, ${result.foldersImported} folders',
+        );
+        _statusController.add(
+          'merged:${result.tasksImported}:${result.foldersImported}',
+        );
       } else {
         _statusController.add('merge_failed:${result.error}');
       }
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Sync merge failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Sync merge failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
   void _addPeer(SyncPeer peer) {
     // Don't show our own device in the peers list.
     if (_isOwnPeer(peer)) return;
-    _peers.removeWhere((p) => p.name == peer.name && p.host == peer.host && p.port == peer.port);
+    _peers.removeWhere(
+      (p) => p.name == peer.name && p.host == peer.host && p.port == peer.port,
+    );
     _peers.add(peer);
     _peersController.add(List.unmodifiable(_peers));
   }
@@ -315,7 +522,11 @@ class SyncService {
           .map((addr) => addr.address)
           .toList();
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.w('Failed to load local network interfaces', error: error, stackTrace: stackTrace);
+      LoggerService.instance.w(
+        'Failed to load local network interfaces',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return [];
     }
   }

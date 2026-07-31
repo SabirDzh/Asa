@@ -12,6 +12,18 @@ import '../../../core/notification_service.dart';
 
 enum TaskFilter { all, active, completed, foldersOnly }
 
+class _PersistenceSnapshot {
+  final String tasksJson;
+  final String foldersJson;
+  final List<TaskItem> tasks;
+
+  const _PersistenceSnapshot({
+    required this.tasksJson,
+    required this.foldersJson,
+    required this.tasks,
+  });
+}
+
 class TaskProvider with ChangeNotifier {
   final _uuid = const Uuid();
   final List<TaskItem> _tasks = [];
@@ -73,7 +85,12 @@ class TaskProvider with ChangeNotifier {
   // ── Persistence methods ─────────────────────────────────────
   /// Serializes persistence writes so a slower earlier write cannot overwrite
   /// a newer mutation with an older snapshot.
-  Future<void> _saveToPrefs() {
+  Future<void> _saveToPrefs({bool waitForReady = true}) {
+    // Mutations are synchronous, so a call made during startup must capture
+    // its state only after initial data has been merged. Once initialized,
+    // capture immediately so queued writes retain their own coherent snapshot.
+    final capturedSnapshot =
+        !waitForReady || _initCompleter.isCompleted ? _snapshotState() : null;
     _saveQueue = _saveQueue
         .catchError((Object error, StackTrace stackTrace) {
           LoggerService.instance.e(
@@ -82,20 +99,30 @@ class TaskProvider with ChangeNotifier {
             stackTrace: stackTrace,
           );
         })
-        .then((_) => _writeToPrefs());
+        .then((_) async {
+          if (waitForReady) await ready;
+          await _writeToPrefs(capturedSnapshot ?? _snapshotState());
+        });
     return _saveQueue;
   }
 
-  Future<void> _writeToPrefs() async {
+  _PersistenceSnapshot _snapshotState() {
+    final tasks = List<TaskItem>.unmodifiable(_tasks);
+    return _PersistenceSnapshot(
+      tasksJson: jsonEncode(tasks.map((t) => t.toJson()).toList()),
+      foldersJson: jsonEncode(_folders.map((f) => f.toJson()).toList()),
+      tasks: tasks,
+    );
+  }
+
+  Future<void> _writeToPrefs(_PersistenceSnapshot snapshot) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final tasksJson = jsonEncode(_tasks.map((t) => t.toJson()).toList());
-      final foldersJson = jsonEncode(_folders.map((f) => f.toJson()).toList());
-      await prefs.setString('saved_tasks', tasksJson);
-      await prefs.setString('saved_folders', foldersJson);
+      await prefs.setString('saved_tasks', snapshot.tasksJson);
+      await prefs.setString('saved_folders', snapshot.foldersJson);
       HomeWidgetService.updateData(this);
       try {
-        await NotificationService.syncTasks(_tasks);
+        await NotificationService.syncTasks(snapshot.tasks);
       } on Object catch (error, stackTrace) {
         LoggerService.instance.w(
           'Task notification sync failed; data was saved',
@@ -121,13 +148,16 @@ class TaskProvider with ChangeNotifier {
 
       if (tasksStr != null && tasksStr.isNotEmpty) {
         final List decoded = jsonDecode(tasksStr);
-        _tasks.clear();
-        _tasks.addAll(decoded.map((e) => TaskItem.fromJson(e)));
+        for (final entry in decoded) {
+          final task = TaskItem.fromJson(entry);
+          if (!_tasks.any((existing) => existing.id == task.id)) {
+            _tasks.add(task);
+          }
+        }
       }
 
       if (foldersStr != null && foldersStr.isNotEmpty) {
         final List decoded = jsonDecode(foldersStr);
-        _folders.clear();
         for (final entry in decoded) {
           try {
             final folder = FolderItem.fromJson(entry);
@@ -140,7 +170,9 @@ class TaskProvider with ChangeNotifier {
             if (folder.parentFolderId == 'system_streak_folder') {
               folder.parentFolderId = null;
             }
-            _folders.add(folder);
+            if (!_folders.any((existing) => existing.id == folder.id)) {
+              _folders.add(folder);
+            }
           } catch (error, stackTrace) {
             LoggerService.instance.w(
               'Skipping malformed persisted folder',
@@ -211,7 +243,7 @@ class TaskProvider with ChangeNotifier {
       );
     }
     _foldersVersion++;
-    await _saveToPrefs();
+    unawaited(_saveToPrefs(waitForReady: false));
     notifyListeners();
   }
 
@@ -730,15 +762,20 @@ class TaskProvider with ChangeNotifier {
       return false;
     }
     final index = _folders.indexWhere((f) => f.id == folder.id);
+    if (index != -1 && !folder.updatedAt.isAfter(_folders[index].updatedAt)) {
+      return false;
+    }
+
+    final safeFolder =
+        _wouldCreateFolderCycle(folder.id, folder.parentFolderId)
+            ? folder.copyWith(parentFolderId: null)
+            : folder;
     if (index == -1) {
-      _folders.add(folder);
-      return true;
+      _folders.add(safeFolder);
+    } else {
+      _folders[index] = safeFolder;
     }
-    if (folder.updatedAt.isAfter(_folders[index].updatedAt)) {
-      _folders[index] = folder;
-      return true;
-    }
-    return false;
+    return true;
   }
 
   /// Notifies listeners and persists the current state. Called after bulk

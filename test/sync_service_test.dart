@@ -117,6 +117,18 @@ void main() {
       expect(SyncService.instance.actualPort, isNull);
     });
 
+    test('concurrent starts share one startup result', () async {
+      SyncService.instance.setProvider(provider);
+
+      final first = SyncService.instance.start();
+      final second = SyncService.instance.start();
+
+      expect(await first, true);
+      expect(await second, true);
+      expect(SyncService.instance.isRunning, true);
+      expect(SyncService.instance.actualPort, isNotNull);
+    });
+
     test('sendToPeer round-trips a payload to the local server', () async {
       provider.addTask('Local task');
       final receiver = TaskProvider();
@@ -135,6 +147,28 @@ void main() {
       await SyncService.instance.stop();
     });
 
+    test('server rejects oversized frames before importing data', () async {
+      final receiver = TaskProvider();
+      SyncService.instance.setProvider(receiver);
+      await SyncService.instance.start();
+
+      final port = SyncService.instance.actualPort!;
+      final socket = await Socket.connect('127.0.0.1', port);
+      const oversizedLength = 10 * 1024 * 1024 + 1;
+      socket.add(<int>[
+        (oversizedLength >> 24) & 0xFF,
+        (oversizedLength >> 16) & 0xFF,
+        (oversizedLength >> 8) & 0xFF,
+        oversizedLength & 0xFF,
+      ]);
+      await socket.flush();
+      await socket.close();
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(receiver.tasks, isEmpty);
+      await SyncService.instance.stop();
+    });
+
     test('server rejects payload with wrong secret', () async {
       provider.addTask('Secret task');
       final receiver = TaskProvider();
@@ -147,7 +181,10 @@ void main() {
       await SyncService.instance.start();
 
       final port = SyncService.instance.actualPort!;
-      final payload = ExportImportService.buildSyncPayload(provider, secret: 'wrong');
+      final payload = ExportImportService.buildSyncPayload(
+        provider,
+        secret: 'wrong',
+      );
       final socket = await Socket.connect('127.0.0.1', port);
       final length = payload.length;
       final frame = <int>[

@@ -9,7 +9,9 @@ class ThemeSwitcher {
     required BuildContext context,
     required VoidCallback onToggle,
   }) async {
-    final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    final boundary =
+        boundaryKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
     if (boundary == null) {
       onToggle();
       return;
@@ -56,7 +58,8 @@ class _ThemeTransitionOverlay extends StatefulWidget {
   _ThemeTransitionOverlayState createState() => _ThemeTransitionOverlayState();
 }
 
-class _ThemeTransitionOverlayState extends State<_ThemeTransitionOverlay> with SingleTickerProviderStateMixin {
+class _ThemeTransitionOverlayState extends State<_ThemeTransitionOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -83,14 +86,8 @@ class _ThemeTransitionOverlayState extends State<_ThemeTransitionOverlay> with S
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Opacity(
-            opacity: 1.0 - _controller.value,
-            child: child,
-          );
-        },
+      child: FadeTransition(
+        opacity: ReverseAnimation(_controller),
         child: RawImage(
           image: widget.image,
           fit: BoxFit.cover,

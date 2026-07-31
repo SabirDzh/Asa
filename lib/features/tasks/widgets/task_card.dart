@@ -370,6 +370,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
 
     final cardChild = Container(
       height: AppTheme.rowHeight,
@@ -400,6 +401,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                             : null,
                     decorationColor: textSecondary,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -435,10 +437,14 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                             top: AppTheme.rowPadV,
                             bottom: AppTheme.rowPadV,
                           ),
-                          child: Icon(
-                            Iconsax.more_square,
-                            color: textSecondary,
-                            size: 24,
+                          child: Semantics(
+                            button: true,
+                            label: settings.tr('more_options'),
+                            child: Icon(
+                              Iconsax.more_square,
+                              color: textSecondary,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
@@ -498,73 +504,79 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
 
     return LongPressDraggable<TaskItem>(
       data: widget.task,
-      feedback: Material(
-        color: Colors.transparent,
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width - 32,
-          child: Container(
-            height: AppTheme.rowHeight,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.navDark : AppColors.navLight,
-              borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.only(left: AppTheme.rowPadH),
-            child: Row(
-              children: [
-                Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
-                const SizedBox(width: AppTheme.rowGap),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: AppTheme.rowGap),
-                    child: Text(
-                      widget.task.title,
-                      style: TextStyle(
-                        color: textSecondary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
-                        decoration:
-                            widget.task.isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                        decorationColor: textSecondary,
+      feedback: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width - 32,
+            child: Container(
+              height: AppTheme.rowHeight,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.navDark : AppColors.navLight,
+                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.only(left: AppTheme.rowPadH),
+              child: Row(
+                children: [
+                  Icon(Iconsax.clipboard_tick, color: textSecondary, size: 24),
+                  const SizedBox(width: AppTheme.rowGap),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                      child: Text(
+                        widget.task.title,
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                          decoration:
+                              widget.task.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                          decorationColor: textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                if (!widget.task.isCompleted)
-                  Padding(
+                  if (!widget.task.isCompleted)
+                    Semantics(
+                      excludeSemantics: true,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          left: AppTheme.rowGap,
+                          right: AppTheme.rowGap,
+                          top: AppTheme.rowPadV,
+                          bottom: AppTheme.rowPadV,
+                        ),
+                        child: Icon(
+                          Iconsax.more_square,
+                          color: textSecondary,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  AnimatedTaskCheckbox(
+                    isCompleted: widget.task.isCompleted,
+                    onTap: () {},
+                    textSecondary: textSecondary,
                     padding: const EdgeInsets.only(
                       left: AppTheme.rowGap,
-                      right: AppTheme.rowGap,
+                      right: AppTheme.rowPadH,
                       top: AppTheme.rowPadV,
                       bottom: AppTheme.rowPadV,
                     ),
-                    child: Icon(
-                      Iconsax.more_square,
-                      color: textSecondary,
-                      size: 24,
-                    ),
                   ),
-                AnimatedTaskCheckbox(
-                  isCompleted: widget.task.isCompleted,
-                  onTap: () {},
-                  textSecondary: textSecondary,
-                  padding: const EdgeInsets.only(
-                    left: AppTheme.rowGap,
-                    right: AppTheme.rowPadH,
-                    top: AppTheme.rowPadV,
-                    bottom: AppTheme.rowPadV,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -631,47 +643,57 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _handleTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: widget.padding,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color:
-                  widget.isCompleted ? AppColors.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(
-                widget.isCompleted
-                    ? AppTheme.checkRadiusDone
-                    : AppTheme.checkRadius,
-              ),
-              border: Border.all(
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+
+    return Semantics(
+      button: true,
+      checked: widget.isCompleted,
+      label:
+          widget.isCompleted
+              ? settings.tr('status_completed')
+              : settings.tr('status_active'),
+      child: GestureDetector(
+        onTap: _handleTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: widget.padding,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
                 color:
-                    widget.isCompleted
-                        ? AppColors.primary
-                        : widget.textSecondary,
-                width: 2,
-              ),
-            ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder:
-                  (child, anim) => ScaleTransition(scale: anim, child: child),
-              child:
+                    widget.isCompleted ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(
                   widget.isCompleted
-                      ? const Icon(
-                        Icons.check,
-                        key: ValueKey('check'),
-                        color: Colors.white,
-                        size: 14,
-                      )
-                      : const SizedBox(key: ValueKey('empty')),
+                      ? AppTheme.checkRadiusDone
+                      : AppTheme.checkRadius,
+                ),
+                border: Border.all(
+                  color:
+                      widget.isCompleted
+                          ? AppColors.primary
+                          : widget.textSecondary,
+                  width: 2,
+                ),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder:
+                    (child, anim) => ScaleTransition(scale: anim, child: child),
+                child:
+                    widget.isCompleted
+                        ? const Icon(
+                          Icons.check,
+                          key: ValueKey('check'),
+                          color: Colors.white,
+                          size: 14,
+                        )
+                        : const SizedBox(key: ValueKey('empty')),
+              ),
             ),
           ),
         ),

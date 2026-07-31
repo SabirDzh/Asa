@@ -12,6 +12,7 @@ class AppStrings {
       'edit': 'Редактировать',
       'edit_task': 'Редактировать задачу',
       'edit_folder': 'Редактировать папку',
+      'more_options': 'Дополнительные действия',
       'delete_folder': 'Удалить папку',
       'delete_custom_value_title': 'Удалить пользовательское значение?',
       'delete_custom_value_content':
@@ -183,6 +184,7 @@ class AppStrings {
       'edit': 'Edit',
       'edit_task': 'Edit task',
       'edit_folder': 'Edit folder',
+      'more_options': 'More options',
       'delete_folder': 'Delete folder',
       'delete_custom_value_title': 'Delete custom value?',
       'delete_custom_value_content':

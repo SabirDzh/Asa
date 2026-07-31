@@ -57,7 +57,9 @@ class _FolderRowState extends State<FolderRow> {
             );
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+              ),
             );
           }
         }
@@ -122,28 +124,41 @@ class _FolderRowState extends State<FolderRow> {
     } else if (value == 'delete') {
       final isDark = Theme.of(iconContext).brightness == Brightness.dark;
       final bg = isDark ? AppColors.navDark : AppColors.navLight;
-      final text = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+      final text =
+          isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
       final confirmed = await showDialog<bool>(
         context: iconContext,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: bg,
-          title: Text(settings.tr('confirm_delete_title'), style: TextStyle(color: isDark ? AppColors.textDark : AppColors.textLight)),
-          content: Text(
-            settings.tr('confirm_delete_content'),
-            style: TextStyle(color: text),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(settings.tr('cancel'), style: TextStyle(color: text)),
+        builder:
+            (ctx) => AlertDialog(
+              backgroundColor: bg,
+              title: Text(
+                settings.tr('confirm_delete_title'),
+                style: TextStyle(
+                  color: isDark ? AppColors.textDark : AppColors.textLight,
+                ),
+              ),
+              content: Text(
+                settings.tr('confirm_delete_content'),
+                style: TextStyle(color: text),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(
+                    settings.tr('cancel'),
+                    style: TextStyle(color: text),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(
+                    settings.tr('delete'),
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(settings.tr('delete'), style: const TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
       );
 
       if (confirmed == true && iconContext.mounted) {
@@ -156,7 +171,8 @@ class _FolderRowState extends State<FolderRow> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     final rowChild = Material(
       key: _rowKey,
@@ -176,55 +192,71 @@ class _FolderRowState extends State<FolderRow> {
           duration: const Duration(milliseconds: 200),
           height: AppTheme.rowHeight,
           decoration: BoxDecoration(
-            color: _isDragHovered ? AppColors.primary.withValues(alpha: 0.25) : surface,
+            color:
+                _isDragHovered
+                    ? AppColors.primary.withValues(alpha: 0.25)
+                    : surface,
             borderRadius: BorderRadius.circular(AppTheme.pillRadius),
             border: Border.all(
               color: _isDragHovered ? AppColors.primary : Colors.transparent,
               width: 2,
             ),
           ),
-          padding: const EdgeInsets.only(
-            left: AppTheme.rowPadH,
-          ),
+          padding: const EdgeInsets.only(left: AppTheme.rowPadH),
           child: Row(
-          children: [
-            _folderIcon(textSecondary),
-            const SizedBox(width: AppTheme.rowGap),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: AppTheme.rowGap),
-                child: Text(
-                  widget.folder.name,
-                  style: TextStyle(
-                    color: textSecondary,
-                    fontSize: 16,
-                    fontWeight: widget.folder.isSystemStreak ? FontWeight.w600 : FontWeight.w400,
+            children: [
+              _folderIcon(textSecondary),
+              const SizedBox(width: AppTheme.rowGap),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                  child: Text(
+                    widget.folder.name,
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: 16,
+                      fontWeight:
+                          widget.folder.isSystemStreak
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-            if (!widget.folder.isSystemStreak)
-              Builder(
-                builder: (iconCtx) => GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _showPopupMenu(iconCtx),
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppTheme.rowGap,
-                      right: AppTheme.rowPadH,
-                      top: AppTheme.rowPadV,
-                      bottom: AppTheme.rowPadV,
-                    ),
-                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
-                  ),
-                ),
-              )
-            else
-              const SizedBox(width: AppTheme.rowPadH),
-          ],
+              if (!widget.folder.isSystemStreak)
+                Builder(
+                  builder:
+                      (iconCtx) => GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _showPopupMenu(iconCtx),
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            left: AppTheme.rowGap,
+                            right: AppTheme.rowPadH,
+                            top: AppTheme.rowPadV,
+                            bottom: AppTheme.rowPadV,
+                          ),
+                          child: Semantics(
+                            button: true,
+                            label: context.read<SettingsProvider>().tr(
+                              'more_options',
+                            ),
+                            child: Icon(
+                              Iconsax.more_square,
+                              color: textSecondary,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                )
+              else
+                const SizedBox(width: AppTheme.rowPadH),
+            ],
+          ),
         ),
-      ),
       ),
     );
 
@@ -248,7 +280,9 @@ class _FolderRowState extends State<FolderRow> {
           final settings = context.read<SettingsProvider>();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${settings.tr('task_moved')} ${widget.folder.name}'),
+              content: Text(
+                '${settings.tr('task_moved')} ${widget.folder.name}',
+              ),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -257,7 +291,9 @@ class _FolderRowState extends State<FolderRow> {
           final settings = context.read<SettingsProvider>();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${settings.tr('folder_moved')} ${widget.folder.name}'),
+              content: Text(
+                '${settings.tr('folder_moved')} ${widget.folder.name}',
+              ),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -272,76 +308,84 @@ class _FolderRowState extends State<FolderRow> {
 
     return LongPressDraggable<FolderItem>(
       data: widget.folder,
-      feedback: Material(
-        color: Colors.transparent,
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width - 32,
-          child: Container(
-            height: AppTheme.rowHeight,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.navDark : AppColors.navLight,
-              borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.only(
-              left: AppTheme.rowPadH,
-            ),
-            child: Row(
-              children: [
-                _dragIcon(textSecondary),
-                const SizedBox(width: AppTheme.rowGap),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: AppTheme.rowGap),
-                    child: Text(
-                      widget.folder.name,
-                      style: TextStyle(
-                        color: textSecondary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
+      feedback: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width - 32,
+            child: Container(
+              height: AppTheme.rowHeight,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.navDark : AppColors.navLight,
+                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.only(left: AppTheme.rowPadH),
+              child: Row(
+                children: [
+                  _dragIcon(textSecondary),
+                  const SizedBox(width: AppTheme.rowGap),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: AppTheme.rowGap),
+                      child: Text(
+                        widget.folder.name,
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                if (!widget.folder.isSystemStreak)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppTheme.rowGap,
-                      right: AppTheme.rowPadH,
-                      top: AppTheme.rowPadV,
-                      bottom: AppTheme.rowPadV,
-                    ),
-                    child: Icon(Iconsax.more_square, color: textSecondary, size: 24),
-                  )
-                else
-                  const SizedBox(width: AppTheme.rowPadH),
-              ],
+                  if (!widget.folder.isSystemStreak)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: AppTheme.rowGap,
+                        right: AppTheme.rowPadH,
+                        top: AppTheme.rowPadV,
+                        bottom: AppTheme.rowPadV,
+                      ),
+                      child: Semantics(
+                        excludeSemantics: true,
+                        child: Icon(
+                          Iconsax.more_square,
+                          color: textSecondary,
+                          size: 24,
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: AppTheme.rowPadH),
+                ],
+              ),
             ),
           ),
         ),
       ),
-      childWhenDragging: Opacity(
-        opacity: 0.3,
-        child: dragTargetChild,
-      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: dragTargetChild),
       child: dragTargetChild,
     );
   }
 
-  Widget _dragIcon(Color textSecondary) => _buildFolderIcon(color: textSecondary);
+  Widget _dragIcon(Color textSecondary) =>
+      _buildFolderIcon(color: textSecondary);
 
-  Widget _folderIcon(Color textSecondary) =>
-      _buildFolderIcon(color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary);
+  Widget _folderIcon(Color textSecondary) => _buildFolderIcon(
+    color: widget.folder.isSystemStreak ? AppColors.primary : textSecondary,
+  );
 
   Widget _buildFolderIcon({required Color color}) {
-    if (widget.folder.iconAsset != null && widget.folder.iconAsset!.isNotEmpty) {
+    if (widget.folder.iconAsset != null &&
+        widget.folder.iconAsset!.isNotEmpty) {
       return SvgPicture.asset(
         widget.folder.iconAsset!,
         width: 24,

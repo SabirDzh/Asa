@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/calendar_service.dart';
 import '../../../core/home_widget_service.dart';
+import '../../../core/logger_service.dart';
 
 enum TaskFilter { all, active, completed, foldersOnly }
 
@@ -15,6 +16,7 @@ class TaskProvider with ChangeNotifier {
   final List<TaskItem> _tasks = [];
   final List<FolderItem> _folders = [];
   final _initCompleter = Completer<void>();
+  Future<void> _saveQueue = Future<void>.value();
 
   String _searchQuery = '';
   TaskFilter _filter = TaskFilter.all;
@@ -66,7 +68,22 @@ class TaskProvider with ChangeNotifier {
   }
 
   // ── Persistence methods ─────────────────────────────────────
-  Future<void> _saveToPrefs() async {
+  /// Serializes persistence writes so a slower earlier write cannot overwrite
+  /// a newer mutation with an older snapshot.
+  Future<void> _saveToPrefs() {
+    _saveQueue = _saveQueue
+        .catchError((Object error, StackTrace stackTrace) {
+          LoggerService.instance.e(
+            'Previous task persistence failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        })
+        .then((_) => _writeToPrefs());
+    return _saveQueue;
+  }
+
+  Future<void> _writeToPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final tasksJson = jsonEncode(_tasks.map((t) => t.toJson()).toList());
@@ -74,7 +91,14 @@ class TaskProvider with ChangeNotifier {
       await prefs.setString('saved_tasks', tasksJson);
       await prefs.setString('saved_folders', foldersJson);
       HomeWidgetService.updateData(this);
-    } catch (_) {}
+    } on Exception catch (error, stackTrace) {
+      LoggerService.instance.e(
+        'Task persistence failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
   }
 
   Future<void> _loadFromPrefs() async {
@@ -224,13 +248,38 @@ class TaskProvider with ChangeNotifier {
 
   void moveFolderToFolder(String folderId, String? targetParentFolderId) {
     if (folderId == targetParentFolderId) return;
+    if (targetParentFolderId != null &&
+        !_folders.any((f) => f.id == targetParentFolderId && !f.isDeleted)) {
+      return;
+    }
+    if (_wouldCreateFolderCycle(folderId, targetParentFolderId)) return;
+
     final index = _folders.indexWhere((f) => f.id == folderId);
-    if (index != -1 && !_folders[index].isSystemStreak) {
-      _folders[index] = _folders[index].copyWith(parentFolderId: targetParentFolderId, updatedAt: DateTime.now());
+    if (index != -1 && !_folders[index].isDeleted && !_folders[index].isSystemStreak) {
+      _folders[index] = _folders[index].copyWith(
+        parentFolderId: targetParentFolderId,
+        updatedAt: DateTime.now(),
+      );
       _foldersVersion++;
       notifyListeners();
       _saveToPrefs();
     }
+  }
+
+  /// Returns true when [targetParentFolderId] is [folderId] or one of its
+  /// descendants. A visited set also prevents malformed legacy data from
+  /// causing an infinite walk while validating a move.
+  bool _wouldCreateFolderCycle(String folderId, String? targetParentFolderId) {
+    var currentId = targetParentFolderId;
+    final visited = <String>{};
+    while (currentId != null) {
+      if (currentId == folderId) return true;
+      if (!visited.add(currentId)) return true;
+      final index = _folders.indexWhere((f) => f.id == currentId);
+      if (index == -1) return false;
+      currentId = _folders[index].parentFolderId;
+    }
+    return false;
   }
 
   void _reorderFoldersByParent(String? parentFolderId, int oldIndex, int newIndex) {
@@ -269,7 +318,9 @@ class TaskProvider with ChangeNotifier {
   }
 
   void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {
-    final folderTasks = _tasks.where((t) => t.folderId == folderId).toList();
+    final folderTasks = _tasks
+        .where((t) => t.folderId == folderId && !t.isDeleted)
+        .toList();
     if (oldIndex < 0 ||
         newIndex < 0 ||
         oldIndex >= folderTasks.length ||
@@ -358,9 +409,13 @@ class TaskProvider with ChangeNotifier {
       _tasks[index] = task.copyWith(isDeleted: true, updatedAt: DateTime.now());
       notifyListeners();
       _saveToPrefs();
-      if (task.calendarId != null && task.calendarEventId != null) {
-        CalendarService.deleteEvent(task.calendarId!, task.calendarEventId!).catchError((_) {});
-      }
+      _removeTaskCalendarEvent(task);
+    }
+  }
+
+  void _removeTaskCalendarEvent(TaskItem task) {
+    if (task.calendarId != null && task.calendarEventId != null) {
+      CalendarService.deleteEvent(task.calendarId!, task.calendarEventId!).catchError((_) {});
     }
   }
 
@@ -497,6 +552,10 @@ class TaskProvider with ChangeNotifier {
     if (name.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
+    if (parentFolderId != null &&
+        !_folders.any((f) => f.id == parentFolderId && !f.isDeleted)) {
+      return;
+    }
     _folders.add(
       FolderItem(id: _uuid.v4(), name: name, parentFolderId: parentFolderId, iconAsset: iconAsset, updatedAt: DateTime.now()),
     );
@@ -550,27 +609,41 @@ class TaskProvider with ChangeNotifier {
   }
 
   void removeFolder(String id) {
+    final changed = _removeFolderTree(id, DateTime.now(), <String>{});
+    if (!changed) return;
+
+    _foldersVersion++;
+    notifyListeners();
+    _saveToPrefs();
+  }
+
+  bool _removeFolderTree(String id, DateTime updatedAt, Set<String> visited) {
+    if (!visited.add(id)) return false;
+
     final index = _folders.indexWhere((f) => f.id == id);
-    if (index != -1 && !_folders[index].isSystemStreak) {
-      final now = DateTime.now();
-      final childFolders =
-          _folders
-              .where((f) => f.parentFolderId == id)
-              .map((f) => f.id)
-              .toList();
-      for (final childId in childFolders) {
-        removeFolder(childId);
-      }
-      _folders[index] = _folders[index].copyWith(isDeleted: true, updatedAt: now);
-      for (var i = 0; i < _tasks.length; i++) {
-        if (_tasks[i].folderId == id) {
-          _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);
-        }
-      }
-      _foldersVersion++;
-      notifyListeners();
-      _saveToPrefs();
+    if (index == -1 || _folders[index].isDeleted || _folders[index].isSystemStreak) {
+      return false;
     }
+
+    var changed = false;
+    final childIds = _folders
+        .where((f) => f.parentFolderId == id)
+        .map((f) => f.id)
+        .toList();
+    for (final childId in childIds) {
+      changed = _removeFolderTree(childId, updatedAt, visited) || changed;
+    }
+
+    _folders[index] = _folders[index].copyWith(isDeleted: true, updatedAt: updatedAt);
+    changed = true;
+    for (var i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].folderId == id && !_tasks[i].isDeleted) {
+        final task = _tasks[i];
+        _tasks[i] = task.copyWith(isDeleted: true, updatedAt: updatedAt);
+        _removeTaskCalendarEvent(task);
+      }
+    }
+    return changed;
   }
 
   void clearAllTasks() {
@@ -583,8 +656,19 @@ class TaskProvider with ChangeNotifier {
   }
 
   void clearAllFolders() {
-    _folders.removeWhere((f) => !f.isSystemStreak);
-    _tasks.removeWhere((t) => t.folderId != null);
+    final now = DateTime.now();
+    for (var i = 0; i < _folders.length; i++) {
+      if (!_folders[i].isSystemStreak && !_folders[i].isDeleted) {
+        _folders[i] = _folders[i].copyWith(isDeleted: true, updatedAt: now);
+      }
+    }
+    for (var i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].folderId != null && !_tasks[i].isDeleted) {
+        final task = _tasks[i];
+        _tasks[i] = task.copyWith(isDeleted: true, updatedAt: now);
+        _removeTaskCalendarEvent(task);
+      }
+    }
     _foldersVersion++;
     notifyListeners();
     _saveToPrefs();

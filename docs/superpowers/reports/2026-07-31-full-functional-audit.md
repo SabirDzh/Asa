@@ -1,0 +1,74 @@
+# ASA Full Functional Audit Report
+
+**Date:** 2026-07-31
+**Branch:** `fix/review-remediation`
+**APK under test:** `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
+**Initial APK SHA-256:** `b89b228708e853216c11a1b331666f240a3517e4fe47d7a804894bc61fbc994a`
+**Initial APK size:** 21.8 MB
+**Initial APK evidence:** APK Signature Scheme v2 verified; native libraries contain only `arm64-v8a`.
+**Audit baseline commit:** `b62146f`
+
+## Result vocabulary
+
+- **PASS:** behavior observed and assertion/evidence completed.
+- **FAIL-fixed:** reproducible defect fixed with regression coverage.
+- **BLOCKED:** required external device, permission, platform, or test harness is unavailable; the exact limitation is recorded.
+- **NOT APPLICABLE:** feature is intentionally unavailable on the tested platform and its fallback is documented.
+
+## Functional matrix
+
+| Function | Valid cases | Invalid/boundary cases | Cancel/permission cases | Lifecycle/offline cases | Automated evidence | Device evidence | Result | Defect/commit |
+|---|---|---|---|---|---|---|---|---|
+| Task/folder CRUD, search, filters, ordering | Covered by existing provider/model tests; detailed audit is Task 2 | Covered in existing provider/model tests; detailed audit is Task 2 | Detailed audit is Task 2 | Detailed audit is Task 2 | Baseline group passed: 153 tests | Android device not connected | PARTIAL — Task 2 pending | — |
+| Task editor, information blocks, attachments, time, manual timer | Existing focused tests present; detailed audit is Task 3 | Existing focused tests present; detailed audit is Task 3 | Detailed audit is Task 3 | Detailed audit is Task 3 | Baseline group passed; widget editor group blocked | Android device not connected | PARTIAL — Task 3 pending | — |
+| Settings, theme, language, scale, notifications, avatar | Existing provider/service tests present; detailed audit is Task 4 | Detailed audit is Task 4 | Detailed audit is Task 4 | Detailed audit is Task 4 | Baseline group passed | Android device not connected | PARTIAL — Task 4 pending | — |
+| Export/import, sync, logging, calendar, external integrations | Existing service tests present; detailed audit is Task 5 | Existing service tests present; detailed audit is Task 5 | Detailed audit is Task 5 | Detailed audit is Task 5 | Baseline group passed | Android device not connected | PARTIAL — Task 5 pending | — |
+| Android notifications, widgets, calendar, picker, APK install | Not run | Not run | Not run | Not run | Native device evidence pending | `adb devices -l`: no devices | BLOCKED | — |
+
+## Automated command evidence
+
+### Repository baseline
+
+- Branch: `fix/review-remediation`.
+- Baseline commit: `b62146f fix: clarify task timing and notification flow`.
+- `dart format --output=none --set-exit-if-changed .` — **PASS**; 70 files checked, 0 changed.
+- `dart analyze` — **PASS**; `No issues found!`.
+- `flutter pub deps --style=compact` — **PASS**; project `asa 1.1.0+2`, Flutter 3.44.8, Dart 3.12.2.
+- `adb devices -l` — **BLOCKED** for device verification; no Android devices connected.
+- `flutter devices` — macOS desktop and Chrome web available; no Android device.
+
+### Isolated test groups
+
+- Command: `flutter test --no-pub test/input_utils_test.dart test/task_model_test.dart test/task_provider_test.dart test/settings_provider_test.dart test/export_import_service_test.dart test/sync_service_test.dart test/notification_service_test.dart test/image_utils_test.dart test/task_attachment_service_test.dart test/logger_service_test.dart test/home_widget_service_test.dart -r compact`
+- Result: **PASS**, 153 tests passed, exit code 0.
+- Command: `perl -e 'alarm 300; exec @ARGV' -- flutter test --no-pub test/task_editor_sheet_test.dart -r compact`
+- Result: **BLOCKED**, timed out after 300 seconds, exit code 142 (`Alarm clock`).
+- Command: `perl -e 'alarm 300; exec @ARGV' -- flutter test --no-pub test/task_folder_popup_menu_test.dart -r compact`
+- Result: **BLOCKED**, timed out after 300 seconds, exit code 142 (`Alarm clock`).
+
+The widget-test timeouts are not reported as passes and do not invalidate the independent 153-test result.
+
+## Android device evidence
+
+No Android device was connected during Task 1. The following real-device scenarios remain blocked until an Android device is available:
+
+- APK install and launch through ADB.
+- Runtime notification permission and exact-alarm behavior.
+- Delivery timing of scheduled notifications and `start_timer` action.
+- Home-screen widget rendering and refresh.
+- Calendar permission, event creation/update/deletion.
+- Native image/file picker and attachment opening.
+- Avatar picker/compression on Android.
+- TalkBack and large-text verification.
+- LAN/mDNS sync between physical devices.
+
+## Fixed defects
+
+No production defect was fixed during Task 1. The task established baseline evidence and documented existing test/device limitations.
+
+## Blocked scenarios and unresolved risks
+
+- Android real-device matrix is blocked by the absence of an ADB-connected Android device.
+- `task_editor_sheet_test.dart` and `task_folder_popup_menu_test.dart` each hang after test startup in the current widget harness and require separate harness diagnosis.
+- Passing unit/service tests do not prove native notification delivery, calendar operations, widget rendering, picker behavior, or external URL/file opening.
+- Exact-alarm denial may cause Android notification fallback to be inexact; this must be measured on-device rather than inferred from unit tests.

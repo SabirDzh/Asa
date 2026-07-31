@@ -1,12 +1,43 @@
 # Full Standards Review and Remediation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or **superpowers:executing-plans** to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or **superpowers:executing-plans** to implement this plan task-by-task. Steps use checkbox (`- [x]`/`- [ ]`) syntax for tracking.
 
 **Goal:** Audit and harden ASA against confirmed correctness, security, performance, accessibility, platform, testing, and release-quality risks, while preserving current product behavior and documenting anything that cannot be verified locally.
 
 **Architecture:** Keep the existing Flutter feature-first structure and Provider + ChangeNotifier design. Remediation is layered by risk: first make static analysis and data/input boundaries reliable, then harden LAN sync and diagnostics, then verify platform integrations and improve measured UI/performance issues. Avoid broad rewrites; every change must have a focused regression test or an explicit platform-build verification.
 
 **Tech Stack:** Flutter 3.44.8, Dart 3.12.2, Dart SDK ^3.7.2, Provider, SharedPreferences, file_picker, path_provider, crypto/HMAC, bonsoir/TCP sockets, flutter_local_notifications, home_widget, image_picker, flutter_image_compress, device_calendar, Flutter test, Gradle/Kotlin, Xcode project files.
+
+## Completion status and evidence — 2026-07-31
+
+The remediation implementation is complete and independently reviewed. The repository is not claimed as fully green on every platform gate because environment/tooling limitations remain documented below. In the checklists, `[x]` means the implementation or evidence is complete; an unchecked step with a `Blocked` note is intentionally unresolved.
+
+| Area | Status | Evidence |
+|---|---|---|
+| Static analysis | **Passed** | `dart analyze` → `No issues found!`; `422d567` |
+| Repository formatting | **Passed** | `dart format --output=none --set-exit-if-changed .`; formatting-only `3427d11` |
+| Import/avatar boundaries | **Passed** | `6e76e3d`; focused parser/image tests included in the 144-test non-widget suite |
+| Persistence/sync/diagnostics | **Passed** | `3e337b4`, `08c86f2`, `f959f22`, `2dd1116`; 144 focused non-widget tests passed |
+| Notification/widgets | **Passed** | `e9659b5`; notification/widget contracts and Android gate passed |
+| Android native gate | **Passed** | `:app:processDebugResources :app:compileDebugKotlin --no-daemon` → `BUILD SUCCESSFUL` |
+| Android arm64 release | **Passed** | `flutter build apk --target-platform android-arm64 --split-per-abi --release`; `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (~21.6 MB) |
+| Web build | **Partial** | `flutter build web --no-tree-shake-icons` passed; ordinary build remains blocked by Flutter `IconTreeShakerException` |
+| Non-widget tests | **Passed** | 144 tests passed across model, parser, provider, sync, export/import, notification, image, settings, logger, and widget-service suites |
+| Widget/full test suite | **Blocked** | `home_screen_test` first test passes; `folder_detail_screen_test` and `task_folder_popup_menu_test` hang after test start, so full `flutter test` is not claimed |
+| Physical-device/platform matrix | **Not verified** | Android/iOS attachment, notification, widget, calendar, TalkBack/VoiceOver, 1.5x text scale, LAN discovery, and desktop/iOS builds require device/toolchain verification |
+
+### Standards remediation commit range
+
+`422d567`, `6e76e3d`, `3e337b4`, `2dd1116`, `e9659b5`, `2250954`, `614aa05`, `94087c5`, `08c86f2`, `1eff7fe`, `e653dab`, `c7b7333`, `f959f22`, and the formatting gate `3427d11`.
+
+The later task-information commits are separate product work: `00676a3`, `a74254c`, `0e568ad`, `7ddb155`, `71d33e7`.
+
+### Final review limitations
+
+* Ordinary web icon tree-shaking is an upstream/tooling failure involving the icons font; the no-tree-shaking build is a diagnostic workaround, not a replacement for the ordinary release gate.
+* Widget tests hang without producing a Flutter assertion or stack trace. They are recorded as unresolved test-harness/platform behavior, not silently marked passed.
+* `SharedPreferences` remains unencrypted; sync secrets must be migrated to platform secure storage before being treated as high-value credentials.
+* No physical-device behavior is claimed as verified.
 
 ## Global Constraints
 
@@ -47,7 +78,7 @@
 - Consumes: existing `flutter_lints/flutter.yaml` configuration.
 - Produces: a repository-wide static-analysis gate that reports no issues and does not silently downgrade diagnostics.
 
-- [ ] **Step 1: Reproduce the current analyzer finding**
+- [x] **Step 1: Reproduce the current analyzer finding**
 
 Run:
 
@@ -57,11 +88,11 @@ dart analyze
 
 Expected before the fix: one `unnecessary_import` issue in `test/input_utils_test.dart`.
 
-- [ ] **Step 2: Remove only the unused test import**
+- [x] **Step 2: Remove only the unused test import**
 
 Delete the import that analyzer identifies as unused; keep all imports required by the test and do not broaden the test change.
 
-- [ ] **Step 3: Keep the baseline analyzer gate bounded**
+- [x] **Step 3: Keep the baseline analyzer gate bounded**
 
 Update `analysis_options.yaml` so it retains the Flutter defaults and makes the confirmed unused-import diagnostic fail the gate without starting an unbounded migration:
 
@@ -78,7 +109,7 @@ linter:
 
 Do not add global `strict-casts`, `strict-inference`, `strict-raw-types`, `unawaited_futures`, or `use_build_context_synchronously` enforcement in this baseline task. The baseline run identified existing violations for those rules; later tasks will fix concrete violations and can enable each rule only after its scope is clean. Never silence those diagnostics with global ignores.
 
-- [ ] **Step 4: Run the quality gate**
+- [x] **Step 4: Run the quality gate**
 
 Run:
 
@@ -90,7 +121,7 @@ flutter test test/input_utils_test.dart
 
 Expected: the focused formatter check for the changed files exits 0, analyzer reports `No issues found!`, and the focused test passes. A repository-wide formatter migration is tracked separately and must not be hidden in this task’s commit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add analysis_options.yaml test/input_utils_test.dart
@@ -114,7 +145,7 @@ git commit -m "chore: enforce project analyzer quality gate"
 - Consumes: `ExportImportService.previewImport`, `importFromBytes`, `FilePicker.platform.pickFiles`, `detectImageFormat`, and existing avatar persistence.
 - Produces: bounded parsing that validates actual byte length, rejects malformed JSON shapes before casts, and stores only verified/size-bounded avatar files.
 
-- [ ] **Step 1: Add failing parser tests for byte-size and map-shape validation**
+- [x] **Step 1: Add failing parser tests for byte-size and map-shape validation**
 
 Add tests that assert:
 
@@ -148,7 +179,7 @@ test('rejects task entries that are not JSON objects', () {
 
 Use the test file’s existing helpers and keep the large input bounded to one case.
 
-- [ ] **Step 2: Run the focused tests and verify they fail**
+- [x] **Step 2: Run the focused tests and verify they fail**
 
 Run:
 
@@ -158,23 +189,23 @@ flutter test test/export_import_service_test.dart
 
 Expected: the new tests fail because validation currently trusts the caller-provided `fileSize` and `AsaDataSnapshot.fromJson` uses unchecked list casts.
 
-- [ ] **Step 3: Implement safe byte and JSON-shape validation**
+- [x] **Step 3: Implement safe byte and JSON-shape validation**
 
 In `previewImport`, calculate `actualSize = bytes.length` and reject when `actualSize > _kMaxImportFileSize`; use `actualSize` in the returned preview where the byte buffer is authoritative. Before constructing `AsaDataSnapshot`, verify every task/folder entry is a `Map<String, dynamic>` (convert `Map` entries with `Map<String, dynamic>.from` only after checking the key/value shape). Return `error_invalid_lists` instead of allowing a `TypeError`.
 
 In `pickImportFile`, reject a selected `PlatformFile` when `file.size > _kMaxImportFileSize` before retaining/processing bytes. Continue using `withData: true` for web compatibility and do not use an absolute path as the only source of bytes.
 
-- [ ] **Step 4: Add avatar size and lifecycle regression tests**
+- [x] **Step 4: Add avatar size and lifecycle regression tests**
 
 Also preserve the provider rollback contract: if `SettingsProvider.setAvatarPath` cannot persist the new path, it must restore the previous in-memory path before rethrowing.
 
 Add `readValidatedImageBytes(String path, {int maxBytes = kMaxAvatarFileSize})` to `lib/core/image_utils.dart`. It must return `null` when the file is missing, larger than `maxBytes`, or unreadable, and otherwise return the bytes. Add tests that create a temporary valid image-signature file, assert accepted bytes are returned, and assert an oversized file returns `null`. Keep the existing `detectImageFormat` signature checks.
 
-- [ ] **Step 5: Implement bounded avatar copying**
+- [x] **Step 5: Implement bounded avatar copying**
 
 In `avatar_section.dart`, use `readValidatedImageBytes(pickedFile.path)` after format detection and before writing the destination. If it returns `null`, show the localized invalid/oversized-avatar message and return. For GIF, write the validated bytes directly; for other formats, retain `FlutterImageCompress.compressAndGetFile` but first reject the source through the helper. Preserve deletion of the previous avatar only after the new file is successfully written and `setAvatarPath` has completed.
 
-- [ ] **Step 6: Run focused validation**
+- [x] **Step 6: Run focused validation**
 
 Run:
 
@@ -186,7 +217,7 @@ flutter test test/export_import_service_test.dart test/image_utils_test.dart
 
 Expected: analyzer clean and all focused tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart lib/features/settings/providers/settings_provider.dart test/export_import_service_test.dart test/image_utils_test.dart
@@ -209,11 +240,11 @@ git commit -m "fix: harden import and avatar file boundaries"
 - Consumes: `TaskProvider._saveToPrefs`, `TaskProvider.persist`, `SyncService.start/stop/sendToPeer`, `ExportImportService.buildSyncPayload/importFromBytes`.
 - Produces: serialized persistence writes, deterministic cleanup on sync failure/stop, bounded frame handling, and logs that do not include shared secrets or raw task payloads.
 
-- [ ] **Step 1: Add regression tests for malformed frames and concurrent persistence**
+- [x] **Step 1: Add regression tests for malformed frames and concurrent persistence**
 
 Add a sync-service test that starts the existing loopback server, writes a four-byte big-endian length of `10 * 1024 * 1024 + 1`, closes the socket, and asserts no task is imported. Add a provider persistence test that performs two mutations without awaiting the first persistence call, awaits `provider.persist()`, then reads `saved_tasks` and asserts the JSON contains the second mutation and not an older-only snapshot. Use only `127.0.0.1`; do not open external network connections.
 
-- [ ] **Step 2: Inspect current failures/data flow before editing**
+- [x] **Step 2: Inspect current failures/data flow before editing**
 
 Run:
 
@@ -223,11 +254,11 @@ flutter test test/task_provider_test.dart test/sync_service_test.dart
 
 Record whether the new tests fail for frame parsing, persistence ordering, or both.
 
-- [ ] **Step 3: Serialize provider persistence**
+- [x] **Step 3: Serialize provider persistence**
 
 Add a private `Future<void> _persistQueue = Future<void>.value();` and enqueue JSON writes so each write captures a coherent snapshot and executes after the prior write. Preserve synchronous in-memory mutation and listener notification. Log a generic persistence failure with operation context, but never log full task JSON or secrets.
 
-- [ ] **Step 4: Harden sync connection lifecycle**
+- [x] **Step 4: Harden sync connection lifecycle**
 
 In `sync_service.dart`:
 
@@ -240,7 +271,7 @@ In `sync_service.dart`:
 
 Do not expose `_secret`, payload contents, or raw socket data in logs.
 
-- [ ] **Step 5: Run focused validation**
+- [x] **Step 5: Run focused validation**
 
 Run:
 
@@ -252,7 +283,7 @@ flutter test test/task_provider_test.dart test/sync_service_test.dart
 
 Expected: analyzer clean and provider/sync tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/features/tasks/providers/task_provider.dart lib/core/sync_service.dart lib/core/logger_service.dart test/task_provider_test.dart test/sync_service_test.dart
@@ -274,7 +305,7 @@ git commit -m "fix: serialize persistence and harden local sync"
 - Consumes: compile-time Telegram configuration, `syncSecret`, settings persistence, and sync UI.
 - Produces: secret-safe diagnostics and a clear policy for local shared-secret storage, with no secret values in messages or exported/logged payloads.
 
-- [ ] **Step 1: Add failing redaction tests**
+- [x] **Step 1: Add failing redaction tests**
 
 Add tests around a pure redaction helper or observable log output:
 
@@ -287,15 +318,15 @@ test('redacts configured sync secret from diagnostic text', () {
 
 Also verify sync status/log messages do not contain the payload or configured secret.
 
-- [ ] **Step 2: Implement centralized redaction**
+- [x] **Step 2: Implement centralized redaction**
 
 Add a small `LoggerService.redactSensitive(String message, Iterable<String> secrets)` helper that replaces non-empty secrets with `[REDACTED]`. Apply it at log-entry creation and before Telegram upload. Keep URLs, task counts, IDs, and generic error keys; remove raw exception text from user-facing error strings where it can expose file paths or network data.
 
-- [ ] **Step 3: Review secret persistence and document the limitation**
+- [x] **Step 3: Review secret persistence and document the limitation**
 
 If the current product requires sync secrets to survive restart, keep the existing preference key only if no secure-storage dependency is already present; otherwise do not introduce a new dependency without a separate decision. Add a developer-documentation note that `SharedPreferences` is not encrypted and that production builds should migrate sync secrets to platform secure storage before treating them as high-value credentials.
 
-- [ ] **Step 4: Run focused validation**
+- [x] **Step 4: Run focused validation**
 
 Run:
 
@@ -307,7 +338,7 @@ flutter test test/settings_provider_test.dart test/sync_service_test.dart
 
 Expected: analyzer clean and focused tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/core/logger_service.dart lib/features/settings/providers/settings_provider.dart lib/features/settings/widgets/sync_bottom_sheet.dart test/settings_provider_test.dart test/sync_service_test.dart docs/DEVELOPER.md
@@ -334,11 +365,11 @@ git commit -m "fix: redact secrets from diagnostics"
 - Consumes: current notification scheduling/action contract and native widget data keys.
 - Produces: explicit channel/permission/resource declarations and platform-safe notification behavior without changing the period-start timer action.
 
-- [ ] **Step 1: Add contract tests for notification behavior**
+- [x] **Step 1: Add contract tests for notification behavior**
 
 Extend `test/notification_service_test.dart` with pure tests for stable task IDs, next occurrence behavior, complete-period eligibility, and payload parsing. Assert that web/unsupported platforms do not attempt native scheduling through the existing guards.
 
-- [ ] **Step 2: Inspect native resource constraints**
+- [x] **Step 2: Inspect native resource constraints**
 
 Run:
 
@@ -348,13 +379,13 @@ Run:
 
 Inspect all widget XML `minWidth`, `minHeight`, resize modes, text truncation, and plural resources. Record any mismatch between the Dart `HomeWidgetService` keys and Kotlin providers before changing them.
 
-- [ ] **Step 3: Implement only confirmed platform fixes**
+- [x] **Step 3: Implement only confirmed platform fixes**
 
 Ensure notification channel names/descriptions are localized through Android resources where the plugin supports it, runtime permission requests remain contextual, and scheduled task notifications preserve an `AndroidNotificationAction` whose action id is `_startTimerActionId` (`'start_timer'`), whose label is `_tr('Запустить таймер', 'Start timer')`, and whose `showsUserInterface` is `true`.
 
 Ensure each widget provider has safe fallback content, content descriptions, bounded text, and resize metadata that matches its layout. Do not add broad permissions unless a feature uses them; remove any permission proven unused by code and platform documentation.
 
-- [ ] **Step 4: Run platform checks**
+- [x] **Step 4: Run platform checks**
 
 Run:
 
@@ -366,7 +397,7 @@ dart analyze lib/core/notification_service.dart test/notification_service_test.d
 
 Expected: all commands exit 0. If a physical-device-only behavior cannot be tested, record the exact manual test matrix in `docs/DEVELOPER.md` rather than claiming it verified.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/core/notification_service.dart android ios/Runner/Info.plist test/notification_service_test.dart docs/DEVELOPER.md
@@ -392,7 +423,7 @@ git commit -m "fix: verify notification and widget platform contracts"
 - Consumes: existing row/card widgets, theme transition overlay, Provider selectors, and avatar path.
 - Produces: stable semantics/tap targets, bounded image decoding, and narrower rebuild/animation work while preserving visual behavior.
 
-- [ ] **Step 1: Add failing accessibility/widget tests**
+- [x] **Step 1: Add failing accessibility/widget tests**
 
 Add tests that pump representative task/folder rows and assert:
 
@@ -404,11 +435,11 @@ expect(tester.getSize(find.byTooltip('Paste')).width, greaterThanOrEqualTo(48));
 
 Use the project’s actual keys/tooltips and add keys only where a stable test locator is missing.
 
-- [ ] **Step 2: Verify behavior at large text scale**
+- [ ] **Step 2: Verify behavior at large text scale — Blocked: 1.5x widget verification is not available in the current harness.**
 
 Run the affected widget tests with a `MediaQuery` using `textScaler: const TextScaler.linear(1.5)` and confirm no overflow exceptions. Add a regression test for long task/folder names and custom settings text.
 
-- [ ] **Step 3: Implement narrow performance/accessibility fixes**
+- [x] **Step 3: Implement narrow performance/accessibility fixes**
 
 - Use `FadeTransition`/`AnimatedOpacity` only where it avoids an unnecessary `Opacity` save layer, preserving the existing animation controllers.
 - Add `cacheWidth`/`cacheHeight` based on the displayed avatar size before constructing `FileImage`.
@@ -418,7 +449,7 @@ Run the affected widget tests with a `MediaQuery` using `textScaler: const TextS
 
 Do not remove the theme transition boundary or redesign all fixed-height rows without a failing test or profile evidence.
 
-- [ ] **Step 4: Run focused validation**
+- [ ] **Step 4: Run focused validation — Blocked: `folder_detail_screen_test.dart` and `task_folder_popup_menu_test.dart` hang after startup; analyzer and formatting pass, but no overflow-free widget run can be claimed.**
 
 Run:
 
@@ -430,7 +461,7 @@ flutter test test/home_screen_test.dart test/folder_detail_screen_test.dart
 
 Expected: no analyzer issues, no overflow exceptions, and focused tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/main.dart lib/core/theme_switcher.dart lib/features/tasks/widgets/task_card.dart lib/features/tasks/widgets/folder_card.dart lib/features/tasks/screens/folder_detail_screen.dart lib/features/settings/widgets/avatar_section.dart test/home_screen_test.dart test/folder_detail_screen_test.dart
@@ -453,7 +484,7 @@ git commit -m "perf: tighten task UI rebuilds and accessibility"
 - Consumes: current CRUD, reorder, streak, timer, copyWith, parser, and persistence APIs.
 - Produces: regression coverage for boundary indices, folder cascades/cycles, stale streak data, input limits, and legacy serialization without speculative model rewrites.
 
-- [ ] **Step 1: Add boundary tests before implementation changes**
+- [x] **Step 1: Add boundary tests before implementation changes**
 
 Cover:
 
@@ -473,7 +504,7 @@ test('malformed persisted records are skipped without losing valid records', () 
 
 Use complete executable tests in the existing test style; do not leave comments as test bodies.
 
-- [ ] **Step 2: Run focused tests and classify failures**
+- [x] **Step 2: Run focused tests and classify failures**
 
 Run:
 
@@ -483,11 +514,11 @@ flutter test test/task_provider_test.dart test/task_model_test.dart test/input_u
 
 Only fix behavior whose failure is reproducible and attributable to production code. If a suspected item passes, document it as reviewed and do not change it.
 
-- [ ] **Step 3: Implement minimal fixes for confirmed failures**
+- [x] **Step 3: Implement minimal fixes for confirmed failures**
 
 Preserve public signatures. Use `copyWith` where model immutability is part of the tested contract, batch recursive folder deletion into one notification/persistence operation, and reject invalid reorder indices without mutating state. Keep system streak-folder protections intact.
 
-- [ ] **Step 4: Run focused and full validation**
+- [ ] **Step 4: Run focused and full validation — Blocked: focused non-widget tests pass, but the full/widget suite hangs.**
 
 Run:
 
@@ -499,7 +530,7 @@ flutter test test/task_provider_test.dart test/task_model_test.dart test/input_u
 
 Expected: analyzer clean and all focused tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/features/tasks/providers/task_provider.dart lib/features/tasks/models/task_model.dart lib/core/input_utils.dart test/task_provider_test.dart test/task_model_test.dart test/input_utils_test.dart
@@ -521,7 +552,7 @@ git commit -m "test: cover provider and model boundary cases"
 - Consumes: all prior remediation results and exact project commands.
 - Produces: accurate onboarding/release documentation and a reproducible release checklist.
 
-- [ ] **Step 1: Verify dependency usage and updates**
+- [x] **Step 1: Verify dependency usage and updates**
 
 Run:
 
@@ -532,11 +563,11 @@ flutter pub outdated --no-transitive
 
 Search each direct dependency in `lib/` and platform files. Remove only a dependency proven unused and update `pubspec.lock` only through the package manager. Do not upgrade packages in this review unless a current vulnerability or build incompatibility is confirmed.
 
-- [ ] **Step 2: Replace the template README with accurate project instructions**
+- [x] **Step 2: Replace the template README with accurate project instructions**
 
 Document the actual app purpose, supported platforms, local-first data model, sync/security limitations, test commands, Android arm64 release command, required notification/calendar/local-network permissions, and the fact that release signing credentials are external and must never be committed.
 
-- [ ] **Step 3: Update developer documentation with verified findings**
+- [x] **Step 3: Update developer documentation with verified findings**
 
 Add sections for:
 
@@ -547,7 +578,7 @@ Add sections for:
 - physical-device manual test matrix for notifications, widgets, calendars, TalkBack, VoiceOver, large text, and LAN discovery;
 - release build/signing and obfuscation recommendations.
 
-- [ ] **Step 4: Run release gates**
+- [ ] **Step 4: Run release gates — Partial: Android/arm64 and diagnostic web build pass; ordinary web and full Flutter test remain blocked.**
 
 Run the commands supported by the local machine:
 
@@ -562,7 +593,7 @@ flutter build web
 
 Run iOS/macOS/Linux/Windows builds only when the corresponding SDK/toolchain is installed; otherwise record the exact unavailable toolchain and do not claim those builds passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pubspec.yaml pubspec.lock README.md docs/DEVELOPER.md docs/superpowers/plans/2026-07-31-full-standards-review-remediation.md
@@ -581,11 +612,11 @@ git commit -m "docs: document standards review and release gates"
 - Consumes: all prior task commits and documented platform limitations.
 - Produces: an evidence-backed final report with confirmed fixes, unresolved risks, and exact commands/results.
 
-- [ ] **Step 1: Run independent code review**
+- [x] **Step 1: Run independent code review**
 
 Ask a fresh reviewer to inspect the final diff for security, data loss, async races, platform regressions, accessibility, and test gaps. Resolve every blocker before completion; record non-blocking recommendations in the final report.
 
-- [ ] **Step 2: Run the complete verification gate**
+- [ ] **Step 2: Run the complete verification gate — Blocked: full `flutter test` and ordinary web release gate do not complete in this environment.**
 
 Run:
 
@@ -599,7 +630,7 @@ flutter test
 
 Also run the release/build commands from Task 8 that are supported locally.
 
-- [ ] **Step 3: Verify repository state and commits**
+- [ ] **Step 3: Verify repository state and commits — Pending until the evidence commit is created and checked.**
 
 Run:
 
@@ -610,7 +641,7 @@ git log --oneline -n 12
 
 Expected: no uncommitted source changes, no generated artifacts staged, and one focused commit per completed task.
 
-- [ ] **Step 4: Write the final review report**
+- [x] **Step 4: Write the final review report**
 
 Report separately:
 

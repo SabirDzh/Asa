@@ -1,7 +1,7 @@
 # ASA — Developer Documentation
 
 > **Audience:** engineers joining the project, maintainers, and anyone who wants to extend the app.  
-> **Last updated:** 2026-07-29  
+> **Last updated:** 2026-07-31
 > **Project:** [`pubspec.yaml`](../pubspec.yaml)
 
 ---
@@ -122,7 +122,7 @@ Both providers start async init in their constructors:
 ### 4.3 Important rules
 
 * Do **not** call `notifyListeners()` from inside a constructor before the provider is attached to a widget tree. `SettingsProvider` defers its first notification with `Future.microtask`.
-* Persist happens in `_saveToPrefs()` after every mutating operation. If you add bulk operations, consider batching or debouncing writes (currently a known improvement area).
+* Persist happens in `_saveToPrefs()` after every mutating operation. Persistence writes are serialized and coalesced; preserve that ordering when adding bulk operations.
 * `TaskItem` and `FolderItem` support `copyWith`. Use it instead of mutating fields in place.
 
 ---
@@ -144,19 +144,31 @@ Both providers start async init in their constructors:
 
 [`lib/features/tasks/models/task_model.dart`](../lib/features/tasks/models/task_model.dart)
 
-* `TaskItem` — id, title, `isCompleted`, `folderId`, `dueDate`, `startTime`, `endTime`, `expectedDuration` (minutes), calendar IDs, timestamps, `isDeleted`.
+* `TaskItem` — id, title, `isCompleted`, `folderId`, `dueDate`, `startTime`, `endTime`, `expectedDuration` (minutes), calendar IDs, timestamps, `isDeleted`, and typed `infoBlocks`.
+* `TaskInfoBlock` supports quantity goals and plain-text descriptions. Description blocks may reference bounded links, images, and files through `TaskAttachment`; binary bytes are never embedded in task JSON.
 * `FolderItem` — id, name, `isSystemStreak`, `parentFolderId`, `iconAsset`, timestamps, `isDeleted`.
 * Both classes have `toJson()` / `fromJson()` and `copyWith(...)`.  
   `copyWith` uses `Object?` sentinel values to distinguish “no change” from `null`.
 
 ### 6.2 Persistence
 
-* `TaskProvider._saveToPrefs()` encodes `_tasks` and `_folders` as JSON strings in `SharedPreferences`.
+* `TaskProvider._saveToPrefs()` encodes `_tasks` and `_folders` as JSON strings in `SharedPreferences` and serializes/coalesces writes so stale asynchronous writes cannot overwrite newer state.
 * Keys: `saved_tasks`, `saved_folders`.
 * Settings are persisted per-field under their own keys (see `SettingsProvider`).
 * **Security limitation:** `SharedPreferences` is not encrypted storage. The optional `syncSecret` currently survives restarts in plaintext application preferences. Treat it as a local convenience secret, not a high-value credential; migrate sensitive keys to platform secure storage (for example, `flutter_secure_storage`) before relying on it for stronger at-rest protection.
 
-### 6.3 Search & filters
+### 6.3 Task information blocks and attachments
+
+The task editor keeps a local draft until the user saves. It supports two block types:
+
+* **Quantity:** current value, target value, unit, and optional label. Values are finite, non-negative, capped at `1_000_000_000`, and reaching the target never auto-completes the task.
+* **Description:** bounded plain text (10,000 characters) plus structured attachments. Links accept only `http`/`https`; files and images are copied to the app documents attachment directory on native platforms before their reference is persisted.
+
+Attachment limits are 10 MB per file and 20 attachments per task. Export/import/sync preserve metadata and local references only; binary files are not transferred between devices. The web/stub implementation supports metadata and links but does not persist local binary attachments. Missing local files render as unavailable and must not crash the UI.
+
+The task detail sheet is intentionally read-only. Editing, setting time, and deleting are available from the task row `…` menu; the time icon in the row is an informational indicator.
+
+### 6.4 Search & filters
 
 `TaskFilter` enum:
 
@@ -334,7 +346,8 @@ Central helper for creating tasks/folders. Features:
 
 ### 8.3 Task detail & time sheets
 
-* `task_detail_sheet.dart` — read-only details + quick actions (edit, time, calendar, delete).
+* `task_detail_sheet.dart` — read-only task information; it does not mutate tasks.
+* `task_card.dart` — task-row `…` menu for editing, setting time, calendar actions, and deletion; the timer icon is display-only.
 * `task_time_sheet.dart` — set duration and/or time period using wheel pickers.
 
 ### 8.4 Settings UI
@@ -460,6 +473,17 @@ Output: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
 flutter test
 ```
 
+For the current review evidence, the focused non-widget suite passes (144 tests). The full/widget suite currently has environment-level hangs in `folder_detail_screen_test.dart` and `task_folder_popup_menu_test.dart` after test startup; do not report the full suite as passing until those hangs are diagnosed.
+
+The repository-wide formatter and analyzer gates pass:
+
+```bash
+dart format --output=none --set-exit-if-changed .
+dart analyze
+```
+
+The ordinary web build currently hits Flutter's icon tree-shaking `IconTreeShakerException`; `flutter build web --no-tree-shake-icons` succeeds as a diagnostic workaround, but this does not close the ordinary web release gate.
+
 ---
 
 ## 13. Testing
@@ -558,7 +582,20 @@ flutter build ios --release
 
 ---
 
-## 18. Further Reading
+## 18. Verification and manual platform matrix
+
+The following checks were completed during the standards remediation:
+
+* `dart analyze` — passed with no issues.
+* Repository-wide `dart format --output=none --set-exit-if-changed .` — passed after the formatting-only commit `3427d11`.
+* Android `:app:processDebugResources` and `:app:compileDebugKotlin` — passed.
+* Android arm64 release — passed; output is `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (approximately 21.6 MB, ignored build output).
+* `flutter pub deps --style=compact` and `flutter pub outdated --no-transitive` — passed; outdated major dependencies were not upgraded during remediation.
+* `flutter build web --no-tree-shake-icons` — passed. Ordinary `flutter build web` remains blocked by Flutter icon tree-shaking.
+
+Physical-device verification is still required before release: Android/iOS attachment picking and opening, notification action `start_timer`, home widgets, calendar permissions/events, TalkBack/VoiceOver labels, 1.5x text scale, keyboard/large-description behavior, and LAN discovery/HMAC exchange. iOS/macOS/Linux/Windows release builds were not claimed because their platform toolchains/devices were not part of this verification run.
+
+## 19. Further Reading
 
 * [Flutter Provider docs](https://pub.dev/packages/provider)
 * [home_widget](https://pub.dev/packages/home_widget)

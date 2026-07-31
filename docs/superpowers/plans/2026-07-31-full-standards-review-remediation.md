@@ -630,7 +630,7 @@ flutter test
 
 Also run the release/build commands from Task 8 that are supported locally.
 
-- [ ] **Step 3: Verify repository state and commits — Pending until the evidence commit is created and checked.**
+- [x] **Step 3: Verify repository state and commits**
 
 Run:
 

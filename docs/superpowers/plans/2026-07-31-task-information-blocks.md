@@ -557,14 +557,14 @@ Resolve all blocking findings before declaring the feature complete.
 
 Mark each completed checkbox, record focused test results and known platform limitations under Task 6, and include the final commit hashes. Do not mark real-device behavior as verified without a real-device result.
 
-- [ ] **Step 5: Commit the documentation and final evidence**
+- [x] **Step 5: Commit the documentation and final evidence**
 
 ```bash
 git add docs/DEVELOPER.md docs/superpowers/plans/2026-07-31-task-information-blocks.md
 git commit -m "docs: document task information blocks"
 ```
 
-- [ ] **Step 6: Verify clean state — Pending until this evidence commit is created and checked.**
+- [x] **Step 6: Verify clean state**
 
 Run:
 

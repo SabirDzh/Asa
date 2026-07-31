@@ -45,8 +45,25 @@ class TaskProvider with ChangeNotifier {
   String _searchQuery = '';
   TaskFilter _filter = TaskFilter.all;
   int _streakCount = 1;
+  int _tasksVersion = 0;
   int _foldersVersion = 0;
   String? _lastViewedFolderName;
+
+  void _notifyTasksChanged() {
+    _tasksVersion++;
+    notifyListeners();
+  }
+
+  void _notifyFoldersChanged() {
+    _foldersVersion++;
+    notifyListeners();
+  }
+
+  void _notifyTasksAndFoldersChanged() {
+    _tasksVersion++;
+    _foldersVersion++;
+    notifyListeners();
+  }
 
   TaskProvider() {
     initData();
@@ -76,6 +93,7 @@ class TaskProvider with ChangeNotifier {
   String get searchQuery => _searchQuery;
   TaskFilter get filter => _filter;
   int get streakCount => _streakCount;
+  int get tasksVersion => _tasksVersion;
   int get foldersVersion => _foldersVersion;
   String? get lastViewedFolderName => _lastViewedFolderName;
 
@@ -337,9 +355,8 @@ class TaskProvider with ChangeNotifier {
         ),
       );
     }
-    _foldersVersion++;
+    _notifyFoldersChanged();
     unawaited(_saveToPrefs(waitForReady: false));
-    notifyListeners();
   }
 
   // Root level folders (parentFolderId == null)
@@ -424,7 +441,7 @@ class TaskProvider with ChangeNotifier {
       timerStartedAt: startedAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -441,7 +458,7 @@ class TaskProvider with ChangeNotifier {
       timerElapsedSeconds: task.timerElapsedSeconds + elapsed.clamp(0, 1 << 31),
       updatedAt: DateTime.now(),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -453,7 +470,7 @@ class TaskProvider with ChangeNotifier {
       timerElapsedSeconds: 0,
       updatedAt: DateTime.now(),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -465,7 +482,7 @@ class TaskProvider with ChangeNotifier {
         folderId: targetFolderId,
         updatedAt: DateTime.now(),
       );
-      notifyListeners();
+      _notifyTasksChanged();
       _saveToPrefs();
     }
   }
@@ -487,8 +504,7 @@ class TaskProvider with ChangeNotifier {
         parentFolderId: targetParentFolderId,
         updatedAt: DateTime.now(),
       );
-      _foldersVersion++;
-      notifyListeners();
+      _notifyFoldersChanged();
       _saveToPrefs();
     }
   }
@@ -537,8 +553,7 @@ class TaskProvider with ChangeNotifier {
     _folders
       ..clear()
       ..addAll(newFolders);
-    _foldersVersion++;
-    notifyListeners();
+    _notifyFoldersChanged();
     _saveToPrefs();
   }
 
@@ -576,7 +591,7 @@ class TaskProvider with ChangeNotifier {
     _tasks
       ..clear()
       ..addAll(newTasks);
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -604,14 +619,14 @@ class TaskProvider with ChangeNotifier {
         updatedAt: DateTime.now(),
       ),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
   /// Adds a raw [task] directly, used by import/sync flows.
   void addTaskRaw(TaskItem task) {
     _tasks.add(task);
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -650,7 +665,7 @@ class TaskProvider with ChangeNotifier {
       timerElapsedSeconds: elapsedSeconds,
       updatedAt: DateTime.now(),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -659,7 +674,7 @@ class TaskProvider with ChangeNotifier {
     if (index != -1) {
       final task = _tasks[index];
       _tasks[index] = task.copyWith(isDeleted: true, updatedAt: DateTime.now());
-      notifyListeners();
+      _notifyTasksChanged();
       _saveToPrefs();
       _removeTaskCalendarEvent(task);
     }
@@ -684,7 +699,7 @@ class TaskProvider with ChangeNotifier {
         title: newTitle,
         updatedAt: DateTime.now(),
       );
-      notifyListeners();
+      _notifyTasksChanged();
       _saveToPrefs();
       syncTaskCalendarEvent(id).catchError((_) {});
     }
@@ -716,7 +731,7 @@ class TaskProvider with ChangeNotifier {
         calendarEventId: eventId,
         updatedAt: DateTime.now(),
       );
-      notifyListeners();
+      _notifyTasksChanged();
       _saveToPrefs();
     }
   }
@@ -739,7 +754,7 @@ class TaskProvider with ChangeNotifier {
       calendarEventId: null,
       updatedAt: DateTime.now(),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -758,7 +773,7 @@ class TaskProvider with ChangeNotifier {
       expectedDuration: calculatedDuration,
       updatedAt: DateTime.now(),
     );
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
     syncTaskCalendarEvent(id).catchError((_) {});
   }
@@ -830,8 +845,7 @@ class TaskProvider with ChangeNotifier {
         updatedAt: DateTime.now(),
       ),
     );
-    _foldersVersion++;
-    notifyListeners();
+    _notifyFoldersChanged();
     _saveToPrefs();
   }
 
@@ -843,8 +857,7 @@ class TaskProvider with ChangeNotifier {
       return;
     }
     _folders.add(folder);
-    _foldersVersion++;
-    notifyListeners();
+    _notifyFoldersChanged();
     _saveToPrefs();
   }
 
@@ -876,8 +889,7 @@ class TaskProvider with ChangeNotifier {
   /// Notifies listeners and persists the current state. Called after bulk
   /// operations such as import/sync merges.
   Future<void> persist() async {
-    _foldersVersion++;
-    notifyListeners();
+    _notifyTasksAndFoldersChanged();
     await flushPersistence();
   }
 
@@ -892,8 +904,7 @@ class TaskProvider with ChangeNotifier {
         iconAsset: iconAsset,
         updatedAt: DateTime.now(),
       );
-      _foldersVersion++;
-      notifyListeners();
+      _notifyFoldersChanged();
       _saveToPrefs();
     }
   }
@@ -902,8 +913,7 @@ class TaskProvider with ChangeNotifier {
     final changed = _removeFolderTree(id, DateTime.now(), <String>{});
     if (!changed) return;
 
-    _foldersVersion++;
-    notifyListeners();
+    _notifyTasksAndFoldersChanged();
     _saveToPrefs();
   }
 
@@ -944,7 +954,7 @@ class TaskProvider with ChangeNotifier {
     for (var i = 0; i < _tasks.length; i++) {
       _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);
     }
-    notifyListeners();
+    _notifyTasksChanged();
     _saveToPrefs();
   }
 
@@ -962,8 +972,7 @@ class TaskProvider with ChangeNotifier {
         _removeTaskCalendarEvent(task);
       }
     }
-    _foldersVersion++;
-    notifyListeners();
+    _notifyTasksAndFoldersChanged();
     _saveToPrefs();
   }
 
@@ -977,8 +986,7 @@ class TaskProvider with ChangeNotifier {
         _folders[i] = _folders[i].copyWith(isDeleted: true, updatedAt: now);
       }
     }
-    _foldersVersion++;
-    notifyListeners();
+    _notifyTasksAndFoldersChanged();
     _saveToPrefs();
   }
 }

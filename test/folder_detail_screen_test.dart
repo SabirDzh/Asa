@@ -8,6 +8,7 @@ import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/screens/folder_detail_screen.dart';
+import 'package:asa/core/home_widget_service.dart';
 
 Widget createTestApp(FolderItem folder) {
   return MultiProvider(
@@ -15,15 +16,21 @@ Widget createTestApp(FolderItem folder) {
       ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
-    child: MaterialApp(
-      home: FolderDetailScreen(folder: folder),
-    ),
+    child: MaterialApp(home: FolderDetailScreen(folder: folder)),
   );
 }
 
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    HomeWidgetService.instance.debounceDelay = Duration.zero;
+  });
+
+  tearDown(() {
+    HomeWidgetService.resetForTests();
+    HomeWidgetService.instance.debounceDelay = const Duration(
+      milliseconds: 300,
+    );
   });
 
   testWidgets('renders empty folder state', (tester) async {
@@ -36,7 +43,11 @@ void main() {
   });
 
   testWidgets('shows streak folder icon', (tester) async {
-    final folder = FolderItem(id: 'streak_5', name: 'День 5', isSystemStreak: true);
+    final folder = FolderItem(
+      id: 'streak_5',
+      name: 'День 5',
+      isSystemStreak: true,
+    );
     await tester.pumpWidget(createTestApp(folder));
     await tester.pumpAndSettle();
 
@@ -54,7 +65,9 @@ void main() {
           ChangeNotifierProvider.value(value: taskProvider),
         ],
         child: MaterialApp(
-          home: FolderDetailScreen(folder: FolderItem(id: 'test_folder', name: 'Work')),
+          home: FolderDetailScreen(
+            folder: FolderItem(id: 'test_folder', name: 'Work'),
+          ),
         ),
       ),
     );

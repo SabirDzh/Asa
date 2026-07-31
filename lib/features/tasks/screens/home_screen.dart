@@ -20,7 +20,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with ScrollHideMixin<HomeScreen> {
   int _navIndex = 0;
   late final PageController _pageController;
   final TextEditingController _searchController = TextEditingController();
@@ -114,12 +115,8 @@ class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen
   ) {
     final isSelected = provider.filter == filterOption;
     return ListTile(
-      title: Text(
-        label,
-        style: TextStyle(color: onSurface, fontSize: 16),
-      ),
-      trailing:
-          isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
+      title: Text(label, style: TextStyle(color: onSurface, fontSize: 16)),
+      trailing: isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         provider.setFilter(filterOption);
         Navigator.pop(ctx);
@@ -226,7 +223,10 @@ class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
             right: AppTheme.screenPad,
-            bottom: fabVisible ? AppTheme.screenPad : -AppTheme.fabSize - AppTheme.screenPad,
+            bottom:
+                fabVisible
+                    ? AppTheme.screenPad
+                    : -AppTheme.fabSize - AppTheme.screenPad,
             child: GestureDetector(
               onTap: () => _showCreateFolderSheet(context),
               child: Container(
@@ -244,7 +244,11 @@ class _HomeScreenState extends State<HomeScreen> with ScrollHideMixin<HomeScreen
                   ],
                 ),
                 child: Center(
-                  child: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface, size: 28),
+                  child: Icon(
+                    Icons.add,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    size: 28,
+                  ),
                 ),
               ),
             ),
@@ -367,7 +371,17 @@ class _HomeFolderList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TaskProvider>();
+    // Select only the inputs that can change this derived folder list. Reading
+    // the provider afterward avoids subscribing the whole list to every task
+    // mutation (for example, a timer or task title update).
+    context.select<TaskProvider, (int, String, TaskFilter)>(
+      (provider) => (
+        provider.foldersVersion,
+        provider.searchQuery,
+        provider.filter,
+      ),
+    );
+    final provider = context.read<TaskProvider>();
     final folders = provider.filteredFolders;
     final searchQuery = provider.searchQuery;
 

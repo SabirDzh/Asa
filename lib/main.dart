@@ -117,17 +117,23 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final settingsProvider = Provider.of<SettingsProvider>(context);
+    // Only theme and scale affect the app shell. Language, sync and profile
+    // changes are consumed by their feature widgets and must not rebuild the
+    // entire MaterialApp tree.
+    final themeMode = context.select<SettingsProvider, ThemeMode>(
+      (settings) => settings.themeMode,
+    );
+    final appScale = context.select<SettingsProvider, double>(
+      (settings) => settings.appScale,
+    );
 
     return MaterialApp(
       title: 'ASA',
       debugShowCheckedModeBanner: false,
-      themeMode: settingsProvider.themeMode,
+      themeMode: themeMode,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      builder:
-          (context, child) =>
-              _ScaledApp(scale: settingsProvider.appScale, child: child!),
+      builder: (context, child) => _ScaledApp(scale: appScale, child: child!),
       home: const SplashScreen(),
     );
   }

@@ -24,7 +24,8 @@ class FolderDetailScreen extends StatefulWidget {
   State<FolderDetailScreen> createState() => _FolderDetailScreenState();
 }
 
-class _FolderDetailScreenState extends State<FolderDetailScreen> with ScrollHideMixin<FolderDetailScreen> {
+class _FolderDetailScreenState extends State<FolderDetailScreen>
+    with ScrollHideMixin<FolderDetailScreen> {
   final ScrollController _breadcrumbScroll = ScrollController();
 
   @override
@@ -159,29 +160,29 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> with ScrollHide
                       ),
                     ),
                     Expanded(
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: handleScrollNotification,
-                    child: _FolderContent(folder: widget.folder),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: handleScrollNotification,
+                        child: _FolderContent(folder: widget.folder),
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned.fill(
+                  child: AnimatedOpacity(
+                    opacity: fabVisible ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      ignoring: !fabVisible,
+                      child: _FolderFloatingMenu(
+                        onMenuClose: () {},
+                        showCreateSheet: _showCreateSheet,
+                        bottomOffset: AppTheme.navHeight,
+                        isVisible: fabVisible,
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
-            Positioned.fill(
-              child: AnimatedOpacity(
-                opacity: fabVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                child: IgnorePointer(
-                  ignoring: !fabVisible,
-                  child: _FolderFloatingMenu(
-                    onMenuClose: () {},
-                    showCreateSheet: _showCreateSheet,
-                    bottomOffset: AppTheme.navHeight,
-                    isVisible: fabVisible,
-                  ),
-                ),
-              ),
-            ),
               ],
             ),
           ),
@@ -204,11 +205,14 @@ class _Breadcrumbs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TaskProvider>();
+    // Breadcrumbs depend only on folder hierarchy, not task/timer changes.
+    context.select<TaskProvider, int>((provider) => provider.foldersVersion);
+    final provider = context.read<TaskProvider>();
     final allFolders = provider.folders;
     List<FolderItem> path = [folder];
+    final visited = <String>{folder.id};
     String? currentParentId = folder.parentFolderId;
-    while (currentParentId != null) {
+    while (currentParentId != null && visited.add(currentParentId)) {
       final matches = allFolders.where((f) => f.id == currentParentId).toList();
       if (matches.isNotEmpty) {
         final parent = matches.first;
@@ -238,7 +242,8 @@ class _Breadcrumbs extends StatelessWidget {
                         color: textSecondary,
                         size: 20,
                       ),
-                    ),                    GestureDetector(
+                    ),
+                  GestureDetector(
                     onTap: () {
                       if (!isLast) {
                         final pops = path.length - 1 - idx;
@@ -298,10 +303,24 @@ class _FolderContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
+    // Folder content is independent of search/filter state elsewhere only in
+    // terms of its own task/folder versions; view state is included because
+    // search and filter affect the derived folder/task lists.
+    context.select<TaskProvider, (int, int, String, TaskFilter)>(
+      (provider) => (
+        provider.tasksVersion,
+        provider.foldersVersion,
+        provider.searchQuery,
+        provider.filter,
+      ),
+    );
+    context.select<SettingsProvider, String>(
+      (settings) => settings.languageCode,
+    );
+    final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final provider = context.watch<TaskProvider>();
+    final provider = context.read<TaskProvider>();
     final subfolders = provider.getSubfolders(folder.id);
     final folderTasks = provider.getFolderTasks(folder.id);
 
@@ -333,9 +352,10 @@ class _FolderContent extends StatelessWidget {
       final bool hasDivider = inProgress.isNotEmpty && i == 0;
       Widget taskWidget = Padding(
         key: ValueKey(t.id),
-        padding: hasDivider
-            ? const EdgeInsets.only(top: 8, bottom: 8)
-            : const EdgeInsets.only(bottom: 8),
+        padding:
+            hasDivider
+                ? const EdgeInsets.only(top: 8, bottom: 8)
+                : const EdgeInsets.only(bottom: 8),
         child: TaskRow(task: t),
       );
       if (hasDivider) {
@@ -347,7 +367,7 @@ class _FolderContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 9),
               child: Align(
                 alignment: Alignment.center,
-                child:                SizedBox(
+                child: SizedBox(
                   width: AppTheme.rowWidth,
                   child: Divider(
                     color: isDark ? Colors.white30 : AppColors.navLight,
@@ -544,7 +564,8 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                         offset: const Offset(0, 4),
                       ),
                     ],
-                  ),                    child: IntrinsicWidth(
+                  ),
+                  child: IntrinsicWidth(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -602,7 +623,11 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
                   turns: _isOpen ? 0.125 : 0.0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
-                  child: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface, size: 28),
+                  child: Icon(
+                    Icons.add,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    size: 28,
+                  ),
                 ),
               ),
             ),

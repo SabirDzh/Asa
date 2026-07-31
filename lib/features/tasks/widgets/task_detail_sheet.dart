@@ -270,11 +270,14 @@ class _TaskDetailSheet extends StatelessWidget {
   }
 
   Widget _actionTile(IconData icon, String label, VoidCallback onTap, Color color) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: color, size: 22),
-      title: Text(label, style: TextStyle(color: color, fontSize: 16)),
-      onTap: onTap,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon, color: color, size: 22),
+        title: Text(label, style: TextStyle(color: color, fontSize: 16)),
+        onTap: onTap,
+      ),
     );
   }
 

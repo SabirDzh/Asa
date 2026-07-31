@@ -1,5 +1,6 @@
 import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
@@ -291,73 +292,46 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     await context.read<TaskProvider>().linkTaskToCalendar(widget.task.id, selected.id!, date);
   }
 
-  String _formatTime(DateTime time) {
-    final h = time.hour.toString().padLeft(2, '0');
-    final m = time.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
+  Widget _buildTimeIndicator(BuildContext context) {
+    final hasTimeData =
+        widget.task.expectedDuration != null ||
+        widget.task.startTime != null ||
+        widget.task.endTime != null;
+    if (!hasTimeData) return const SizedBox.shrink();
 
-  String _formatDuration(int minutes) {
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    return '$h:${m.toString().padLeft(2, '0')}';
-  }
-
-  List<(String label, IconData icon)> _timeInfoList() {
-    final items = <(String, IconData)>[];
-    if (widget.task.expectedDuration != null) {
-      items.add((_formatDuration(widget.task.expectedDuration!), Iconsax.timer_1));
-    }
-    if (widget.task.startTime != null && widget.task.endTime != null) {
-      items.add(('${_formatTime(widget.task.startTime!)}–${_formatTime(widget.task.endTime!)}', Iconsax.clock));
-    } else if (widget.task.startTime != null) {
-      items.add((_formatTime(widget.task.startTime!), Iconsax.clock));
-    }
-    return items;
-  }
-
-  Widget _buildTimeChip(BuildContext context) {
-    final infos = _timeInfoList();
-    if (infos.isEmpty) return const SizedBox.shrink();
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final iconColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
     return Padding(
-      padding: const EdgeInsets.only(left: AppTheme.rowGap, top: 16, bottom: 16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: infos.map((info) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Material(
-              color: Colors.transparent,
+      padding: const EdgeInsets.only(left: AppTheme.rowGap),
+      child: Semantics(
+        button: true,
+        label: settings.tr('set_time'),
+        child: Tooltip(
+          message: settings.tr('set_time'),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+            child: InkWell(
+              onTap: () => showTaskTimeSheet(context, widget.task),
               borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-              clipBehavior: Clip.hardEdge,
-              child: InkWell(
-                onTap: () => showTaskTimeSheet(context, widget.task),
-                borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight,
-                    borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(info.$2, color: textSecondary, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        info.$1,
-                        style: TextStyle(color: textSecondary, fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: SvgPicture.asset(
+                    key: const ValueKey('task_timer_icon'),
+                    'assets/icons/timer.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
                   ),
                 ),
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ),
       ),
     );
   }
@@ -413,7 +387,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                   padding: const EdgeInsets.only(left: AppTheme.rowGap, top: 16, bottom: 16),
                   child: Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
                 ),
-              _buildTimeChip(context),
+              _buildTimeIndicator(context),
               if (!widget.task.isCompleted)
                 Builder(
                   builder: (iconCtx) => GestureDetector(

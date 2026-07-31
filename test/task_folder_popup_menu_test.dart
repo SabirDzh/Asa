@@ -50,6 +50,54 @@ void main() {
     await tester.tap(find.text('Отмена'));
   });
 
+  testWidgets('task row shows only timer icon while details show time values', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'timed-task',
+      title: 'Time task',
+      expectedDuration: 90,
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 11, 0),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('task_timer_icon')), findsOneWidget);
+    expect(find.text('1:30'), findsNothing);
+    expect(find.text('10:00'), findsNothing);
+    expect(find.text('11:00'), findsNothing);
+
+    await tester.tap(find.text('Time task'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Длительность: 1:30'), findsOneWidget);
+    expect(find.textContaining('Период: 10:00 – 11:00'), findsOneWidget);
+  });
+
+  testWidgets('timer icon opens the time editor', (tester) async {
+    final task = TaskItem(
+      id: 'timer-task',
+      title: 'Timer task',
+      expectedDuration: 30,
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('task_timer_icon')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Установить время'), findsOneWidget);
+    expect(find.text('Длительность'), findsOneWidget);
+    expect(find.text('Период'), findsOneWidget);
+  });
+
   testWidgets('folder ellipsis opens the folder action menu', (tester) async {
     await tester.pumpWidget(
       _TestApp(

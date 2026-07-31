@@ -80,6 +80,27 @@ void main() {
     expect(find.text('Удалить'), findsNothing);
   });
 
+  testWidgets('time editor opens from the timer icon', (tester) async {
+    final task = TaskItem(
+      id: 'timer-icon-task',
+      title: 'Timer icon task',
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 10, 30),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('task_timer_icon')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Установить время'), findsOneWidget);
+    expect(find.text('Период'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+  });
+
   testWidgets('time editor opens from the task ellipsis menu', (tester) async {
     final task = TaskItem(
       id: 'timer-task',

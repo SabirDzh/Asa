@@ -30,7 +30,7 @@ The remediation implementation is complete and independently reviewed. The repos
 
 `422d567`, `6e76e3d`, `3e337b4`, `2dd1116`, `e9659b5`, `2250954`, `614aa05`, `94087c5`, `08c86f2`, `1eff7fe`, `e653dab`, `c7b7333`, `f959f22`, and the formatting gate `3427d11`.
 
-The later task-information commits are separate product work: `00676a3`, `a74254c`, `0e568ad`, `7ddb155`, `71d33e7`.
+The later task-information commits are separate product work: `00676a3`, `a74254c`, `0e568ad`, `7ddb155`, `71d33e7`. The timer icon remains an entry point to the time editor; the detail sheet itself remains read-only.
 
 ### Final review limitations
 

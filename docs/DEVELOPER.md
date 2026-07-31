@@ -166,7 +166,7 @@ The task editor keeps a local draft until the user saves. It supports two block 
 
 Attachment limits are 10 MB per file and 20 attachments per task. Export/import/sync preserve metadata and local references only; binary files are not transferred between devices. The web/stub implementation supports metadata and links but does not persist local binary attachments. Missing local files render as unavailable and must not crash the UI.
 
-The task detail sheet is intentionally read-only. Editing, setting time, and deleting are available from the task row `…` menu; the time icon in the row is an informational indicator.
+The task detail sheet is intentionally read-only. Editing and deleting are available from the task row `…` menu; setting time is available both from that menu and by tapping the time icon in the row.
 
 ### 6.4 Search & filters
 
@@ -347,7 +347,7 @@ Central helper for creating tasks/folders. Features:
 ### 8.3 Task detail & time sheets
 
 * `task_detail_sheet.dart` — read-only task information; it does not mutate tasks.
-* `task_card.dart` — task-row `…` menu for editing, setting time, calendar actions, and deletion; the timer icon is display-only.
+* `task_card.dart` — task-row `…` menu for editing, setting time, calendar actions, and deletion; tapping the timer icon also opens the time editor.
 * `task_time_sheet.dart` — set duration and/or time period using wheel pickers.
 
 ### 8.4 Settings UI

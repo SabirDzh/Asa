@@ -27,7 +27,7 @@ The task-information-block feature is implemented in focused commits. The reposi
 * Description content is bounded plain text, not rich text; attachments are structured metadata and local references.
 * Export/import/sync preserve attachment metadata and references but do not transfer local binary files.
 * Web supports metadata and links through the stub boundary; native file/image copying requires a device/platform implementation.
-* The detail sheet is information-only. Edit, set-time, and delete actions are available from the task row `…` menu; the time icon is display-only.
+* The detail sheet is information-only. Edit and delete actions are available from the task row `…` menu; setting time is available from that menu and by tapping the time icon.
 
 ### Feature commit range
 

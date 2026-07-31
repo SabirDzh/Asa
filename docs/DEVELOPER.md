@@ -412,7 +412,27 @@ flutter pub get
 flutter run
 ```
 
-### 12.2 Release APK (arm64-v8a only)
+### 12.2 Android release signing
+
+Release builds never use the debug signing key. For a distributable APK, provide
+signing values through either the ignored `android/key.properties` file or CI
+environment variables:
+
+```properties
+storeFile=/absolute/path/to/upload-keystore.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+Equivalent CI variables are `ANDROID_KEYSTORE_PATH`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`.
+Do not commit `key.properties`, keystores, or passwords. The repository keeps
+those paths ignored in `android/.gitignore`. Without credentials, Gradle emits
+an explicit warning and produces an unsigned release artifact that is suitable
+only for local inspection, not distribution.
+
+### 12.3 Release APK (arm64-v8a only)
 
 ```bash
 flutter build apk --target-platform android-arm64 --split-per-abi --release

@@ -310,28 +310,26 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final iconColor =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    return Padding(
-      padding: const EdgeInsets.only(left: AppTheme.rowGap),
-      child: Semantics(
-        button: true,
-        label: settings.tr('set_time'),
-        child: Tooltip(
-          message: settings.tr('set_time'),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => showTaskTimeSheet(context, widget.task),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Center(
-                child: SvgPicture.asset(
-                  key: const ValueKey('task_timer_icon'),
-                  'assets/icons/timer.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                ),
-              ),
+    return Semantics(
+      button: true,
+      label: settings.tr('set_time'),
+      child: Tooltip(
+        message: settings.tr('set_time'),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => showTaskTimeSheet(context, widget.task),
+          child: Padding(
+            padding: const EdgeInsets.only(
+              left: AppTheme.rowGap,
+              top: AppTheme.rowPadV,
+              bottom: AppTheme.rowPadV,
+            ),
+            child: SvgPicture.asset(
+              key: const ValueKey('task_timer_icon'),
+              'assets/icons/timer.svg',
+              width: 24,
+              height: 24,
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
             ),
           ),
         ),

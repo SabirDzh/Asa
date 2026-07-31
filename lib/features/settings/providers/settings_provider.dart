@@ -34,6 +34,7 @@ class SettingsProvider with ChangeNotifier {
   bool _initialized = false;
   final _initCompleter = Completer<void>();
   Future<void> _customValuesOperation = Future<void>.value();
+  Future<void> _avatarPathOperation = Future<void>.value();
 
   SettingsProvider({
     Future<String> Function() deviceNameProvider = getDefaultDeviceName,
@@ -380,14 +381,33 @@ class SettingsProvider with ChangeNotifier {
     );
   }
 
-  Future<void> setAvatarPath(String? path) async {
+  /// Persists [path] in FIFO order and returns the path replaced by this
+  /// operation. The returned value lets callers clean up the correct previous
+  /// file even when multiple avatar selections are started concurrently.
+  Future<String?> setAvatarPath(String? path) {
+    final next = _avatarPathOperation.then((_) => _persistAvatarPath(path));
+    _avatarPathOperation = next.catchError(
+      (Object error, StackTrace stackTrace) => null,
+    );
+    return next;
+  }
+
+  Future<String?> _persistAvatarPath(String? path) async {
+    final previousPath = _avatarPath;
     _avatarPath = path;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (path == null) {
-      await prefs.remove('avatarPath');
-    } else {
-      await prefs.setString('avatarPath', path);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (path == null) {
+        await prefs.remove('avatarPath');
+      } else {
+        await prefs.setString('avatarPath', path);
+      }
+      return previousPath;
+    } catch (_) {
+      _avatarPath = previousPath;
+      notifyListeners();
+      rethrow;
     }
   }
 

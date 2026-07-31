@@ -94,12 +94,23 @@ void main() {
       },
     );
 
-    test('setAvatarPath stores and clears path', () {
-      provider.setAvatarPath('/path/to/avatar.webp');
+    test('setAvatarPath stores and clears path', () async {
+      await provider.setAvatarPath('/path/to/avatar.webp');
       expect(provider.avatarPath, '/path/to/avatar.webp');
 
-      provider.setAvatarPath(null);
+      await provider.setAvatarPath(null);
       expect(provider.avatarPath, isNull);
+    });
+
+    test('serializes concurrent avatar path updates in call order', () async {
+      final first = provider.setAvatarPath('/avatars/first.webp');
+      final second = provider.setAvatarPath('/avatars/second.webp');
+
+      expect(await first, isNull);
+      expect(await second, '/avatars/first.webp');
+      expect(provider.avatarPath, '/avatars/second.webp');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('avatarPath'), '/avatars/second.webp');
     });
 
     test('tr returns Russian text for ru locale', () {

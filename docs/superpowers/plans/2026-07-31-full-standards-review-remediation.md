@@ -105,6 +105,7 @@ git commit -m "chore: enforce project analyzer quality gate"
 - Modify: `lib/core/export_import_service.dart`
 - Modify: `lib/core/image_utils.dart`
 - Modify: `lib/features/settings/widgets/avatar_section.dart`
+- Modify: `lib/features/settings/providers/settings_provider.dart`
 - Modify: `test/export_import_service_test.dart`
 - Modify: `test/image_utils_test.dart`
 - Test: focused import/image tests
@@ -165,6 +166,8 @@ In `pickImportFile`, reject a selected `PlatformFile` when `file.size > _kMaxImp
 
 - [ ] **Step 4: Add avatar size and lifecycle regression tests**
 
+Also preserve the provider rollback contract: if `SettingsProvider.setAvatarPath` cannot persist the new path, it must restore the previous in-memory path before rethrowing.
+
 Add `readValidatedImageBytes(String path, {int maxBytes = kMaxAvatarFileSize})` to `lib/core/image_utils.dart`. It must return `null` when the file is missing, larger than `maxBytes`, or unreadable, and otherwise return the bytes. Add tests that create a temporary valid image-signature file, assert accepted bytes are returned, and assert an oversized file returns `null`. Keep the existing `detectImageFormat` signature checks.
 
 - [ ] **Step 5: Implement bounded avatar copying**
@@ -176,8 +179,8 @@ In `avatar_section.dart`, use `readValidatedImageBytes(pickedFile.path)` after f
 Run:
 
 ```bash
-dart format lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart test/export_import_service_test.dart test/image_utils_test.dart
- dart analyze lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart test/export_import_service_test.dart test/image_utils_test.dart
+dart format lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart lib/features/settings/providers/settings_provider.dart test/export_import_service_test.dart test/image_utils_test.dart
+ dart analyze lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart lib/features/settings/providers/settings_provider.dart test/export_import_service_test.dart test/image_utils_test.dart
 flutter test test/export_import_service_test.dart test/image_utils_test.dart
 ```
 
@@ -186,7 +189,7 @@ Expected: analyzer clean and all focused tests pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart test/export_import_service_test.dart test/image_utils_test.dart
+git add lib/core/export_import_service.dart lib/core/image_utils.dart lib/features/settings/widgets/avatar_section.dart lib/features/settings/providers/settings_provider.dart test/export_import_service_test.dart test/image_utils_test.dart
 git commit -m "fix: harden import and avatar file boundaries"
 ```
 

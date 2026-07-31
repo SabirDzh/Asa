@@ -1,5 +1,7 @@
 import 'dart:io';
 
+const int kMaxAvatarFileSize = 10 * 1024 * 1024;
+
 class ImageFormat {
   final String name;
   final String extension;
@@ -14,7 +16,41 @@ class ImageFormat {
 
   static const List<ImageFormat> all = [jpeg, png, gif, webp];
 
-  static const List<String> allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  static const List<String> allowedExtensions = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+  ];
+}
+
+Future<bool> isImageFileWithinLimit(
+  String path, {
+  int maxBytes = kMaxAvatarFileSize,
+}) async {
+  try {
+    if (maxBytes <= 0) return false;
+    final file = File(path);
+    return await file.exists() && await file.length() <= maxBytes;
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<List<int>?> readValidatedImageBytes(
+  String path, {
+  int maxBytes = kMaxAvatarFileSize,
+}) async {
+  try {
+    if (maxBytes <= 0) return null;
+    final file = File(path);
+    if (!await file.exists()) return null;
+    if (await file.length() > maxBytes) return null;
+    return await file.readAsBytes();
+  } catch (_) {
+    return null;
+  }
 }
 
 Future<ImageFormat?> detectImageFormat(String path) async {
@@ -28,14 +64,27 @@ Future<ImageFormat?> detectImageFormat(String path) async {
     if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
       return ImageFormat.jpeg;
     }
-    if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+    if (bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
       return ImageFormat.png;
     }
-    if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38) {
+    if (bytes[0] == 0x47 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x38) {
       return ImageFormat.gif;
     }
-    if (bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46) {
-      if (bytes.length >= 12 && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
+    if (bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46) {
+      if (bytes.length >= 12 &&
+          bytes[8] == 0x57 &&
+          bytes[9] == 0x45 &&
+          bytes[10] == 0x42 &&
+          bytes[11] == 0x50) {
         return ImageFormat.webp;
       }
     }

@@ -65,7 +65,9 @@ class ImportPreview {
 
   String get fileSizeLabel {
     if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    if (fileSize < 1024 * 1024) {
+      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }
@@ -85,18 +87,44 @@ class AsaDataSnapshot {
   });
 
   Map<String, dynamic> toJson() => {
-        'version': version,
-        'exportedAt': exportedAt,
-        'tasks': tasks,
-        'folders': folders,
-      };
+    'version': version,
+    'exportedAt': exportedAt,
+    'tasks': tasks,
+    'folders': folders,
+  };
 
-  factory AsaDataSnapshot.fromJson(Map<String, dynamic> json) => AsaDataSnapshot(
-        version: json['version']?.toString() ?? '1.0.0',
-        exportedAt: json['exportedAt'] is int ? json['exportedAt'] as int : 0,
-        tasks: (json['tasks'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
-        folders: (json['folders'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
-      );
+  factory AsaDataSnapshot.fromJson(Map<String, dynamic> json) {
+    return AsaDataSnapshot(
+      version: json['version']?.toString() ?? '1.0.0',
+      exportedAt: json['exportedAt'] is int ? json['exportedAt'] as int : 0,
+      tasks: _readObjectList(json['tasks'], 'tasks'),
+      folders: _readObjectList(json['folders'], 'folders'),
+    );
+  }
+
+  static List<Map<String, dynamic>> _readObjectList(
+    Object? value,
+    String fieldName,
+  ) {
+    if (value == null) return [];
+    if (value is! List) {
+      throw FormatException('$fieldName must be a list');
+    }
+
+    return value.map((entry) {
+      if (entry is! Map) {
+        throw FormatException('$fieldName entries must be objects');
+      }
+      final object = <String, dynamic>{};
+      for (final item in entry.entries) {
+        if (item.key is! String) {
+          throw FormatException('$fieldName object keys must be strings');
+        }
+        object[item.key as String] = item.value;
+      }
+      return object;
+    }).toList();
+  }
 }
 
 /// Wire-safe envelope for sync payloads.
@@ -111,16 +139,38 @@ class SyncEnvelope {
   const SyncEnvelope({this.secret, this.mac, required this.payload});
 
   Map<String, dynamic> toJson() => {
-        if (secret != null) 'secret': secret,
-        if (mac != null) 'mac': mac,
-        'payload': payload,
-      };
+    if (secret != null) 'secret': secret,
+    if (mac != null) 'mac': mac,
+    'payload': payload,
+  };
 
-  factory SyncEnvelope.fromJson(Map<String, dynamic> json) => SyncEnvelope(
-        secret: json['secret'] as String?,
-        mac: json['mac'] as String?,
-        payload: json['payload'] as String? ?? '',
+  factory SyncEnvelope.fromJson(Map<String, dynamic> json) {
+    if (!json.containsKey('payload')) {
+      throw const FormatException('Envelope payload is required');
+    }
+
+    final payload = json['payload'];
+    if (payload is! String || payload.isEmpty) {
+      throw const FormatException(
+        'Envelope payload must be a non-empty string',
       );
+    }
+
+    String? readOptionalString(String key) {
+      final value = json[key];
+      if (value == null) return null;
+      if (value is! String) {
+        throw FormatException('Envelope $key must be a string');
+      }
+      return value;
+    }
+
+    return SyncEnvelope(
+      secret: readOptionalString('secret'),
+      mac: readOptionalString('mac'),
+      payload: payload,
+    );
+  }
 }
 
 /// Exports and imports app data as a portable JSON file.
@@ -130,10 +180,11 @@ class ExportImportService {
   /// Builds a serializable snapshot from the current provider state.
   static AsaDataSnapshot buildSnapshot(TaskProvider provider) {
     final tasks = provider.tasks.map((t) => t.toJson()).toList();
-    final folders = provider.folders
-        .where((f) => !f.isSystemStreak)
-        .map((f) => f.toJson())
-        .toList();
+    final folders =
+        provider.folders
+            .where((f) => !f.isSystemStreak)
+            .map((f) => f.toJson())
+            .toList();
 
     return AsaDataSnapshot(
       version: _version,
@@ -151,15 +202,18 @@ class ExportImportService {
       final file = await _writeToFile(json);
 
       final xFile = XFile(file.path);
-      await Share.shareXFiles(
-        [xFile],
-        subject: 'ASA backup',
-      );
+      await Share.shareXFiles([xFile], subject: 'ASA backup');
 
-      LoggerService.instance.i('Exported ${snapshot.tasks.length} tasks, ${snapshot.folders.length} folders');
+      LoggerService.instance.i(
+        'Exported ${snapshot.tasks.length} tasks, ${snapshot.folders.length} folders',
+      );
       return ExportResult(file: file, success: true);
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Export failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Export failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return ExportResult(error: error.toString(), success: false);
     }
   }
@@ -173,7 +227,11 @@ class ExportImportService {
       LoggerService.instance.i('Exported backup to ${file.path}');
       return ExportResult(file: file, success: true);
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Export failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Export failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return ExportResult(error: error.toString(), success: false);
     }
   }
@@ -192,7 +250,10 @@ class ExportImportService {
     }
 
     final file = result.files.single;
-    if (file.bytes == null) {
+    final bytes = file.bytes;
+    if (bytes == null ||
+        file.size > _kMaxImportFileSize ||
+        bytes.length > _kMaxImportFileSize) {
       return null;
     }
 
@@ -209,7 +270,11 @@ class ExportImportService {
 
       return importFromBytes(provider, file.bytes!);
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Import failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Import failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return const ImportResult(error: 'error_import_failed');
     }
   }
@@ -223,22 +288,25 @@ class ExportImportService {
     required List<int> bytes,
     String? expectedSecret,
   }) {
+    final actualSize = bytes.length;
+    final effectiveSize = actualSize > fileSize ? actualSize : fileSize;
+
     // Raw byte imports (including network sync) do not have a filename.
     // File-based previews still validate the user-visible extension.
-    final ext = fileName.isEmpty ? null : fileName.split('.').lastOrNull?.toLowerCase();
+    final ext =
+        fileName.isEmpty ? null : fileName.split('.').lastOrNull?.toLowerCase();
     if (ext != null && ext != 'json' && ext != 'asa') {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_extension',
       );
     }
-
-    if (fileSize > _kMaxImportFileSize) {
+    if (effectiveSize > _kMaxImportFileSize) {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_file_too_large',
       );
@@ -250,17 +318,18 @@ class ExportImportService {
     } on Exception {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_not_utf8',
       );
     }
 
-    final firstChar = jsonString.trimLeft().isNotEmpty ? jsonString.trimLeft()[0] : '';
+    final firstChar =
+        jsonString.trimLeft().isNotEmpty ? jsonString.trimLeft()[0] : '';
     if (firstChar != '{' && firstChar != '[') {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_json',
       );
@@ -272,7 +341,7 @@ class ExportImportService {
     } on Exception {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_json',
       );
@@ -281,7 +350,7 @@ class ExportImportService {
     if (decodedRaw is! Map<String, dynamic>) {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_format',
       );
@@ -296,7 +365,7 @@ class ExportImportService {
       if (payloadValue is! String || payloadValue.isEmpty) {
         return ImportPreview(
           fileName: fileName,
-          fileSize: fileSize,
+          fileSize: effectiveSize,
           isValid: false,
           errorKey: 'error_invalid_format',
         );
@@ -304,7 +373,7 @@ class ExportImportService {
       if (decoded['secret'] != null && decoded['secret'] is! String) {
         return ImportPreview(
           fileName: fileName,
-          fileSize: fileSize,
+          fileSize: effectiveSize,
           isValid: false,
           errorKey: 'error_invalid_format',
         );
@@ -312,7 +381,7 @@ class ExportImportService {
       if (decoded['mac'] != null && decoded['mac'] is! String) {
         return ImportPreview(
           fileName: fileName,
-          fileSize: fileSize,
+          fileSize: effectiveSize,
           isValid: false,
           errorKey: 'error_invalid_format',
         );
@@ -323,7 +392,7 @@ class ExportImportService {
         if (expectedSecret == null) {
           return ImportPreview(
             fileName: fileName,
-            fileSize: fileSize,
+            fileSize: effectiveSize,
             isValid: false,
             errorKey: 'error_missing_secret',
             hasSecret: true,
@@ -333,7 +402,7 @@ class ExportImportService {
         if (!_constantTimeEquals(envelope.mac!, expectedMac)) {
           return ImportPreview(
             fileName: fileName,
-            fileSize: fileSize,
+            fileSize: effectiveSize,
             isValid: false,
             errorKey: 'error_invalid_secret',
             hasSecret: true,
@@ -344,7 +413,7 @@ class ExportImportService {
         // wire. Sync payloads must use the HMAC format above.
         return ImportPreview(
           fileName: fileName,
-          fileSize: fileSize,
+          fileSize: effectiveSize,
           isValid: false,
           errorKey: 'error_invalid_secret',
           hasSecret: true,
@@ -352,7 +421,7 @@ class ExportImportService {
       } else if (expectedSecret != null) {
         return ImportPreview(
           fileName: fileName,
-          fileSize: fileSize,
+          fileSize: effectiveSize,
           isValid: false,
           errorKey: 'error_missing_secret',
           hasSecret: true,
@@ -362,7 +431,7 @@ class ExportImportService {
     } else if (expectedSecret != null) {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_missing_secret',
       );
@@ -376,7 +445,7 @@ class ExportImportService {
     } on Exception {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_json',
       );
@@ -385,7 +454,7 @@ class ExportImportService {
     if (payloadRaw is! Map<String, dynamic>) {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_format',
       );
@@ -399,7 +468,7 @@ class ExportImportService {
         !payload.containsKey('folders')) {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_missing_keys',
       );
@@ -408,7 +477,22 @@ class ExportImportService {
     if (payload['tasks'] is! List || payload['folders'] is! List) {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
+        isValid: false,
+        errorKey: 'error_invalid_lists',
+      );
+    }
+
+    final taskEntries = payload['tasks'] as List<dynamic>;
+    final folderEntries = payload['folders'] as List<dynamic>;
+    final areValidEntries = [
+      ...taskEntries,
+      ...folderEntries,
+    ].every((entry) => entry is Map);
+    if (!areValidEntries) {
+      return ImportPreview(
+        fileName: fileName,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_invalid_lists',
       );
@@ -416,10 +500,13 @@ class ExportImportService {
 
     try {
       final snapshot = AsaDataSnapshot.fromJson(payload);
-      final exportedAt = DateTime.fromMillisecondsSinceEpoch(snapshot.exportedAt, isUtc: true);
+      final exportedAt = DateTime.fromMillisecondsSinceEpoch(
+        snapshot.exportedAt,
+        isUtc: true,
+      );
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: true,
         version: snapshot.version,
         exportedAt: exportedAt,
@@ -431,7 +518,7 @@ class ExportImportService {
     } on Exception {
       return ImportPreview(
         fileName: fileName,
-        fileSize: fileSize,
+        fileSize: effectiveSize,
         isValid: false,
         errorKey: 'error_import_failed',
       );
@@ -439,8 +526,17 @@ class ExportImportService {
   }
 
   /// Imports/merges raw bytes using a last-write-wins (LWW) strategy.
-  static Future<ImportResult> importFromBytes(TaskProvider provider, List<int> bytes, {String? expectedSecret}) async {
-    final preview = previewImport(fileName: '', fileSize: bytes.length, bytes: bytes, expectedSecret: expectedSecret);
+  static Future<ImportResult> importFromBytes(
+    TaskProvider provider,
+    List<int> bytes, {
+    String? expectedSecret,
+  }) async {
+    final preview = previewImport(
+      fileName: '',
+      fileSize: bytes.length,
+      bytes: bytes,
+      expectedSecret: expectedSecret,
+    );
     if (!preview.isValid) {
       return ImportResult(error: preview.errorKey ?? 'error_import_failed');
     }
@@ -451,7 +547,10 @@ class ExportImportService {
   }
 
   /// Applies a validated [snapshot] to the provider and persists changes.
-  static Future<ImportResult> importFromSnapshot(TaskProvider provider, AsaDataSnapshot snapshot) async {
+  static Future<ImportResult> importFromSnapshot(
+    TaskProvider provider,
+    AsaDataSnapshot snapshot,
+  ) async {
     try {
       int tasksImported = 0;
       int foldersImported = 0;
@@ -463,7 +562,11 @@ class ExportImportService {
             tasksImported++;
           }
         } on Exception catch (error, stackTrace) {
-          LoggerService.instance.w('Failed to import task', error: error, stackTrace: stackTrace);
+          LoggerService.instance.w(
+            'Failed to import task',
+            error: error,
+            stackTrace: stackTrace,
+          );
         }
       }
 
@@ -474,15 +577,28 @@ class ExportImportService {
             foldersImported++;
           }
         } on Exception catch (error, stackTrace) {
-          LoggerService.instance.w('Failed to import folder', error: error, stackTrace: stackTrace);
+          LoggerService.instance.w(
+            'Failed to import folder',
+            error: error,
+            stackTrace: stackTrace,
+          );
         }
       }
 
       await provider.persist();
-      LoggerService.instance.i('Imported $tasksImported tasks and $foldersImported folders');
-      return ImportResult(tasksImported: tasksImported, foldersImported: foldersImported);
+      LoggerService.instance.i(
+        'Imported $tasksImported tasks and $foldersImported folders',
+      );
+      return ImportResult(
+        tasksImported: tasksImported,
+        foldersImported: foldersImported,
+      );
     } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e('Import parsing failed', error: error, stackTrace: stackTrace);
+      LoggerService.instance.e(
+        'Import parsing failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return const ImportResult(error: 'error_import_failed');
     }
   }

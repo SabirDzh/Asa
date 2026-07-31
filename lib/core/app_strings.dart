@@ -28,6 +28,7 @@ class AppStrings {
       'change_avatar': 'Сменить аватар',
       'avatar_invalid_format':
           'Неподдерживаемый формат. Используйте JPEG, PNG, GIF или WebP',
+      'avatar_too_large': 'Файл аватара слишком большой',
       'notifications': 'Уведомления',
       'profile': 'Профиль',
       'appearance': 'Внешний вид',
@@ -198,6 +199,7 @@ class AppStrings {
       'change_avatar': 'Change avatar',
       'avatar_invalid_format':
           'Unsupported format. Use JPEG, PNG, GIF, or WebP',
+      'avatar_too_large': 'Avatar file is too large',
       'notifications': 'Notifications',
       'profile': 'Profile',
       'appearance': 'Appearance',

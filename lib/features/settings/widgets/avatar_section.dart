@@ -15,7 +15,10 @@ class AvatarSection extends StatelessWidget {
   Future<void> _pickAvatar(BuildContext context) async {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: null);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: null,
+    );
     if (pickedFile == null) return;
 
     final format = await detectImageFormat(pickedFile.path);
@@ -28,16 +31,28 @@ class AvatarSection extends StatelessWidget {
       return;
     }
 
+    final withinLimit = await isImageFileWithinLimit(pickedFile.path);
+    if (!withinLimit) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(settings.tr('avatar_too_large'))),
+        );
+      }
+      return;
+    }
+
     final dir = await getApplicationDocumentsDirectory();
     final ext = format == ImageFormat.gif ? 'gif' : 'webp';
-    final targetPath = '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final targetPath =
+        '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
 
     String? resultPath;
 
     if (format == ImageFormat.gif) {
-      final src = File(pickedFile.path);
+      final sourceBytes = await readValidatedImageBytes(pickedFile.path);
+      if (sourceBytes == null) return;
       final dst = File(targetPath);
-      await dst.writeAsBytes(await src.readAsBytes());
+      await dst.writeAsBytes(sourceBytes);
       resultPath = targetPath;
     } else {
       final result = await FlutterImageCompress.compressAndGetFile(
@@ -50,13 +65,22 @@ class AvatarSection extends StatelessWidget {
     }
 
     if (resultPath != null) {
-      if (settings.avatarPath != null) {
+      String? previousPath;
+      try {
+        previousPath = await settings.setAvatarPath(resultPath);
+      } catch (_) {
         try {
-          final oldFile = File(settings.avatarPath!);
+          final newFile = File(resultPath);
+          if (await newFile.exists()) await newFile.delete();
+        } catch (_) {}
+        return;
+      }
+      if (previousPath != null && previousPath != resultPath) {
+        try {
+          final oldFile = File(previousPath);
           if (await oldFile.exists()) await oldFile.delete();
         } catch (_) {}
       }
-      settings.setAvatarPath(resultPath);
     }
   }
 
@@ -64,34 +88,40 @@ class AvatarSection extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            iconTheme: const IconThemeData(color: Colors.white),
-            elevation: 0,
-          ),
-          body: Center(
-            child: InteractiveViewer(
-              child: Hero(
-                tag: 'avatar_hero',
-                child: Image.file(File(imagePath)),
+        builder:
+            (_) => Scaffold(
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                iconTheme: const IconThemeData(color: Colors.white),
+                elevation: 0,
+              ),
+              body: Center(
+                child: InteractiveViewer(
+                  child: Hero(
+                    tag: 'avatar_hero',
+                    child: Image.file(File(imagePath)),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final avatarPath = context.select<SettingsProvider, String?>((s) => s.avatarPath);
+    final avatarPath = context.select<SettingsProvider, String?>(
+      (s) => s.avatarPath,
+    );
     final hasAvatar = avatarPath != null;
-    final changeAvatarLabel = context.select<SettingsProvider, String>((s) => s.tr('change_avatar'));
+    final changeAvatarLabel = context.select<SettingsProvider, String>(
+      (s) => s.tr('change_avatar'),
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Column(
       children: [
@@ -118,20 +148,30 @@ class AvatarSection extends StatelessWidget {
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: hasAvatar
-                    ? Image.file(
-                        File(avatarPath),
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                        cacheWidth: 240,
-                        errorBuilder: (context, error, stackTrace) => Center(
-                          child: Icon(Icons.person, size: 52, color: textSecondary),
+                child:
+                    hasAvatar
+                        ? Image.file(
+                          File(avatarPath),
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          cacheWidth: 240,
+                          errorBuilder:
+                              (context, error, stackTrace) => Center(
+                                child: Icon(
+                                  Icons.person,
+                                  size: 52,
+                                  color: textSecondary,
+                                ),
+                              ),
+                        )
+                        : Center(
+                          child: Icon(
+                            Icons.person,
+                            size: 52,
+                            color: textSecondary,
+                          ),
                         ),
-                      )
-                    : Center(
-                        child: Icon(Icons.person, size: 52, color: textSecondary),
-                      ),
               ),
             ),
           ),

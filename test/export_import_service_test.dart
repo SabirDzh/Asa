@@ -39,10 +39,18 @@ void main() {
         version: '1.1.0',
         exportedAt: 0,
         tasks: [
-          TaskItem(id: 't1', title: 'Remote task', updatedAt: DateTime(2026, 1, 1)).toJson(),
+          TaskItem(
+            id: 't1',
+            title: 'Remote task',
+            updatedAt: DateTime(2026, 1, 1),
+          ).toJson(),
         ],
         folders: [
-          FolderItem(id: 'f1', name: 'Remote folder', updatedAt: DateTime(2026, 1, 1)).toJson(),
+          FolderItem(
+            id: 'f1',
+            name: 'Remote folder',
+            updatedAt: DateTime(2026, 1, 1),
+          ).toJson(),
         ],
       );
 
@@ -58,37 +66,57 @@ void main() {
       expect(provider.folders.any((f) => f.id == 'f1'), true);
     });
 
-    test('import rejects reserved streak folders but keeps valid folders', () async {
-      final snapshot = AsaDataSnapshot(
-        version: '1.1.0',
-        exportedAt: 0,
-        tasks: [],
-        folders: [
-          FolderItem(id: 'valid', name: 'Valid folder').toJson(),
-          FolderItem(id: 'system-shaped', name: 'System-shaped', isSystemStreak: true).toJson(),
-          FolderItem(
-            id: 'nested-in-streak',
-            name: 'Nested in streak',
-            parentFolderId: 'system_streak_folder',
-          ).toJson(),
-        ],
-      );
+    test(
+      'import rejects reserved streak folders but keeps valid folders',
+      () async {
+        final snapshot = AsaDataSnapshot(
+          version: '1.1.0',
+          exportedAt: 0,
+          tasks: [],
+          folders: [
+            FolderItem(id: 'valid', name: 'Valid folder').toJson(),
+            FolderItem(
+              id: 'system-shaped',
+              name: 'System-shaped',
+              isSystemStreak: true,
+            ).toJson(),
+            FolderItem(
+              id: 'nested-in-streak',
+              name: 'Nested in streak',
+              parentFolderId: 'system_streak_folder',
+            ).toJson(),
+          ],
+        );
 
-      await provider.ready;
-      final result = await ExportImportService.importFromSnapshot(provider, snapshot);
+        await provider.ready;
+        final result = await ExportImportService.importFromSnapshot(
+          provider,
+          snapshot,
+        );
 
-      expect(result.success, true);
-      expect(result.foldersImported, 1);
-      expect(provider.folders.any((folder) => folder.id == 'valid'), true);
-      expect(provider.folders.where((folder) => folder.id != 'system_streak_folder'), hasLength(1));
-    });
+        expect(result.success, true);
+        expect(result.foldersImported, 1);
+        expect(provider.folders.any((folder) => folder.id == 'valid'), true);
+        expect(
+          provider.folders.where(
+            (folder) => folder.id != 'system_streak_folder',
+          ),
+          hasLength(1),
+        );
+      },
+    );
 
     test('LWW merge prefers newer task', () async {
       provider.addTask('Local task');
       final localId = provider.tasks.first.id;
       final now = DateTime.now();
 
-      final remote = TaskItem(id: localId, title: 'Remote task', updatedAt: now.add(const Duration(days: 1))).toJson();
+      final remote =
+          TaskItem(
+            id: localId,
+            title: 'Remote task',
+            updatedAt: now.add(const Duration(days: 1)),
+          ).toJson();
       final snapshot = AsaDataSnapshot(
         version: '1.1.0',
         exportedAt: 0,
@@ -96,7 +124,10 @@ void main() {
         folders: [],
       );
 
-      final result = await ExportImportService.importFromBytes(provider, _utf8(snapshot.toJson()));
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        _utf8(snapshot.toJson()),
+      );
 
       expect(result.success, true);
       expect(provider.tasks.first.title, 'Remote task');
@@ -107,7 +138,12 @@ void main() {
       final localId = provider.tasks.first.id;
       final now = DateTime.now();
 
-      final remote = TaskItem(id: localId, title: 'Remote task', updatedAt: now.subtract(const Duration(days: 1))).toJson();
+      final remote =
+          TaskItem(
+            id: localId,
+            title: 'Remote task',
+            updatedAt: now.subtract(const Duration(days: 1)),
+          ).toJson();
       final snapshot = AsaDataSnapshot(
         version: '1.1.0',
         exportedAt: 0,
@@ -115,7 +151,10 @@ void main() {
         folders: [],
       );
 
-      final result = await ExportImportService.importFromBytes(provider, _utf8(snapshot.toJson()));
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        _utf8(snapshot.toJson()),
+      );
 
       expect(result.success, true);
       expect(result.tasksImported, 0);
@@ -127,12 +166,13 @@ void main() {
       final localId = provider.tasks.first.id;
       final now = DateTime.now();
 
-      final remote = TaskItem(
-        id: localId,
-        title: 'Local task',
-        isDeleted: true,
-        updatedAt: now.add(const Duration(days: 1)),
-      ).toJson();
+      final remote =
+          TaskItem(
+            id: localId,
+            title: 'Local task',
+            isDeleted: true,
+            updatedAt: now.add(const Duration(days: 1)),
+          ).toJson();
       final snapshot = AsaDataSnapshot(
         version: '1.1.0',
         exportedAt: 0,
@@ -140,7 +180,10 @@ void main() {
         folders: [],
       );
 
-      final result = await ExportImportService.importFromBytes(provider, _utf8(snapshot.toJson()));
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        _utf8(snapshot.toJson()),
+      );
 
       expect(result.success, true);
       expect(provider.tasks, isEmpty);
@@ -155,7 +198,10 @@ void main() {
           tasks: [TaskItem(id: 't1', title: 'Secret task').toJson()],
           folders: [],
         );
-        final envelope = SyncEnvelope(secret: '1234', payload: _json(payload.toJson()));
+        final envelope = SyncEnvelope(
+          secret: '1234',
+          payload: _json(payload.toJson()),
+        );
         final bytes = _utf8(envelope.toJson());
 
         final result = await ExportImportService.importFromBytes(
@@ -175,7 +221,10 @@ void main() {
           tasks: [TaskItem(id: 't1', title: 'Secret task').toJson()],
           folders: [],
         );
-        final envelope = SyncEnvelope(secret: '1234', payload: _json(payload.toJson()));
+        final envelope = SyncEnvelope(
+          secret: '1234',
+          payload: _json(payload.toJson()),
+        );
         final bytes = _utf8(envelope.toJson());
 
         final result = await ExportImportService.importFromBytes(
@@ -216,7 +265,10 @@ void main() {
         );
         final bytes = _utf8(payload.toJson());
 
-        final result = await ExportImportService.importFromBytes(provider, bytes);
+        final result = await ExportImportService.importFromBytes(
+          provider,
+          bytes,
+        );
 
         expect(result.success, true);
         expect(result.tasksImported, 1);
@@ -232,20 +284,29 @@ void main() {
       expect(decoded['tasks'], isA<List<dynamic>>());
     });
 
-    test('buildSyncPayload with secret uses a MAC without exposing the secret', () {
-      provider.addTask('Task');
-      final bytes = ExportImportService.buildSyncPayload(provider, secret: '1234');
-      final decoded = _decode(bytes) as Map<String, dynamic>;
+    test(
+      'buildSyncPayload with secret uses a MAC without exposing the secret',
+      () {
+        provider.addTask('Task');
+        final bytes = ExportImportService.buildSyncPayload(
+          provider,
+          secret: '1234',
+        );
+        final decoded = _decode(bytes) as Map<String, dynamic>;
 
-      expect(decoded['secret'], isNull);
-      expect(decoded['mac'], isA<String>());
-      expect((decoded['mac'] as String).length, 64);
-      expect(decoded['payload'], isA<String>());
-    });
+        expect(decoded['secret'], isNull);
+        expect(decoded['mac'], isA<String>());
+        expect((decoded['mac'] as String).length, 64);
+        expect(decoded['payload'], isA<String>());
+      },
+    );
 
     test('importFromBytes accepts a valid MAC envelope', () async {
       provider.addTask('Task');
-      final bytes = ExportImportService.buildSyncPayload(provider, secret: '1234');
+      final bytes = ExportImportService.buildSyncPayload(
+        provider,
+        secret: '1234',
+      );
 
       final result = await ExportImportService.importFromBytes(
         TaskProvider(),
@@ -259,9 +320,11 @@ void main() {
 
     test('importFromBytes rejects a tampered MAC envelope', () async {
       provider.addTask('Task');
-      final decoded = _decode(
-        ExportImportService.buildSyncPayload(provider, secret: '1234'),
-      ) as Map<String, dynamic>;
+      final decoded =
+          _decode(
+                ExportImportService.buildSyncPayload(provider, secret: '1234'),
+              )
+              as Map<String, dynamic>;
       decoded['mac'] = '0' * 64;
 
       final result = await ExportImportService.importFromBytes(
@@ -276,12 +339,10 @@ void main() {
 
     test('importFromBytes rejects an unauthenticated envelope', () async {
       provider.addTask('Task');
-      final decoded = _decode(
-        ExportImportService.buildSyncPayload(provider),
-      ) as Map<String, dynamic>;
-      final unauthenticated = <String, dynamic>{
-        'payload': jsonEncode(decoded),
-      };
+      final decoded =
+          _decode(ExportImportService.buildSyncPayload(provider))
+              as Map<String, dynamic>;
+      final unauthenticated = <String, dynamic>{'payload': jsonEncode(decoded)};
 
       final result = await ExportImportService.importFromBytes(
         TaskProvider(),
@@ -294,19 +355,29 @@ void main() {
     });
 
     test('importFromBytes rejects non-UTF8 bytes', () async {
-      final result = await ExportImportService.importFromBytes(provider, [0x80, 0x81, 0x82]);
+      final result = await ExportImportService.importFromBytes(provider, [
+        0x80,
+        0x81,
+        0x82,
+      ]);
       expect(result.success, false);
       expect(result.error, 'error_not_utf8');
     });
 
     test('importFromBytes rejects invalid JSON', () async {
-      final result = await ExportImportService.importFromBytes(provider, utf8.encode('not json'));
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        utf8.encode('not json'),
+      );
       expect(result.success, false);
       expect(result.error, 'error_invalid_json');
     });
 
     test('importFromBytes rejects non-object JSON', () async {
-      final result = await ExportImportService.importFromBytes(provider, utf8.encode('[1, 2, 3]'));
+      final result = await ExportImportService.importFromBytes(
+        provider,
+        utf8.encode('[1, 2, 3]'),
+      );
       expect(result.success, false);
       expect(result.error, 'error_invalid_format');
     });
@@ -323,12 +394,14 @@ void main() {
     test('importFromBytes rejects non-list tasks/folders', () async {
       final result = await ExportImportService.importFromBytes(
         provider,
-        utf8.encode(jsonEncode({
-          'version': '1.1.0',
-          'exportedAt': 0,
-          'tasks': 'not-a-list',
-          'folders': [],
-        })),
+        utf8.encode(
+          jsonEncode({
+            'version': '1.1.0',
+            'exportedAt': 0,
+            'tasks': 'not-a-list',
+            'folders': [],
+          }),
+        ),
       );
       expect(result.success, false);
       expect(result.error, 'error_invalid_lists');
@@ -341,6 +414,22 @@ void main() {
       );
       expect(result.success, false);
       expect(result.error, 'error_invalid_format');
+    });
+
+    test('SyncEnvelope rejects malformed wire fields', () {
+      expect(() => SyncEnvelope.fromJson({}), throwsFormatException);
+      expect(
+        () => SyncEnvelope.fromJson({'payload': ''}),
+        throwsFormatException,
+      );
+      expect(
+        () => SyncEnvelope.fromJson({'payload': '{}', 'mac': 123}),
+        throwsFormatException,
+      );
+      expect(
+        () => SyncEnvelope.fromJson({'payload': '{}', 'secret': false}),
+        throwsFormatException,
+      );
     });
 
     group('previewImport', () {
@@ -398,6 +487,63 @@ void main() {
 
         expect(preview.isValid, false);
         expect(preview.errorKey, 'error_missing_keys');
+      });
+
+      test(
+        'rejects bytes larger than the import limit even when fileSize is smaller',
+        () {
+          final bytes = List<int>.filled(10 * 1024 * 1024 + 1, 32);
+          final preview = ExportImportService.previewImport(
+            fileName: 'backup.json',
+            fileSize: 1,
+            bytes: bytes,
+          );
+
+          expect(preview.isValid, false);
+          expect(preview.errorKey, 'error_file_too_large');
+        },
+      );
+
+      test('rejects task entries that are not JSON objects', () {
+        final preview = ExportImportService.previewImport(
+          fileName: 'backup.json',
+          fileSize: 32,
+          bytes: utf8.encode(
+            jsonEncode({
+              'version': '1.1.0',
+              'exportedAt': 1,
+              'tasks': ['not-a-map'],
+              'folders': [],
+            }),
+          ),
+        );
+
+        expect(preview.isValid, false);
+        expect(preview.errorKey, 'error_invalid_lists');
+      });
+
+      test('rejects malformed folder entries in the snapshot constructor', () {
+        expect(
+          () => AsaDataSnapshot.fromJson({
+            'version': '1.1.0',
+            'exportedAt': 1,
+            'tasks': [],
+            'folders': ['not-a-map'],
+          }),
+          throwsFormatException,
+        );
+      });
+
+      test('rejects malformed task entries in the snapshot constructor', () {
+        expect(
+          () => AsaDataSnapshot.fromJson({
+            'version': '1.1.0',
+            'exportedAt': 1,
+            'tasks': ['not-a-map'],
+            'folders': [],
+          }),
+          throwsFormatException,
+        );
       });
     });
   });

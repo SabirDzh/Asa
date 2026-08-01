@@ -196,6 +196,46 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('sanitizes descriptions as bounded plain text', () {
+      final block = TaskInfoBlock.description(
+        id: 'notes',
+        text: '  <script>alert(1)</script>\u0000\u0008  ',
+      );
+      expect(block.text, '<script>alert(1)</script>');
+    });
+
+    test('rejects unsafe attachments at the description model boundary', () {
+      expect(
+        () => TaskInfoBlock.description(
+          id: 'notes',
+          attachments: [
+            const TaskAttachment(
+              id: 'unsafe-link',
+              type: TaskAttachmentType.link,
+              name: 'Unsafe',
+              value: 'javascript:alert(1)',
+            ),
+          ],
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => TaskInfoBlock.description(
+          id: 'notes',
+          attachments: [
+            const TaskAttachment(
+              id: 'external-file',
+              type: TaskAttachmentType.file,
+              name: 'document.pdf',
+              value: '/private/secret.pdf',
+              mimeType: 'application/pdf',
+            ),
+          ],
+        ),
+        throwsFormatException,
+      );
+    });
   });
 
   group('FolderItem', () {

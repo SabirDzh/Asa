@@ -6,11 +6,86 @@ import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'task_attachment_service_test_platform.dart';
 
 void main() {
-  test('accepts only http and https task links', () {
+  test('normalizes safe http and https links and rejects unsafe URLs', () {
+    expect(
+      normalizeTaskAttachmentLink('  HTTPS://EXAMPLE.COM/book  '),
+      'https://example.com/book',
+    );
     expect(isAllowedTaskLink('https://example.com/book'), isTrue);
     expect(isAllowedTaskLink('http://localhost:8080/source'), isTrue);
     expect(isAllowedTaskLink('javascript:alert(1)'), isFalse);
+    expect(
+      isAllowedTaskLink('data:text/html,<script>alert(1)</script>'),
+      isFalse,
+    );
     expect(isAllowedTaskLink('file:///private/secret'), isFalse);
+    expect(isAllowedTaskLink('https://user:password@example.com'), isFalse);
+    expect(isAllowedTaskLink('https://example.com\x00/secret'), isFalse);
+  });
+
+  test(
+    'detects image type from magic bytes and requires matching metadata',
+    () {
+      const png = <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      expect(taskImageMimeFromBytes(png), 'image/png');
+      expect(
+        isSupportedTaskAttachmentContent(
+          type: TaskAttachmentType.image,
+          name: 'cover.png',
+          bytes: png,
+          mimeType: 'image/png',
+        ),
+        isTrue,
+      );
+      expect(
+        isSupportedTaskAttachmentContent(
+          type: TaskAttachmentType.image,
+          name: 'cover.png',
+          bytes: png,
+          mimeType: 'image/jpeg',
+        ),
+        isFalse,
+      );
+      expect(
+        isSupportedTaskAttachmentContent(
+          type: TaskAttachmentType.image,
+          name: 'cover.jpg',
+          bytes: png,
+          mimeType: 'image/png',
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test('accepts safe document signatures and rejects executable content', () {
+    expect(
+      isSupportedTaskAttachmentContent(
+        type: TaskAttachmentType.file,
+        name: 'document.pdf',
+        bytes: const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31],
+        mimeType: 'application/pdf',
+      ),
+      isTrue,
+    );
+    expect(
+      isSupportedTaskAttachmentContent(
+        type: TaskAttachmentType.file,
+        name: 'document.pdf',
+        bytes: const [0x4D, 0x5A, 0x90, 0x00],
+        mimeType: 'application/pdf',
+      ),
+      isFalse,
+    );
+    expect(
+      isSupportedTaskAttachmentContent(
+        type: TaskAttachmentType.file,
+        name: 'document.pdf',
+        bytes: const [0x50, 0x4B, 0x03, 0x04],
+        mimeType: 'application/pdf',
+      ),
+      isFalse,
+    );
   });
 
   test('attachment display names cannot escape their basename', () {

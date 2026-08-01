@@ -258,6 +258,9 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
     await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-link-sheet')), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
     await tester.enterText(
       find.byKey(const ValueKey('add-link-url-input')),
       'javascript:alert(1)',
@@ -270,6 +273,77 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('add-link-url-input')), findsOneWidget);
+  });
+
+  testWidgets('adds a valid link from the bottom sheet', (tester) async {
+    await tester.pumpWidget(createEditorTestApp());
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-description-block')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-link-sheet')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('add-link-url-input')),
+      'https://example.com/docs',
+    );
+    await tester.tap(find.byKey(const ValueKey('add-link-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-link-sheet')), findsNothing);
+    expect(find.text('example.com'), findsOneWidget);
+  });
+
+  testWidgets('canceling link input closes only the link sheet', (
+    tester,
+  ) async {
+    await tester.pumpWidget(createEditorTestApp());
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-description-block')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-link-sheet')), findsOneWidget);
+    await tester.tap(find.text('Отмена').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-link-sheet')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('description-text-input')),
+      findsOneWidget,
+    );
+    expect(find.text('example.com'), findsNothing);
+  });
+
+  testWidgets('submitting link input with Done adds a valid link', (
+    tester,
+  ) async {
+    await tester.pumpWidget(createEditorTestApp());
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-description-block')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('add-link-url-input')),
+      'https://example.com/done',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-link-sheet')), findsNothing);
+    expect(find.text('example.com'), findsOneWidget);
   });
 
   testWidgets('canceling the editor does not create a task', (tester) async {

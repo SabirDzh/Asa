@@ -28,6 +28,118 @@ typedef TaskAttachmentPicker =
       int existingAttachmentCount,
     );
 
+class _LinkInputSheet extends StatefulWidget {
+  final String title;
+  final String cancelLabel;
+  final String addLabel;
+  final String invalidLinkLabel;
+
+  const _LinkInputSheet({
+    required this.title,
+    required this.cancelLabel,
+    required this.addLabel,
+    required this.invalidLinkLabel,
+  });
+
+  @override
+  State<_LinkInputSheet> createState() => _LinkInputSheetState();
+}
+
+class _LinkInputSheetState extends State<_LinkInputSheet> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final url = attachment_validation.normalizeTaskAttachmentLink(
+      sanitizeText(_controller.text),
+    );
+    if (url == null) {
+      setState(() => _error = widget.invalidLinkLabel);
+      return;
+    }
+    Navigator.of(context).pop(url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const ValueKey('add-link-sheet'),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 48,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(widget.title, style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('add-link-url-input'),
+              controller: _controller,
+              keyboardType: TextInputType.url,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                hintText: 'https://example.com',
+                errorText: _error,
+                prefixIcon: const Icon(Icons.link),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(widget.cancelLabel),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    key: const ValueKey('add-link-confirm'),
+                    onPressed: _submit,
+                    child: Text(widget.addLabel),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Opens the task editor for a new task or an existing [task].
 Future<void> showTaskEditorSheet(
   BuildContext context, {
@@ -461,52 +573,23 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   }
 
   Future<void> _addLink(TaskInfoBlock block) async {
-    final urlController = TextEditingController();
-    String? error;
-    final value = await showDialog<String>(
+    final value = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder:
-          (ctx) => StatefulBuilder(
-            builder:
-                (ctx, setDialogState) => AlertDialog(
-                  title: Text(_settings.tr('add_link')),
-                  content: TextField(
-                    key: const ValueKey('add-link-url-input'),
-                    controller: urlController,
-                    keyboardType: TextInputType.url,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'https://example.com',
-                      errorText: error,
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(_settings.tr('cancel')),
-                    ),
-                    FilledButton(
-                      key: const ValueKey('add-link-confirm'),
-                      onPressed: () {
-                        final url = attachment_validation
-                            .normalizeTaskAttachmentLink(
-                              sanitizeText(urlController.text),
-                            );
-                        if (url == null) {
-                          setDialogState(
-                            () => error = _settings.tr('invalid_link'),
-                          );
-                          return;
-                        }
-                        Navigator.pop(ctx, url);
-                      },
-                      child: Text(_settings.tr('add')),
-                    ),
-                  ],
-                ),
+          (ctx) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: _LinkInputSheet(
+              title: _settings.tr('add_link'),
+              cancelLabel: _settings.tr('cancel'),
+              addLabel: _settings.tr('add'),
+              invalidLinkLabel: _settings.tr('invalid_link'),
+            ),
           ),
     );
-    urlController.dispose();
     if (value == null || !mounted) return;
     if (_attachmentCount >= kMaxTaskAttachmentsPerTask) {
       ScaffoldMessenger.of(

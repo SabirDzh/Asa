@@ -1,10 +1,16 @@
 import 'package:device_calendar/device_calendar.dart';
+import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 /// Wraps the native Android Calendar Provider (and iOS EventKit) via the
 /// `device_calendar` package.
 class CalendarService {
   static final DeviceCalendarPlugin _plugin = DeviceCalendarPlugin();
+
+  /// Gives native calendar providers a moment to expose calendars after the
+  /// user grants access for the first time. Tests can set this to zero.
+  @visibleForTesting
+  static Duration calendarRetryDelay = const Duration(milliseconds: 250);
 
   /// Requests calendar read/write permissions. Returns true if granted.
   static Future<bool> requestPermission() async {
@@ -15,12 +21,37 @@ class CalendarService {
     return requested.isSuccess && (requested.data ?? false);
   }
 
-  /// Returns writable calendars available on the device.
+  /// Returns calendars that are not explicitly marked read-only.
+  ///
+  /// On the first access, Android/iOS can briefly return an empty collection
+  /// while the native calendar store is being initialized. Retry a few times
+  /// so granting permission does not immediately look like a missing calendar.
   static Future<List<Calendar>> getCalendars() async {
     if (!await requestPermission()) return [];
-    final result = await _plugin.retrieveCalendars();
-    if (!result.isSuccess || result.data == null) return [];
-    return result.data!.where((c) => !(c.isReadOnly ?? true)).toList();
+
+    const maxAttempts = 3;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final result = await _plugin.retrieveCalendars();
+      if (result.isSuccess && result.data != null) {
+        final calendars =
+            result.data!
+                .where(
+                  (calendar) =>
+                      calendar.id?.isNotEmpty == true &&
+                      calendar.isReadOnly != true,
+                )
+                .toList();
+        if (calendars.isNotEmpty || attempt == maxAttempts - 1) {
+          return calendars;
+        }
+      } else if (attempt == maxAttempts - 1) {
+        return [];
+      }
+
+      await Future<void>.delayed(calendarRetryDelay);
+    }
+
+    return [];
   }
 
   /// Creates or updates a calendar event linked to [taskId].

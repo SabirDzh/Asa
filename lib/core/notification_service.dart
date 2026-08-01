@@ -45,7 +45,17 @@ class NotificationService {
   /// the request instead; the app consumes it when it starts/resumes.
   static Future<void> Function(String taskId)? onStartTimerRequested;
 
-  static bool get isInitialized => _initialized;
+  @visibleForTesting
+  static Future<bool?> Function()? notificationPermissionStateOverride;
+
+  @visibleForTesting
+  static Future<bool> Function({required bool requestExactAlarms})?
+  requestPermissionOverride;
+
+  @visibleForTesting
+  static bool? initializedOverride;
+
+  static bool get isInitialized => initializedOverride ?? _initialized;
 
   static void setLanguage(String languageCode) {
     if (languageCode == 'ru' || languageCode == 'en') {
@@ -64,6 +74,33 @@ class NotificationService {
   /// Returns the payload used by notification actions for [taskId].
   @visibleForTesting
   static String taskPayloadForId(String taskId) => '$_taskPayloadPrefix$taskId';
+
+  /// Returns the current system notification permission when the platform
+  /// exposes it. A null result means the platform has no separate runtime
+  /// notification permission (for example, older Android versions).
+  static Future<bool?> notificationPermissionState() async {
+    final override = notificationPermissionStateOverride;
+    if (override != null) return override();
+    if (kIsWeb || !isInitialized) return null;
+
+    if (Platform.isAndroid) {
+      final android =
+          _plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+      return android?.areNotificationsEnabled();
+    }
+    if (Platform.isIOS) {
+      final iOS =
+          _plugin
+              .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin
+              >();
+      return (await iOS?.checkPermissions())?.isEnabled;
+    }
+    return true;
+  }
 
   /// Returns whether a task has a valid, non-zero period for a reminder.
   /// A start/end pair with the same time has no computable duration and must
@@ -127,7 +164,11 @@ class NotificationService {
   static Future<bool> requestPermission({
     bool requestExactAlarms = true,
   }) async {
-    if (kIsWeb || !_initialized) return false;
+    final override = requestPermissionOverride;
+    if (override != null) {
+      return override(requestExactAlarms: requestExactAlarms);
+    }
+    if (kIsWeb || !isInitialized) return false;
 
     var granted = false;
     if (Platform.isAndroid) {
@@ -142,7 +183,7 @@ class NotificationService {
       // notification permission is required. Exact alarm access is separate
       // and is intentionally best-effort: scheduling falls back to inexact
       // alarms when the user declines it.
-      if (requestExactAlarms) {
+      if (requestExactAlarms && notificationPermission != false) {
         try {
           await android?.requestExactAlarmsPermission();
         } on Object catch (error, stackTrace) {

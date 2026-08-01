@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -17,6 +18,7 @@ enum WidgetDisplayMode { activeTasks, lastFolder }
 
 class SettingsProvider with ChangeNotifier {
   final Future<String> Function() _deviceNameProvider;
+  final String Function() _systemLanguageCodeProvider;
 
   ThemeMode _themeMode = ThemeMode.system;
   ColorPalette _colorPalette = ColorPalette.base;
@@ -40,10 +42,14 @@ class SettingsProvider with ChangeNotifier {
   final _initCompleter = Completer<void>();
   Future<void> _customValuesOperation = Future<void>.value();
   Future<void> _avatarPathOperation = Future<void>.value();
+  Future<void> _notificationPermissionOperation = Future<void>.value();
 
   SettingsProvider({
     Future<String> Function() deviceNameProvider = getDefaultDeviceName,
-  }) : _deviceNameProvider = deviceNameProvider {
+    String Function()? systemLanguageCodeProvider,
+  }) : _deviceNameProvider = deviceNameProvider,
+       _systemLanguageCodeProvider =
+           systemLanguageCodeProvider ?? _readSystemLanguageCode {
     init();
   }
 
@@ -80,6 +86,22 @@ class SettingsProvider with ChangeNotifier {
 
   String tr(String key) => AppStrings.get(key, _languageCode);
 
+  /// Maps the device language to one of the languages supported by ASA.
+  /// Russian is selected only for Russian system locales; every other locale
+  /// uses English as the safe fallback.
+  @visibleForTesting
+  static String resolveSystemLanguageCode(String languageCode) {
+    return languageCode.toLowerCase().split(RegExp('[-_]')).first == 'ru'
+        ? 'ru'
+        : 'en';
+  }
+
+  static String _readSystemLanguageCode() {
+    return resolveSystemLanguageCode(
+      ui.PlatformDispatcher.instance.locale.languageCode,
+    );
+  }
+
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -108,7 +130,16 @@ class SettingsProvider with ChangeNotifier {
       AppColors.applyPalette(appPalette);
 
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
-      _languageCode = prefs.getString('languageCode') ?? 'ru';
+      // An existing value means the user explicitly selected a language. If
+      // it is absent, follow the device language for the initial experience:
+      // ru -> Russian, everything else -> English. The fallback is kept in
+      // memory only, so a later system-language change is respected until the
+      // user makes an explicit choice.
+      final savedLanguageCode = prefs.getString('languageCode');
+      _languageCode =
+          savedLanguageCode == 'ru' || savedLanguageCode == 'en'
+              ? savedLanguageCode!
+              : resolveSystemLanguageCode(_systemLanguageCodeProvider());
       NotificationService.setLanguage(_languageCode);
       _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
       _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(
@@ -210,31 +241,81 @@ class SettingsProvider with ChangeNotifier {
     );
   }
 
-  Future<void> toggleNotifications(bool value) async {
-    if (value) {
-      bool granted = true;
-      if (NotificationService.isInitialized) {
-        granted = await NotificationService.requestPermission();
-        if (granted) {
-          await NotificationService.showTestNotification();
-          await NotificationService.rescheduleCachedTasks();
-        }
+  /// Serializes permission reads and user toggles so a delayed lifecycle
+  /// check cannot overwrite a newer explicit user action.
+  Future<T> _runNotificationPermissionOperation<T>(
+    Future<T> Function() operation,
+  ) {
+    final result = Completer<T>();
+    final next = _notificationPermissionOperation.then((_) async {
+      try {
+        result.complete(await operation());
+      } on Object catch (error, stackTrace) {
+        result.completeError(error, stackTrace);
       }
-      _notificationsEnabled = granted;
-    } else {
-      _notificationsEnabled = false;
-      if (NotificationService.isInitialized) {
+    });
+    _notificationPermissionOperation = next.catchError((_) {});
+    return result.future;
+  }
+
+  /// Synchronizes the app switch with a revoked system permission.
+  Future<bool?> syncNotificationPermission() {
+    return _runNotificationPermissionOperation(() async {
+      if (!NotificationService.isInitialized) return null;
+
+      try {
+        final granted = await NotificationService.notificationPermissionState();
+        if (granted == false && _notificationsEnabled) {
+          _notificationsEnabled = false;
+          notifyListeners();
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('notificationsEnabled', false);
+          await NotificationService.cancelAll();
+        }
+        return granted;
+      } on Object catch (error, stackTrace) {
+        LoggerService.instance.w(
+          'Notification permission state check failed',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        return null;
+      }
+    });
+  }
+
+  Future<void> toggleNotifications(bool value) {
+    return _runNotificationPermissionOperation(() async {
+      if (value) {
+        var granted = false;
+        if (NotificationService.isInitialized) {
+          granted = await NotificationService.requestPermission(
+            requestExactAlarms: false,
+          );
+        }
+        _notificationsEnabled = granted;
+      } else {
+        _notificationsEnabled = false;
+      }
+
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+
+      if (_notificationsEnabled) {
+        await NotificationService.showTestNotification();
+        await NotificationService.rescheduleCachedTasks();
+      } else if (NotificationService.isInitialized) {
         await NotificationService.cancelAll();
       }
-    }
-
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+    });
   }
 
   Future<void> setLanguage(String code) async {
     if (code != 'ru' && code != 'en') return;
+    // Wait for the initial preference read so a quick user choice cannot be
+    // overwritten by the asynchronous startup fallback.
+    await ready;
     _languageCode = code;
     NotificationService.setLanguage(code);
     notifyListeners();

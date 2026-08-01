@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/core/app_strings.dart';
+import 'package:asa/core/notification_service.dart';
 import 'package:asa/core/theme.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 
@@ -11,16 +14,61 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
-      provider = SettingsProvider();
+      NotificationService.initializedOverride = null;
+      NotificationService.notificationPermissionStateOverride = null;
+      NotificationService.requestPermissionOverride = null;
+      provider = SettingsProvider(systemLanguageCodeProvider: () => 'ru');
+    });
+
+    tearDown(() {
+      NotificationService.initializedOverride = null;
+      NotificationService.notificationPermissionStateOverride = null;
+      NotificationService.requestPermissionOverride = null;
     });
 
     test('uses system theme by default', () {
       expect(provider.themeMode, ThemeMode.system);
     });
 
-    test('uses Russian locale by default', () {
-      expect(provider.languageCode, 'ru');
+    test('uses Russian when the system language is Russian', () async {
+      final russianProvider = SettingsProvider(
+        systemLanguageCodeProvider: () => 'ru',
+      );
+      await russianProvider.ready;
+
+      expect(russianProvider.languageCode, 'ru');
     });
+
+    test('uses English when the system language is English', () async {
+      final englishProvider = SettingsProvider(
+        systemLanguageCodeProvider: () => 'en',
+      );
+      await englishProvider.ready;
+
+      expect(englishProvider.languageCode, 'en');
+    });
+
+    test('falls back to English for unsupported system languages', () async {
+      final otherLanguageProvider = SettingsProvider(
+        systemLanguageCodeProvider: () => 'de-DE',
+      );
+      await otherLanguageProvider.ready;
+
+      expect(otherLanguageProvider.languageCode, 'en');
+    });
+
+    test(
+      'preserves an explicitly saved language over the system language',
+      () async {
+        SharedPreferences.setMockInitialValues({'languageCode': 'en'});
+        final russianSystemProvider = SettingsProvider(
+          systemLanguageCodeProvider: () => 'ru',
+        );
+        await russianSystemProvider.ready;
+
+        expect(russianSystemProvider.languageCode, 'en');
+      },
+    );
 
     test('uses normal animation speed by default', () {
       expect(provider.animationSpeed, 1.0);
@@ -150,19 +198,113 @@ void main() {
       expect(provider.themeMode, ThemeMode.system);
     });
 
-    test('toggleNotifications updates value', () {
-      provider.toggleNotifications(false);
-      expect(provider.notificationsEnabled, false);
+    test(
+      'toggleNotifications updates value when notifications are available',
+      () async {
+        NotificationService.initializedOverride = true;
+        var requestedExactAlarms = true;
+        NotificationService.requestPermissionOverride = ({
+          required bool requestExactAlarms,
+        }) async {
+          requestedExactAlarms = requestExactAlarms;
+          return true;
+        };
+        await provider.ready;
 
-      provider.toggleNotifications(true);
+        await provider.toggleNotifications(false);
+        expect(provider.notificationsEnabled, false);
+
+        await provider.toggleNotifications(true);
+        expect(provider.notificationsEnabled, true);
+        expect(requestedExactAlarms, false);
+      },
+    );
+
+    test(
+      'revoked permission turns the switch off and persists the state',
+      () async {
+        NotificationService.initializedOverride = true;
+        NotificationService.notificationPermissionStateOverride =
+            () async => false;
+        await provider.ready;
+
+        expect(provider.notificationsEnabled, true);
+        expect(await provider.syncNotificationPermission(), false);
+        expect(provider.notificationsEnabled, false);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('notificationsEnabled'), false);
+      },
+    );
+
+    test('enabling after denial requests permission again', () async {
+      NotificationService.initializedOverride = true;
+      var attempts = 0;
+      NotificationService.requestPermissionOverride = ({
+        required bool requestExactAlarms,
+      }) async {
+        attempts++;
+        return attempts > 1;
+      };
+      await provider.ready;
+
+      await provider.toggleNotifications(true);
+      expect(provider.notificationsEnabled, false);
+      expect(attempts, 1);
+
+      await provider.toggleNotifications(true);
       expect(provider.notificationsEnabled, true);
+      expect(attempts, 2);
     });
 
-    test('setLanguage changes language and ignores invalid codes', () {
-      provider.setLanguage('en');
+    test(
+      'explicitly disabled switch stays off when system permission is granted',
+      () async {
+        NotificationService.initializedOverride = true;
+        NotificationService.notificationPermissionStateOverride =
+            () async => true;
+        await provider.ready;
+
+        await provider.toggleNotifications(false);
+        await provider.syncNotificationPermission();
+
+        expect(provider.notificationsEnabled, false);
+      },
+    );
+
+    test(
+      'serializes lifecycle permission checks before a user toggle',
+      () async {
+        NotificationService.initializedOverride = true;
+        final permissionCheck = Completer<bool?>();
+        var requestAttempts = 0;
+        NotificationService.notificationPermissionStateOverride =
+            () => permissionCheck.future;
+        NotificationService.requestPermissionOverride = ({
+          required bool requestExactAlarms,
+        }) async {
+          requestAttempts++;
+          return true;
+        };
+        await provider.ready;
+
+        final lifecycleCheck = provider.syncNotificationPermission();
+        final enable = provider.toggleNotifications(true);
+        permissionCheck.complete(false);
+
+        expect(await lifecycleCheck, false);
+        await enable;
+        expect(requestAttempts, 1);
+        expect(provider.notificationsEnabled, true);
+      },
+    );
+
+    test('setLanguage changes language and ignores invalid codes', () async {
+      await provider.ready;
+      await provider.setLanguage('en');
       expect(provider.languageCode, 'en');
 
-      provider.setLanguage('fr');
+      await provider.setLanguage('fr');
       expect(provider.languageCode, 'en');
     });
 
@@ -221,13 +363,14 @@ void main() {
       expect(prefs.getString('avatarPath'), '/avatars/second.webp');
     });
 
-    test('tr returns Russian text for ru locale', () {
+    test('tr returns Russian text for ru locale', () async {
+      await provider.ready;
       expect(provider.tr('search'), 'Поиск');
       expect(provider.tr('delete'), 'Удалить');
     });
 
-    test('tr returns English text for en locale', () {
-      provider.setLanguage('en');
+    test('tr returns English text for en locale', () async {
+      await provider.setLanguage('en');
       expect(provider.tr('search'), 'Search');
       expect(provider.tr('delete'), 'Delete');
     });

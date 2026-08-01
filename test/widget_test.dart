@@ -22,7 +22,10 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(
+            create:
+                (_) => SettingsProvider(systemLanguageCodeProvider: () => 'ru'),
+          ),
           ChangeNotifierProvider(create: (_) => TaskProvider()),
         ],
         child: const AsaApp(),

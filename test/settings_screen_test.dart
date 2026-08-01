@@ -16,8 +16,10 @@ Widget createTestApp({bool standalone = true}) {
     providers: [
       ChangeNotifierProvider(
         create:
-            (_) =>
-                SettingsProvider(deviceNameProvider: () async => 'Test Device'),
+            (_) => SettingsProvider(
+              deviceNameProvider: () async => 'Test Device',
+              systemLanguageCodeProvider: () => 'ru',
+            ),
       ),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
@@ -68,6 +70,17 @@ void main() {
     await expectVisible('УВЕДОМЛЕНИЯ И ДАННЫЕ');
     await expectVisible('ДРУГОЕ');
     expect(find.byType(SettingRow), findsWidgets);
+  });
+
+  testWidgets('uses the timer icon for animation speed setting', (
+    tester,
+  ) async {
+    await pumpAndInit(tester, createTestApp());
+
+    expect(
+      find.byKey(const ValueKey('animation_speed_timer_icon')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('renders avatar section', (tester) async {

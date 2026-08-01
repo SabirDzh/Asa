@@ -58,9 +58,13 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_tasks_info" />
         </receiver>
+        <!-- The home screen (a separate app) binds to this RemoteViewsService
+             to populate the big widget's task list. It must be exported so the
+             launcher can bind; BIND_REMOTEVIEWS is a signature permission held
+             only by launchers, so the export remains safe. -->
         <service
             android:name=".AsaWidgetTaskService"
-            android:exported="false"
+            android:exported="true"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
         <activity
             android:name=".AsaWidgetConfigActivity"

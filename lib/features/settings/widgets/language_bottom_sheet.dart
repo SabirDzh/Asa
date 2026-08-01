@@ -42,7 +42,7 @@ void showLanguageSheet(BuildContext context) {
                   ),
                   trailing:
                       settings.languageCode == 'ru'
-                          ? const Icon(Icons.check, color: AppColors.primary)
+                          ? Icon(Icons.check, color: AppColors.primary)
                           : null,
                   onTap: () {
                     settings.setLanguage('ru');
@@ -59,7 +59,7 @@ void showLanguageSheet(BuildContext context) {
                   ),
                   trailing:
                       settings.languageCode == 'en'
-                          ? const Icon(Icons.check, color: AppColors.primary)
+                          ? Icon(Icons.check, color: AppColors.primary)
                           : null,
                   onTap: () {
                     settings.setLanguage('en');

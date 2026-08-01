@@ -62,8 +62,7 @@ Widget _modeTile(
         settings.widgetModeLabel(mode),
         style: TextStyle(color: textColor, fontSize: 16),
       ),
-      trailing:
-          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      trailing: isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         settings.setWidgetDisplayMode(mode);
         Navigator.pop(ctx);

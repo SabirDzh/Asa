@@ -155,7 +155,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                           ),
                           child: Text(
                             settings.tr('save'),
-                            style: const TextStyle(color: AppColors.textDark),
+                            style: TextStyle(color: AppColors.textDark),
                           ),
                         ),
                       ),
@@ -339,7 +339,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                       ),
                       child: Text(
                         settings.tr('save'),
-                        style: const TextStyle(color: AppColors.textDark),
+                        style: TextStyle(color: AppColors.textDark),
                       ),
                     ),
                   ),

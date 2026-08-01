@@ -1,34 +1,149 @@
 import 'package:flutter/material.dart';
 
-/// App color system — 3 semantic colors, Material 3 compliant
+enum ColorPalette { base, ocean, custom }
+
+/// Three user-configurable semantic colors: accent, surface and background.
+/// Dark-mode variants are derived from the same three-color input so custom
+/// palettes never need to store more than three colors.
+class AppPalette {
+  final Color primary;
+  final Color surfaceLight;
+  final Color backgroundLight;
+  final Color? primaryDark;
+  final Color? surfaceDark;
+  final Color? backgroundDark;
+
+  const AppPalette({
+    required this.primary,
+    required this.surfaceLight,
+    required this.backgroundLight,
+    this.primaryDark,
+    this.surfaceDark,
+    this.backgroundDark,
+  });
+
+  static const base = AppPalette(
+    primary: Color(0xFF24AC09),
+    surfaceLight: Color(0xFFFFFFFF),
+    backgroundLight: Color(0xFFF2F2F7),
+    primaryDark: Color(0xFF24AC09),
+    surfaceDark: Color(0xFF2C2C2E),
+    backgroundDark: Color(0xFF1C1C1E),
+  );
+
+  static const ocean = AppPalette(
+    primary: Color(0xFF087EDE),
+    surfaceLight: Color(0xFFFFFFFF),
+    backgroundLight: Color(0xFFEAF4FF),
+    primaryDark: Color(0xFF55B1FF),
+    surfaceDark: Color(0xFF17324A),
+    backgroundDark: Color(0xFF091A2A),
+  );
+
+  Color primaryFor(Brightness brightness) {
+    if (brightness == Brightness.dark) {
+      return primaryDark ?? _deriveDark(primary, brighten: true);
+    }
+    return primary;
+  }
+
+  Color surfaceFor(Brightness brightness) {
+    if (brightness == Brightness.dark) {
+      return surfaceDark ?? _deriveDark(surfaceLight);
+    }
+    return surfaceLight;
+  }
+
+  Color backgroundFor(Brightness brightness) {
+    if (brightness == Brightness.dark) {
+      return backgroundDark ?? _deriveDark(backgroundLight);
+    }
+    return backgroundLight;
+  }
+
+  AppPalette copyWith({
+    Color? primary,
+    Color? surfaceLight,
+    Color? backgroundLight,
+    Color? primaryDark,
+    Color? surfaceDark,
+    Color? backgroundDark,
+  }) {
+    return AppPalette(
+      primary: primary ?? this.primary,
+      surfaceLight: surfaceLight ?? this.surfaceLight,
+      backgroundLight: backgroundLight ?? this.backgroundLight,
+      primaryDark: primaryDark ?? this.primaryDark,
+      surfaceDark: surfaceDark ?? this.surfaceDark,
+      backgroundDark: backgroundDark ?? this.backgroundDark,
+    );
+  }
+
+  List<Color> get customColors => [primary, surfaceLight, backgroundLight];
+
+  static Color _deriveDark(Color color, {bool brighten = false}) {
+    final target = brighten ? Colors.white : Colors.black;
+    return Color.lerp(color, target, brighten ? 0.2 : 0.72)!;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is AppPalette &&
+        other.primary == primary &&
+        other.surfaceLight == surfaceLight &&
+        other.backgroundLight == backgroundLight &&
+        other.primaryDark == primaryDark &&
+        other.surfaceDark == surfaceDark &&
+        other.backgroundDark == backgroundDark;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    primary,
+    surfaceLight,
+    backgroundLight,
+    primaryDark,
+    surfaceDark,
+    backgroundDark,
+  );
+}
+
+/// App color system — three semantic colors, Material 3 compliant.
+///
+/// The getters intentionally remain source-compatible with existing widgets.
+/// [applyPalette] updates them before SettingsProvider notifies listeners.
 class AppColors {
-  // ── Palette ──────────────────────────────────────────────
-  // Color 1: Primary action / checked state (green from Figma)
-  static const Color primary = Color(0xFF24AC09);
+  static AppPalette _palette = AppPalette.base;
 
-  // Color 2: Surface / neutral containers
-  // Light: clean white  |  Dark: elevated surface
-  static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF2C2C2E); // iOS-style dark surface
+  static AppPalette get palette => _palette;
 
-  // Color 3: Background
-  static const Color bgLight = Color(0xFFF2F2F7);
-  static const Color bgDark = Color(0xFF1C1C1E); // iOS dark bg
+  static void applyPalette(AppPalette palette) {
+    _palette = palette;
+  }
 
-  // ── Derived ──────────────────────────────────────────────
-  // Bottom nav & sheet background
-  static const Color navLight = Color(0xFFFFFFFF); // white bottom bar
-  static const Color navDark = Color(0xFF3A3A3C);
+  static Color get primary => _palette.primary;
+  static Color get surfaceLight => _palette.surfaceLight;
+  static Color get surfaceDark => _palette.surfaceFor(Brightness.dark);
+  static Color get bgLight => _palette.backgroundLight;
+  static Color get bgDark => _palette.backgroundFor(Brightness.dark);
 
-  // Bottom sheets follow the theme surface so they adapt to light/dark mode.
-  static const Color sheetLight = Color(0xFFFFFFFF);
-  static const Color sheetDark = Color(0xFF3A3A3C);
+  static Color get navLight => surfaceLight;
+  static Color get navDark =>
+      _palette == AppPalette.base
+          ? const Color(0xFF3A3A3C)
+          : Color.lerp(surfaceDark, Colors.white, 0.18)!;
+  static Color get sheetLight => surfaceLight;
+  static Color get sheetDark =>
+      _palette == AppPalette.base ? const Color(0xFF3A3A3C) : navDark;
+  static Color get surfaceSecondaryLight =>
+      _palette == AppPalette.base
+          ? const Color(0xFFE5E5EA)
+          : Color.lerp(surfaceLight, bgLight, 0.55)!;
+  static Color get surfaceSecondaryDark =>
+      _palette == AppPalette.base
+          ? const Color(0xFF3A3A3C)
+          : Color.lerp(surfaceDark, Colors.white, 0.12)!;
 
-  // Secondary surface (slightly lighter/darker)
-  static const Color surfaceSecondaryLight = Color(0xFFE5E5EA);
-  static const Color surfaceSecondaryDark = Color(0xFF3A3A3C);
-
-  // Text
   static const Color textLight = Color(0xFF000000);
   static const Color textDark = Color(0xFFFFFFFF);
   static const Color textSecondaryLight = Color(0xFF6B7280);
@@ -37,58 +152,66 @@ class AppColors {
 
 class AppTheme {
   // ── Figma exact spacing constants ─────────────────────────
-  static const double pillRadius = 28.0; // cr:28 on task rows
-  static const double fabRadius = 16.0; // cr:16 on FAB
-  static const double menuRadius = 16.0; // cr:16 on context menus
-  static const double checkRadius = 8.0; // cr:8 on empty checkbox
-  static const double checkRadiusDone = 6.0; // cr:6 on done checkbox
+  static const double pillRadius = 28.0;
+  static const double fabRadius = 16.0;
+  static const double menuRadius = 16.0;
+  static const double checkRadius = 8.0;
+  static const double checkRadiusDone = 6.0;
   static const double sheetHandleRadius = 2.0;
 
   // ── Figma exact padding/gap constants ─────────────────────
-  static const double rowPadH = 20.0; // left/right inside pill row
-  static const double rowPadV = 15.0; // top/bottom inside pill row
-  static const double rowGap = 10.0; // gap between row children
-  static const double rowHeight = 56.0; // h of every row/pill
-  static const double rowWidth = 328.0; // 360 - 16 - 16
-  static const double screenPad = 16.0; // outer horizontal padding
+  static const double rowPadH = 20.0;
+  static const double rowPadV = 15.0;
+  static const double rowGap = 10.0;
+  static const double rowHeight = 56.0;
+  static const double rowWidth = 328.0;
+  static const double screenPad = 16.0;
 
-  static const double navHeight = 100.0; // Figma nav bar h
+  static const double navHeight = 100.0;
   static const double navPadTop = 14.0;
   static const double navPadBottom = 24.0;
 
   static const double fabSize = 56.0;
   static const double scrollHideThreshold = 2.0;
 
-  static const double sheetGap = 72.0; // gap inside bottom sheet
+  static const double sheetGap = 72.0;
   static const double sheetPadH = 16.0;
   static const double sheetPadTop = 20.0;
 
-  static const double menuItemGap = 6.0; // gap between menu items
-  static const double menuItemPad = 10.0; // padding inside menu item
-  static const double menuItemGapInner = 10.0; // gap icon–label in menu item
-  static const double popupMenuGap = 6.0; // gap between icon and popup menu
+  static const double menuItemGap = 6.0;
+  static const double menuItemPad = 10.0;
+  static const double menuItemGapInner = 10.0;
+  static const double popupMenuGap = 6.0;
 
-  // ── Themes ────────────────────────────────────────────────
-  static ThemeData get lightTheme => _build(Brightness.light);
-  static ThemeData get darkTheme => _build(Brightness.dark);
+  static ThemeData get lightTheme =>
+      _build(Brightness.light, AppColors.palette);
+  static ThemeData get darkTheme => _build(Brightness.dark, AppColors.palette);
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData lightThemeFor(AppPalette palette) =>
+      _build(Brightness.light, palette);
+
+  static ThemeData darkThemeFor(AppPalette palette) =>
+      _build(Brightness.dark, palette);
+
+  static ThemeData _build(Brightness brightness, AppPalette palette) {
     final isDark = brightness == Brightness.dark;
-    final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final bg = palette.backgroundFor(brightness);
+    final surface = palette.surfaceFor(brightness);
+    final primary = palette.primaryFor(brightness);
     final onSurface = isDark ? AppColors.textDark : AppColors.textLight;
     final baseTypography = Typography.material2021();
 
     return ThemeData(
       brightness: brightness,
-      primaryColor: AppColors.primary,
+      primaryColor: primary,
       scaffoldBackgroundColor: bg,
       colorScheme: ColorScheme(
         brightness: brightness,
-        primary: AppColors.primary,
-        onPrimary: Colors.white,
-        secondary: AppColors.navLight,
-        onSecondary: Colors.white,
+        primary: primary,
+        onPrimary:
+            primary.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+        secondary: isDark ? AppColors.navDark : palette.surfaceLight,
+        onSecondary: isDark ? Colors.white : Colors.black,
         surface: surface,
         onSurface: onSurface,
         error: Colors.redAccent,
@@ -115,7 +238,7 @@ class AppTheme {
         elevation: 0,
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: isDark ? AppColors.surfaceDark : AppColors.bgLight,
+        backgroundColor: isDark ? surface : bg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -129,8 +252,7 @@ class AppTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor:
-            isDark ? AppColors.surfaceDark : const Color(0xFF323232),
+        backgroundColor: isDark ? surface : const Color(0xFF323232),
         contentTextStyle: const TextStyle(color: Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,

@@ -96,8 +96,7 @@ Widget _themeTile(
         settings.tr(labelKey),
         style: TextStyle(color: textColor, fontSize: 16),
       ),
-      trailing:
-          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      trailing: isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         if (settings.themeMode != mode) {
           ThemeSwitcher.switchTheme(

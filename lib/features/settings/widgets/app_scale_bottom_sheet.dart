@@ -155,8 +155,7 @@ Widget _scaleTile(
     color: Colors.transparent,
     child: ListTile(
       title: Text(label, style: TextStyle(color: textColor, fontSize: 16)),
-      trailing:
-          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      trailing: isSelected ? Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         settings.setAppScale(value);
         Navigator.pop(ctx);

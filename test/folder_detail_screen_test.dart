@@ -75,6 +75,53 @@ void main() {
     expect(find.byKey(const ValueKey('task-reorder-handle')), findsNWidgets(2));
   });
 
+  testWidgets('swiping a nested task left moves it to the parent folder', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    provider.addFolder('Parent');
+    final parent = provider.folders.firstWhere((item) => item.name == 'Parent');
+    provider.addFolder('Child', parentFolderId: parent.id);
+    final child = provider.folders.firstWhere((item) => item.name == 'Child');
+    provider.addTask('Nested task', folderId: child.id);
+
+    await tester.pumpWidget(createTestApp(child, provider: provider));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.text('Nested task'), const Offset(-350, 0));
+    await tester.pumpAndSettle();
+
+    expect(provider.getFolderTasks(child.id), isEmpty);
+    expect(provider.getFolderTasks(parent.id).single.title, 'Nested task');
+  });
+
+  testWidgets('swiping a nested folder left moves it to the parent folder', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    provider.addFolder('Grandparent');
+    final grandparent = provider.folders.firstWhere(
+      (item) => item.name == 'Grandparent',
+    );
+    provider.addFolder('Parent', parentFolderId: grandparent.id);
+    final parent = provider.folders.firstWhere((item) => item.name == 'Parent');
+    provider.addFolder('Child', parentFolderId: parent.id);
+    final child = provider.folders.firstWhere((item) => item.name == 'Child');
+
+    await tester.pumpWidget(createTestApp(parent, provider: provider));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.text('Child'), const Offset(-350, 0));
+    await tester.pumpAndSettle();
+
+    expect(
+      provider.folders
+          .firstWhere((folder) => folder.id == child.id)
+          .parentFolderId,
+      grandparent.id,
+    );
+  });
+
   testWidgets('shows tasks inside folder', (tester) async {
     final taskProvider = TaskProvider();
 

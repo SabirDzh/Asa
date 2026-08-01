@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
@@ -22,38 +24,137 @@ Future<void> showTaskDetailSheet(BuildContext context, TaskItem task) async {
   );
 }
 
+class _LiveActualTimeLine extends StatefulWidget {
+  final String taskId;
+  final String label;
+  final Color textColor;
+  final bool isTimerRunning;
+  final Duration initialElapsed;
+
+  const _LiveActualTimeLine({
+    required this.taskId,
+    required this.label,
+    required this.textColor,
+    required this.isTimerRunning,
+    required this.initialElapsed,
+  });
+
+  @override
+  State<_LiveActualTimeLine> createState() => _LiveActualTimeLineState();
+}
+
+class _LiveActualTimeLineState extends State<_LiveActualTimeLine> {
+  Timer? _timer;
+  late Duration _elapsed;
+
+  @override
+  void initState() {
+    super.initState();
+    _elapsed = widget.initialElapsed;
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(_LiveActualTimeLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final taskChanged = oldWidget.taskId != widget.taskId;
+    final timerStateChanged = oldWidget.isTimerRunning != widget.isTimerRunning;
+    final elapsedChanged = oldWidget.initialElapsed != widget.initialElapsed;
+    if (taskChanged || timerStateChanged || elapsedChanged) {
+      _elapsed = widget.initialElapsed;
+      if (taskChanged || timerStateChanged) _syncTimer();
+    }
+  }
+
+  void _syncTimer() {
+    _timer?.cancel();
+    _timer = null;
+    if (!widget.isTimerRunning) return;
+
+    final provider = context.read<TaskProvider>();
+    final currentElapsed = provider.elapsedForTask(widget.taskId);
+    final elapsedSeconds = currentElapsed.inSeconds % 60;
+    final secondsUntilNextMinute =
+        elapsedSeconds == 0 ? 60 : 60 - elapsedSeconds;
+    _timer = Timer(Duration(seconds: secondsUntilNextMinute), () {
+      if (!mounted) return;
+      final nextElapsed = provider.elapsedForTask(widget.taskId);
+      if (nextElapsed.inMinutes != _elapsed.inMinutes) {
+        setState(() => _elapsed = nextElapsed);
+      }
+      _syncTimer();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    final totalMinutes = duration.inMinutes;
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    return '$hours:${minutes.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: ValueKey('detail-time-line-${widget.label}'),
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Semantics(
+        label: '${widget.label}: ${_formatDuration(_elapsed)}',
+        child: RichText(
+          key: const ValueKey('detail-actual-time-value'),
+          text: TextSpan(
+            style: TextStyle(color: widget.textColor, fontSize: 15),
+            children: [
+              TextSpan(
+                text: '${widget.label}: ',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              TextSpan(text: _formatDuration(_elapsed)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TaskDetailSheet extends StatelessWidget {
   final TaskItem task;
 
   const _TaskDetailSheet({required this.task});
 
-  String _folderName(BuildContext context) {
+  String _folderName(BuildContext context, TaskItem currentTask) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
-    if (task.folderId == null) return settings.tr('no_folder');
+    if (currentTask.folderId == null) return settings.tr('no_folder');
     final folder = Provider.of<TaskProvider>(
       context,
       listen: false,
     ).folders.firstWhere(
-      (f) => f.id == task.folderId,
+      (f) => f.id == currentTask.folderId,
       orElse: () => FolderItem(id: '', name: ''),
     );
     return folder.name.isNotEmpty ? folder.name : settings.tr('no_folder');
   }
 
-  String _statusText(BuildContext context) {
+  String _statusText(BuildContext context, TaskItem currentTask) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
-    return task.isCompleted
+    return currentTask.isCompleted
         ? settings.tr('status_completed')
         : settings.tr('status_active');
   }
 
-  /// The system streak folder is regenerated every day, so tasks inside it
-  /// cannot be linked to calendar events.
-  bool get _isInStreakFolder => task.folderId == 'system_streak_folder';
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
 
   String _formatDateTime(DateTime date) {
-    final d =
-        '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    final d = _formatDate(date);
     final t =
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     return '$d $t';
@@ -72,16 +173,18 @@ class _TaskDetailSheet extends StatelessWidget {
 
   Widget _buildTimeBlock(
     BuildContext context,
+    TaskItem currentTask,
     Color textColor,
     bool isTimerRunning,
     Duration elapsed,
   ) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final hasPlannedDuration = task.effectiveDurationMinutes != null;
-    final hasPeriod = task.startTime != null || task.endTime != null;
+    final hasPlannedDuration = currentTask.effectiveDurationMinutes != null;
+    final hasPeriod =
+        currentTask.startTime != null || currentTask.endTime != null;
     final hasActualTime =
         isTimerRunning ||
-        task.timerElapsedSeconds > 0 ||
+        currentTask.timerElapsedSeconds > 0 ||
         hasPlannedDuration ||
         hasPeriod;
     if (!hasPlannedDuration && !hasPeriod && !hasActualTime) {
@@ -92,21 +195,17 @@ class _TaskDetailSheet extends StatelessWidget {
     if (hasPlannedDuration) {
       lines.add((
         label: settings.tr('duration'),
-        value: _formatDuration(task.effectiveDurationMinutes!),
+        value: _formatDuration(currentTask.effectiveDurationMinutes!),
       ));
     }
     if (hasPeriod) {
       lines.add((
         label: settings.tr('time_period'),
-        value: '${_timeValue(task.startTime)} - ${_timeValue(task.endTime)}',
+        value:
+            '${_timeValue(currentTask.startTime)} - ${_timeValue(currentTask.endTime)}',
       ));
     }
-    if (hasActualTime) {
-      lines.add((
-        label: settings.tr('actual_time'),
-        value: _formatDuration(elapsed.inMinutes),
-      ));
-    }
+    final actualTimeLabel = settings.tr('actual_time');
 
     return Container(
       key: const ValueKey('detail-time-block'),
@@ -123,13 +222,13 @@ class _TaskDetailSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Icon(
-              task.calendarEventId != null &&
-                      task.folderId != 'system_streak_folder'
+              currentTask.calendarEventId != null &&
+                      currentTask.folderId != 'system_streak_folder'
                   ? Iconsax.calendar
                   : Iconsax.timer_1,
               key: ValueKey(
-                task.calendarEventId != null &&
-                        task.folderId != 'system_streak_folder'
+                currentTask.calendarEventId != null &&
+                        currentTask.folderId != 'system_streak_folder'
                     ? 'detail_calendar_icon'
                     : 'detail_timer_icon',
               ),
@@ -163,6 +262,14 @@ class _TaskDetailSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
+                if (hasActualTime)
+                  _LiveActualTimeLine(
+                    taskId: currentTask.id,
+                    label: actualTimeLabel,
+                    textColor: textColor,
+                    isTimerRunning: isTimerRunning,
+                    initialElapsed: elapsed,
                   ),
               ],
             ),
@@ -389,14 +496,24 @@ class _TaskDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    context.select<SettingsProvider, String>(
+      (settings) => settings.languageCode,
+    );
+    final settings = context.read<SettingsProvider>();
     final taskProvider = context.watch<TaskProvider>();
     final currentTask = taskProvider.allTasks.firstWhere(
       (candidate) => candidate.id == task.id,
       orElse: () => task,
     );
-    final isTimerRunning = taskProvider.isTimerRunning(currentTask.id);
-    final elapsed = taskProvider.elapsedForTask(currentTask.id);
+    final hasProviderTask = taskProvider.allTasks.any(
+      (candidate) => candidate.id == currentTask.id,
+    );
+    final isTimerRunning =
+        hasProviderTask && taskProvider.isTimerRunning(currentTask.id);
+    final elapsed =
+        hasProviderTask
+            ? taskProvider.elapsedForTask(currentTask.id)
+            : Duration(seconds: currentTask.timerElapsedSeconds);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
@@ -443,38 +560,50 @@ class _TaskDetailSheet extends StatelessWidget {
                 const SizedBox(height: 20),
                 _infoTile(
                   Iconsax.clipboard_tick,
-                  task.title,
+                  currentTask.title,
                   textColor,
                   bold: true,
                 ),
                 _infoTile(
                   Iconsax.folder_minus,
-                  '${settings.tr('folder')}: ${_folderName(context)}',
+                  '${settings.tr('folder')}: ${_folderName(context, currentTask)}',
                   textColor,
                 ),
                 _infoTile(
                   Iconsax.clock,
-                  '${settings.tr('task_status')}: ${_statusText(context)}',
+                  '${settings.tr('task_status')}: ${_statusText(context, currentTask)}',
                   textColor,
                 ),
-                _buildTimeBlock(context, textColor, isTimerRunning, elapsed),
-                _buildInfoBlocks(context, textColor, currentTask),
-                if (!_isInStreakFolder)
+                _buildTimeBlock(
+                  context,
+                  currentTask,
+                  textColor,
+                  isTimerRunning,
+                  elapsed,
+                ),
+                if (currentTask.dueDate != null)
                   _infoTile(
-                    task.calendarEventId != null
+                    Iconsax.calendar_1,
+                    '${settings.tr('due_date')}: ${_formatDate(currentTask.dueDate!)}',
+                    textColor,
+                  ),
+                _buildInfoBlocks(context, textColor, currentTask),
+                if (currentTask.folderId != 'system_streak_folder')
+                  _infoTile(
+                    currentTask.calendarEventId != null
                         ? Iconsax.calendar
                         : Iconsax.calendar_remove,
-                    '${settings.tr('calendar_status')}: ${task.calendarEventId != null ? settings.tr('calendar_linked') : settings.tr('calendar_not_linked')}',
+                    '${settings.tr('calendar_status')}: ${currentTask.calendarEventId != null ? settings.tr('calendar_linked') : settings.tr('calendar_not_linked')}',
                     textColor,
                   ),
                 _infoTile(
                   Iconsax.calendar_1,
-                  '${settings.tr('created_at')}: ${_formatDateTime(task.createdAt)}',
+                  '${settings.tr('created_at')}: ${_formatDateTime(currentTask.createdAt)}',
                   textSecondary,
                 ),
                 _infoTile(
                   Iconsax.refresh,
-                  '${settings.tr('updated_at')}: ${_formatDateTime(task.updatedAt)}',
+                  '${settings.tr('updated_at')}: ${_formatDateTime(currentTask.updatedAt)}',
                   textSecondary,
                 ),
                 const SizedBox(height: 8),

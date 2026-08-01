@@ -19,6 +19,7 @@ class FolderRow extends StatefulWidget {
   final bool enableDrag;
   final int? reorderIndex;
   final bool showReorderHandle;
+  final VoidCallback? onSwipeToParent;
 
   const FolderRow({
     super.key,
@@ -26,6 +27,7 @@ class FolderRow extends StatefulWidget {
     this.enableDrag = true,
     this.reorderIndex,
     this.showReorderHandle = false,
+    this.onSwipeToParent,
   });
 
   @override
@@ -178,6 +180,9 @@ class _FolderRowState extends State<FolderRow> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsProvider, String>(
+      (settings) => settings.languageCode,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary =
@@ -313,8 +318,22 @@ class _FolderRowState extends State<FolderRow> {
       builder: (context, candidateData, rejectedData) => rowChild,
     );
 
+    Widget swipeChild = dragTargetChild;
+    if (widget.onSwipeToParent != null) {
+      swipeChild = Dismissible(
+        key: ValueKey('swipe-folder-${widget.folder.id}'),
+        direction: DismissDirection.endToStart,
+        movementDuration: const Duration(milliseconds: 220),
+        resizeDuration: const Duration(milliseconds: 180),
+        background: const ColoredBox(color: Colors.transparent),
+        secondaryBackground: _swipeBackground(textSecondary),
+        onDismissed: (_) => widget.onSwipeToParent!(),
+        child: swipeChild,
+      );
+    }
+
     if (!widget.enableDrag) {
-      return dragTargetChild;
+      return swipeChild;
     }
 
     return LongPressDraggable<FolderItem>(
@@ -382,8 +401,32 @@ class _FolderRowState extends State<FolderRow> {
           ),
         ),
       ),
-      childWhenDragging: Opacity(opacity: 0.3, child: dragTargetChild),
-      child: dragTargetChild,
+      childWhenDragging: Opacity(opacity: 0.3, child: swipeChild),
+      child: swipeChild,
+    );
+  }
+
+  Widget _swipeBackground(Color color) {
+    final settings = context.read<SettingsProvider>();
+    return Container(
+      height: AppTheme.rowHeight,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: AppTheme.rowPadH),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            settings.tr('move_to_parent'),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.reply, color: color, size: 22),
+        ],
+      ),
     );
   }
 

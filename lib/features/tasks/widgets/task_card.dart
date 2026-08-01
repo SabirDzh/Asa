@@ -21,6 +21,7 @@ class TaskRow extends StatefulWidget {
   final bool enableDrag;
   final int? reorderIndex;
   final bool showReorderHandle;
+  final VoidCallback? onSwipeToParent;
 
   const TaskRow({
     super.key,
@@ -28,6 +29,7 @@ class TaskRow extends StatefulWidget {
     this.enableDrag = true,
     this.reorderIndex,
     this.showReorderHandle = false,
+    this.onSwipeToParent,
   });
 
   @override
@@ -36,7 +38,6 @@ class TaskRow extends StatefulWidget {
 
 class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   late final AnimationController _exitController;
-  int _entranceKey = 0;
   bool _isExiting = false;
   bool? _previousCompleted;
 
@@ -69,9 +70,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   void didUpdateWidget(TaskRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.task.isCompleted != _previousCompleted) {
-      _entranceKey++;
+      // Completion is a state update, not a new row insertion. Keep the
+      // entrance animation state stable so a toggle does not replay the
+      // entrance transition or recreate the row subtree.
       _isExiting = false;
-      _exitController.value = 0.0;
       _previousCompleted = widget.task.isCompleted;
     }
   }
@@ -308,6 +310,30 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     );
   }
 
+  Widget _swipeBackground(Color color) {
+    final settings = context.read<SettingsProvider>();
+    return Container(
+      height: AppTheme.rowHeight,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: AppTheme.rowPadH),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            settings.tr('move_to_parent'),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.reply, color: color, size: 22),
+        ],
+      ),
+    );
+  }
+
   Widget _reorderHandle(Color color) {
     final settings = context.read<SettingsProvider>();
     return ReorderableDragStartListener(
@@ -391,7 +417,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final textSecondary =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    context.select<SettingsProvider, String>(
+      (settings) => settings.languageCode,
+    );
+    final settings = context.read<SettingsProvider>();
 
     final cardChild = Container(
       height: AppTheme.rowHeight,
@@ -496,7 +525,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
       );
     } else {
       animatedChild = TweenAnimationBuilder<double>(
-        key: ValueKey('entrance_$_entranceKey'),
+        key: const ValueKey('task-row-entrance'),
         tween: Tween(begin: 0.0, end: 1.0),
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeOutCubic,
@@ -512,7 +541,21 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
       );
     }
 
-    if (!widget.enableDrag) return animatedChild;
+    Widget swipeChild = animatedChild;
+    if (widget.onSwipeToParent != null) {
+      swipeChild = Dismissible(
+        key: ValueKey('swipe-task-${widget.task.id}'),
+        direction: DismissDirection.endToStart,
+        movementDuration: const Duration(milliseconds: 220),
+        resizeDuration: const Duration(milliseconds: 180),
+        background: const ColoredBox(color: Colors.transparent),
+        secondaryBackground: _swipeBackground(textSecondary),
+        onDismissed: (_) => widget.onSwipeToParent!(),
+        child: swipeChild,
+      );
+    }
+
+    if (!widget.enableDrag) return swipeChild;
 
     return LongPressDraggable<TaskItem>(
       data: widget.task,
@@ -595,8 +638,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           ),
         ),
       ),
-      childWhenDragging: Opacity(opacity: 0.4, child: animatedChild),
-      child: animatedChild,
+      childWhenDragging: Opacity(opacity: 0.4, child: swipeChild),
+      child: swipeChild,
     );
   }
 }

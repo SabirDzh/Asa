@@ -35,15 +35,23 @@ Future<void> showTaskEditorSheet(
   TaskItem? task,
   TaskAttachmentPicker? attachmentPicker,
 }) async {
+  // Keep one stable editor widget instance. The route builder may rebuild
+  // while the keyboard animates, but the expensive form subtree must not be
+  // recreated on every inset frame.
+  final editor = TaskEditorSheet(
+    folderId: folderId,
+    task: task,
+    attachmentPicker: attachmentPicker,
+  );
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder:
-        (ctx) => TaskEditorSheet(
-          folderId: folderId,
-          task: task,
-          attachmentPicker: attachmentPicker,
+        (ctx) => Padding(
+          // Only this lightweight wrapper responds to keyboard insets.
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: editor,
         ),
   );
 }
@@ -315,7 +323,11 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   }
 
   Future<void> _showBlockChooser() async {
-    await showModalBottomSheet<void>(
+    // Do not animate the keyboard and the chooser route against each other.
+    // The editor remains mounted while the nested sheet is open, but its
+    // focused field should release focus before the route transition starts.
+    FocusManager.instance.primaryFocus?.unfocus();
+    final selectedType = await showModalBottomSheet<TaskInfoBlockType>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
@@ -341,8 +353,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                   label: _settings.tr('quantity_block'),
                   color: textColor,
                   onTap: () {
-                    Navigator.pop(ctx);
-                    _addBlock(TaskInfoBlockType.quantity);
+                    Navigator.pop(ctx, TaskInfoBlockType.quantity);
                   },
                 ),
                 if (!_hasDescriptionBlock)
@@ -353,8 +364,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                     label: _settings.tr('description_block'),
                     color: textColor,
                     onTap: () {
-                      Navigator.pop(ctx);
-                      _addBlock(TaskInfoBlockType.description);
+                      Navigator.pop(ctx, TaskInfoBlockType.description);
                     },
                   ),
               ],
@@ -363,6 +373,9 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
         );
       },
     );
+    if (selectedType != null && mounted) {
+      _addBlock(selectedType);
+    }
   }
 
   Widget _chooserTile(
@@ -704,112 +717,107 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     final secondaryColor =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: sheetColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-        ),
-        child: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 48,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: secondaryColor,
-                        borderRadius: BorderRadius.circular(2),
+    return Container(
+      decoration: BoxDecoration(
+        color: sheetColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
+      child: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: secondaryColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  _settings.tr(_isEditing ? 'edit_task' : 'create_task'),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const ValueKey('task-title-input'),
+                  controller: _titleController,
+                  autofocus: true,
+                  maxLength: kMaxTextInputLength,
+                  inputFormatters: [textInputFormatter()],
+                  validator: _title,
+                  decoration: InputDecoration(
+                    hintText: _settings.tr('new_task'),
+                    filled: true,
+                    fillColor:
+                        isDark
+                            ? AppColors.surfaceSecondaryDark
+                            : AppColors.surfaceSecondaryLight,
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('add-task-information'),
+                  onPressed: _showBlockChooser,
+                  icon: const Icon(Icons.add),
+                  label: Text(_settings.tr('add_information')),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    alignment: Alignment.centerLeft,
+                  ),
+                ),
+                if (_blocks.isNotEmpty) const SizedBox(height: 12),
+                for (final block in _blocks) _buildBlock(block, textColor),
+                if (_submitError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _submitError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _settings.tr(_isEditing ? 'edit_task' : 'create_task'),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    key: const ValueKey('task-title-input'),
-                    controller: _titleController,
-                    autofocus: true,
-                    maxLength: kMaxTextInputLength,
-                    inputFormatters: [textInputFormatter()],
-                    validator: _title,
-                    decoration: InputDecoration(
-                      hintText: _settings.tr('new_task'),
-                      filled: true,
-                      fillColor:
-                          isDark
-                              ? AppColors.surfaceSecondaryDark
-                              : AppColors.surfaceSecondaryLight,
-                      counterText: '',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppTheme.pillRadius,
-                        ),
-                        borderSide: BorderSide.none,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        key: const ValueKey('cancel-task-editor'),
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(_settings.tr('cancel')),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    key: const ValueKey('add-task-information'),
-                    onPressed: _showBlockChooser,
-                    icon: const Icon(Icons.add),
-                    label: Text(_settings.tr('add_information')),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                      alignment: Alignment.centerLeft,
-                    ),
-                  ),
-                  if (_blocks.isNotEmpty) const SizedBox(height: 12),
-                  for (final block in _blocks) _buildBlock(block, textColor),
-                  if (_submitError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _submitError!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        key: const ValueKey('save-task-editor'),
+                        onPressed: _submit,
+                        child: Text(_settings.tr('save')),
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          key: const ValueKey('cancel-task-editor'),
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(_settings.tr('cancel')),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          key: const ValueKey('save-task-editor'),
-                          onPressed: _submit,
-                          child: Text(_settings.tr('save')),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),

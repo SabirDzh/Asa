@@ -515,6 +515,41 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  /// Moves a task out of its current folder into that folder's parent.
+  /// Tasks already at the root, or whose current folder no longer exists, are
+  /// left untouched.
+  void moveTaskToParentFolder(String taskId) {
+    final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
+    if (taskIndex == -1) return;
+
+    final currentFolderId = _tasks[taskIndex].folderId;
+    if (currentFolderId == null) return;
+    final folderIndex = _folders.indexWhere(
+      (folder) => folder.id == currentFolderId && !folder.isDeleted,
+    );
+    if (folderIndex == -1) return;
+
+    moveTaskToFolder(taskId, _folders[folderIndex].parentFolderId);
+  }
+
+  /// Moves a nested folder into its current parent's parent. Root folders are
+  /// already at the highest level and are intentionally left untouched.
+  void moveFolderToParentFolder(String folderId) {
+    final folderIndex = _folders.indexWhere(
+      (folder) => folder.id == folderId && !folder.isDeleted,
+    );
+    if (folderIndex == -1) return;
+
+    final currentParentId = _folders[folderIndex].parentFolderId;
+    if (currentParentId == null) return;
+    final parentIndex = _folders.indexWhere(
+      (folder) => folder.id == currentParentId && !folder.isDeleted,
+    );
+    if (parentIndex == -1) return;
+
+    moveFolderToFolder(folderId, _folders[parentIndex].parentFolderId);
+  }
+
   /// Returns true when [targetParentFolderId] is [folderId] or one of its
   /// descendants. A visited set also prevents malformed legacy data from
   /// causing an infinite walk while validating a move.

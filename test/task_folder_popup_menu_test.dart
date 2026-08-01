@@ -83,8 +83,10 @@ void main() {
     final task = TaskItem(
       id: 'timed-task',
       title: 'Time task',
+      dueDate: DateTime(2025, 1, 2),
       startTime: DateTime(2025, 1, 1, 10, 0),
       endTime: DateTime(2025, 1, 1, 11, 0),
+      timerElapsedSeconds: 30,
       infoBlocks: [
         TaskInfoBlock.quantity(
           id: 'pages',
@@ -135,6 +137,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('detail-time-block')), findsOneWidget);
+    final actualTime = tester.widget<RichText>(
+      find.byKey(const ValueKey('detail-actual-time-value')),
+    );
+    expect(actualTime.text.toPlainText(), 'Фактическое время: 0:00');
+    expect(find.text('Дата: 02.01.2025'), findsOneWidget);
     expect(find.text('Страницы'), findsOneWidget);
     expect(find.textContaining('12 / 120 стр.'), findsOneWidget);
     expect(find.text('Прочитать первую главу'), findsOneWidget);
@@ -311,6 +318,74 @@ void main() {
     expect(find.byKey(const ValueKey('task-title-input')), findsOneWidget);
     expect(find.byKey(const ValueKey('add-task-information')), findsOneWidget);
   });
+
+  testWidgets('task row updates localized semantics when language changes', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(
+      deviceNameProvider: () async => 'Test Device',
+      systemLanguageCodeProvider: () => 'ru',
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider(create: (_) => TaskProvider()),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TaskRow(
+              task: TaskItem(id: 'localized-task', title: 'Localized task'),
+              enableDrag: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Дополнительные действия'), findsOneWidget);
+    await settings.setLanguage('en');
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('More options'), findsOneWidget);
+  });
+  testWidgets(
+    'task completion update does not restart row entrance animation',
+    (tester) async {
+      final activeTask = TaskItem(
+        id: 'animation-task',
+        title: 'Animation task',
+      );
+      final rowKey = GlobalKey();
+      await tester.pumpWidget(
+        _TestApp(
+          child: TaskRow(key: rowKey, task: activeTask, enableDrag: false),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final rowState = tester.state<State>(find.byKey(rowKey));
+      final animationFinder = find.byType(TweenAnimationBuilder<double>);
+      final initialAnimationState = tester.state<State>(animationFinder);
+
+      await tester.pumpWidget(
+        _TestApp(
+          child: TaskRow(
+            key: rowKey,
+            task: activeTask.copyWith(isCompleted: true),
+            enableDrag: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final updatedRowState = tester.state<State>(find.byKey(rowKey));
+      final updatedAnimationState = tester.state<State>(animationFinder);
+      expect(identical(updatedRowState, rowState), isTrue);
+      expect(identical(updatedAnimationState, initialAnimationState), isTrue);
+    },
+  );
 
   testWidgets('folder ellipsis opens the folder action menu', (tester) async {
     await tester.pumpWidget(

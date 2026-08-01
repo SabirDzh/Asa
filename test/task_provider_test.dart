@@ -520,6 +520,66 @@ void main() {
       expect(folderTasks[0].id, taskId);
     });
 
+    test('moveTaskToParentFolder moves a nested task one level up', () {
+      provider.addFolder('Parent');
+      final parentId =
+          provider.folders.firstWhere((f) => f.name == 'Parent').id;
+      provider.addFolder('Child', parentFolderId: parentId);
+      final childId = provider.folders.firstWhere((f) => f.name == 'Child').id;
+      final taskId = addTaskForTest('Nested task', folderId: childId);
+
+      provider.moveTaskToParentFolder(taskId);
+
+      expect(provider.allTasks.first.folderId, parentId);
+      expect(provider.getFolderTasks(childId), isEmpty);
+      expect(provider.getFolderTasks(parentId).single.id, taskId);
+    });
+
+    test('moveTaskToParentFolder moves a root-folder task to the root', () {
+      provider.addFolder('Root folder');
+      final folderId =
+          provider.folders.firstWhere((f) => f.name == 'Root folder').id;
+      final taskId = addTaskForTest('Task in root folder', folderId: folderId);
+
+      provider.moveTaskToParentFolder(taskId);
+
+      expect(provider.allTasks.first.folderId, isNull);
+    });
+
+    test('moveFolderToParentFolder moves a nested folder one level up', () {
+      provider.addFolder('Grandparent');
+      final grandparentId =
+          provider.folders.firstWhere((f) => f.name == 'Grandparent').id;
+      provider.addFolder('Parent', parentFolderId: grandparentId);
+      final parentId =
+          provider.folders.firstWhere((f) => f.name == 'Parent').id;
+      provider.addFolder('Child', parentFolderId: parentId);
+      final childId = provider.folders.firstWhere((f) => f.name == 'Child').id;
+
+      provider.moveFolderToParentFolder(childId);
+
+      expect(
+        provider.folders.firstWhere((f) => f.id == childId).parentFolderId,
+        grandparentId,
+      );
+    });
+
+    test('move-back operations leave root tasks and folders unchanged', () {
+      provider.addFolder('Root folder');
+      final folderId =
+          provider.folders.firstWhere((f) => f.name == 'Root folder').id;
+      final taskId = addTaskForTest('Root task');
+
+      provider.moveTaskToParentFolder(taskId);
+      provider.moveFolderToParentFolder(folderId);
+
+      expect(provider.allTasks.first.folderId, isNull);
+      expect(
+        provider.folders.firstWhere((f) => f.id == folderId).parentFolderId,
+        isNull,
+      );
+    });
+
     test('moveFolderToFolder rejects moving a folder into its descendant', () {
       provider.addFolder('Parent');
       final parentId = provider.filteredFolders.first.id;

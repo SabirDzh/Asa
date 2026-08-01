@@ -33,25 +33,32 @@ void showInputSheet({
       isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
   final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
 
+  // Keep the form and icon picker stable while the keyboard animates. Only
+  // the lightweight inset wrapper should rebuild in response to viewInsets.
+  final body = _InputSheetBody(
+    icon: icon,
+    hintText: hintText,
+    controller: controller,
+    inputBg: inputBg,
+    sheetBg: sheetBg,
+    paste: paste,
+    onSubmit: onSubmit,
+    folderIconAssets: folderIconAssets,
+    selectedIconAsset: selectedIconAsset,
+    onIconSelected: onIconSelected,
+    noIconLabel: noIconLabel,
+    iconLabels: iconLabels,
+    iconPickerTitle: iconPickerTitle,
+  );
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder:
-        (ctx) => _InputSheetBody(
-          icon: icon,
-          hintText: hintText,
-          controller: controller,
-          inputBg: inputBg,
-          sheetBg: sheetBg,
-          paste: paste,
-          onSubmit: onSubmit,
-          folderIconAssets: folderIconAssets,
-          selectedIconAsset: selectedIconAsset,
-          onIconSelected: onIconSelected,
-          noIconLabel: noIconLabel,
-          iconLabels: iconLabels,
-          iconPickerTitle: iconPickerTitle,
+        (ctx) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: body,
         ),
   );
 }
@@ -108,59 +115,54 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: widget.sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.only(
-          top: 12,
-          left: AppTheme.sheetPadH,
-          right: AppTheme.sheetPadH,
-          bottom: 12,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _handleBar(isDark: Theme.of(context).brightness == Brightness.dark),
-            const SizedBox(height: 36),
-            _inputRow(),
-            if (widget.folderIconAssets != null &&
-                widget.folderIconAssets!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              if (widget.iconPickerTitle != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    widget.iconPickerTitle!,
-                    style: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.7),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              _iconPicker(),
-            ],
-            if (_errorText != null)
+      padding: const EdgeInsets.only(
+        top: 12,
+        left: AppTheme.sheetPadH,
+        right: AppTheme.sheetPadH,
+        bottom: 12,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _handleBar(isDark: Theme.of(context).brightness == Brightness.dark),
+          const SizedBox(height: 36),
+          _inputRow(),
+          if (widget.folderIconAssets != null &&
+              widget.folderIconAssets!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            if (widget.iconPickerTitle != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  _errorText!,
+                  widget.iconPickerTitle!,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 13,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
+            _iconPicker(),
           ],
-        ),
+          if (_errorText != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _errorText!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

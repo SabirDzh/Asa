@@ -311,6 +311,32 @@ class _FolderContent extends StatelessWidget {
   final FolderItem folder;
   const _FolderContent({required this.folder});
 
+  void _moveTaskToParent(BuildContext context, String taskId) {
+    context.read<TaskProvider>().moveTaskToParentFolder(taskId);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.read<SettingsProvider>().tr('task_moved_to_parent'),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _moveFolderToParent(BuildContext context, String folderId) {
+    context.read<TaskProvider>().moveFolderToParentFolder(folderId);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.read<SettingsProvider>().tr('folder_moved_to_parent'),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Folder content is independent of search/filter state elsewhere only in
@@ -373,6 +399,7 @@ class _FolderContent extends StatelessWidget {
           task: t,
           reorderIndex: subfolders.length + inProgress.length + i,
           showReorderHandle: canReorder,
+          onSwipeToParent: () => _moveTaskToParent(context, t.id),
         ),
       );
       if (hasDivider) {
@@ -463,6 +490,8 @@ class _FolderContent extends StatelessWidget {
               folder: subfolders[i],
               reorderIndex: i,
               showReorderHandle: canReorder,
+              onSwipeToParent:
+                  () => _moveFolderToParent(context, subfolders[i].id),
             ),
           ),
         for (var i = 0; i < inProgress.length; i++)
@@ -473,6 +502,8 @@ class _FolderContent extends StatelessWidget {
               task: inProgress[i],
               reorderIndex: subfolders.length + i,
               showReorderHandle: canReorder,
+              onSwipeToParent:
+                  () => _moveTaskToParent(context, inProgress[i].id),
             ),
           ),
         ...completedWidgets,

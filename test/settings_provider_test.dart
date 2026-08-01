@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/core/app_strings.dart';
+import 'package:asa/core/theme.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 
 void main() {
@@ -28,6 +29,113 @@ void main() {
     test('has no avatar by default', () {
       expect(provider.avatarPath, isNull);
     });
+
+    test('uses the base color palette by default', () {
+      expect(provider.colorPalette, ColorPalette.base);
+      expect(provider.appPalette, AppPalette.base);
+    });
+
+    test('persists built-in ocean palette', () async {
+      await provider.ready;
+      await provider.setColorPalette(ColorPalette.ocean);
+
+      expect(provider.colorPalette, ColorPalette.ocean);
+      expect(provider.appPalette, AppPalette.ocean);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('colorPalette'), 'ocean');
+    });
+
+    test(
+      'persists and restores a custom palette with at most three colors',
+      () async {
+        await provider.ready;
+        await provider.setCustomPalette(const [
+          Color(0xFF123456),
+          Color(0xFFF0F0F0),
+          Color(0xFF102030),
+        ]);
+
+        expect(provider.colorPalette, ColorPalette.custom);
+        expect(provider.customPaletteColors, hasLength(3));
+        expect(provider.customPaletteColors.first, const Color(0xFF123456));
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getStringList('customPaletteColors'), [
+          '123456',
+          'F0F0F0',
+          '102030',
+        ]);
+      },
+    );
+
+    test('restores custom palettes with one, two and three colors', () async {
+      for (final colors in const [
+        [Color(0xFF123456)],
+        [Color(0xFF123456), Color(0xFFF0F0F0)],
+        [Color(0xFF123456), Color(0xFFF0F0F0), Color(0xFF102030)],
+      ]) {
+        SharedPreferences.setMockInitialValues({});
+        final source = SettingsProvider();
+        await source.ready;
+        await source.setCustomPalette(colors);
+
+        final restored = SettingsProvider();
+        await restored.ready;
+        expect(restored.colorPalette, ColorPalette.custom);
+        expect(restored.customPaletteColors, colors);
+        expect(restored.hasCustomPalette, isTrue);
+      }
+    });
+
+    test(
+      'rejects empty, oversized, transparent and duplicate-independent invalid input',
+      () async {
+        await provider.ready;
+        expect(
+          () => AppPalette.fromCustomColors(const []),
+          throwsArgumentError,
+        );
+        expect(
+          () => AppPalette.fromCustomColors(const [
+            Color(0xFF000001),
+            Color(0xFF000002),
+            Color(0xFF000003),
+            Color(0xFF000004),
+          ]),
+          throwsArgumentError,
+        );
+        expect(
+          () => AppPalette.fromCustomColors(const [Color(0x00123456)]),
+          throwsArgumentError,
+        );
+        expect(
+          () => AppPalette.fromCustomColors(const [
+            Color(0xFF123456),
+            Color(0xFF123456),
+          ]),
+          throwsArgumentError,
+        );
+        expect(AppPalette.tryParseHex('#12ABef'), const Color(0xFF12ABEF));
+        expect(AppPalette.tryParseHex('#FFF'), isNull);
+        expect(AppPalette.tryParseHex('#FFFFFFFF'), isNull);
+      },
+    );
+
+    test(
+      'falls back to base and cleans corrupted custom palette preferences',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'colorPalette': 'custom',
+          'customPaletteColors': ['123456', '123456'],
+        });
+        final corrupted = SettingsProvider();
+        await corrupted.ready;
+
+        expect(corrupted.colorPalette, ColorPalette.base);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('colorPalette'), 'base');
+        expect(prefs.getStringList('customPaletteColors'), isNull);
+      },
+    );
 
     test('setThemeMode switches between light, dark and system', () {
       provider.setThemeMode(ThemeMode.light);

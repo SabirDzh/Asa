@@ -8,6 +8,7 @@ import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/core/home_widget_service.dart';
+import 'package:asa/core/theme.dart';
 import 'home_widget_channel_mock.dart';
 
 Widget createTestApp({bool standalone = true}) {
@@ -85,6 +86,80 @@ void main() {
     expect(find.text('Язык'), findsOneWidget);
     expect(find.text('Русский'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
+  });
+
+  testWidgets('selects the ocean palette from the profile', (tester) async {
+    await pumpAndInit(tester, createTestApp());
+
+    final paletteRow = find.text('Палитра: Базовая');
+    expect(paletteRow, findsOneWidget);
+    await tester.tap(paletteRow);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('palette-sheet')), findsOneWidget);
+    expect(find.text('Ocean'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('palette-ocean-option')));
+    await tester.pumpAndSettle();
+
+    final settings = Provider.of<SettingsProvider>(
+      tester.element(find.byType(SettingsScreen)),
+      listen: false,
+    );
+    expect(settings.colorPalette, ColorPalette.ocean);
+    expect(find.text('Палитра: Ocean'), findsOneWidget);
+  });
+
+  testWidgets('custom palette editor never allows more than three colors', (
+    tester,
+  ) async {
+    await pumpAndInit(tester, createTestApp());
+
+    await tester.tap(find.text('Палитра: Базовая'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-palette')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('custom-palette-editor')), findsOneWidget);
+    expect(find.byKey(const ValueKey('custom-color-input-0')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('add-custom-color')));
+    await tester.tap(find.byKey(const ValueKey('add-custom-color')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('custom-color-input-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('custom-color-input-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('custom-color-input-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('add-custom-color')), findsNothing);
+  });
+
+  testWidgets('returns to a saved custom palette after selecting ocean', (
+    tester,
+  ) async {
+    await pumpAndInit(tester, createTestApp());
+
+    await tester.tap(find.text('Палитра: Базовая'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-palette')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('custom-color-input-0')),
+      '#123456',
+    );
+    await tester.tap(find.byKey(const ValueKey('save-custom-palette')));
+    await tester.pumpAndSettle();
+    expect(find.text('Палитра: Своя палитра'), findsOneWidget);
+
+    await tester.tap(find.text('Палитра: Своя палитра'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('palette-ocean-option')));
+    await tester.pumpAndSettle();
+    expect(find.text('Палитра: Ocean'), findsOneWidget);
+
+    await tester.tap(find.text('Палитра: Ocean'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('palette-custom-option')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('palette-custom-option')));
+    await tester.pumpAndSettle();
+    expect(find.text('Палитра: Своя палитра'), findsOneWidget);
   });
 
   testWidgets('shows about sheet on tap', (tester) async {

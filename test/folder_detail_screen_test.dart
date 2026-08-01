@@ -95,6 +95,36 @@ void main() {
     expect(provider.getFolderTasks(parent.id).single.title, 'Nested task');
   });
 
+  testWidgets(
+    'swiping a task in a root-level folder is denied and shows a notice',
+    (tester) async {
+      final provider = TaskProvider();
+      provider.addFolder('Root folder');
+      final rootFolder = provider.folders.firstWhere(
+        (item) => item.name == 'Root folder',
+      );
+      provider.addTask('Root-level task', folderId: rootFolder.id);
+
+      await tester.pumpWidget(createTestApp(rootFolder, provider: provider));
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.text('Root-level task'), const Offset(-350, 0));
+      await tester.pumpAndSettle();
+
+      // The task must stay in its folder (no move to the root) and the user
+      // must be told why the swipe was rejected.
+      expect(
+        find.text('Задачу нельзя перенести на главный экран'),
+        findsOneWidget,
+      );
+      expect(
+        provider.getFolderTasks(rootFolder.id).single.title,
+        'Root-level task',
+      );
+      expect(provider.allTasks.single.folderId, rootFolder.id);
+    },
+  );
+
   testWidgets('swiping a nested folder left moves it to the parent folder', (
     tester,
   ) async {

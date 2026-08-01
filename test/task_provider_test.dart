@@ -669,6 +669,15 @@ void main() {
       expect(provider.allTasks.single.folderId, isNot('system_streak_folder'));
     });
 
+    test('moveTaskToFolder rejects moving a task to the root', () {
+      final taskId = addTaskForTest('Task for root');
+
+      final moved = provider.moveTaskToFolder(taskId, null);
+
+      expect(moved, false);
+      expect(provider.allTasks.single.folderId, isNull);
+    });
+
     test('moveTaskToFolder reports false for an unknown task', () {
       expect(provider.moveTaskToFolder('missing-task', null), false);
     });
@@ -688,15 +697,41 @@ void main() {
       expect(provider.getFolderTasks(parentId).single.id, taskId);
     });
 
-    test('moveTaskToParentFolder moves a root-folder task to the root', () {
+    test(
+      'moveTaskToParentFolder rejects moving a root-folder task to the root',
+      () {
+        provider.addFolder('Root folder');
+        final folderId =
+            provider.folders.firstWhere((f) => f.name == 'Root folder').id;
+        final taskId = addTaskForTest(
+          'Task in root folder',
+          folderId: folderId,
+        );
+
+        final moved = provider.moveTaskToParentFolder(taskId);
+
+        expect(moved, false);
+        expect(provider.allTasks.first.folderId, folderId);
+      },
+    );
+
+    test('canMoveTaskToParent reflects where a task would land', () {
       provider.addFolder('Root folder');
-      final folderId =
+      final rootFolderId =
           provider.folders.firstWhere((f) => f.name == 'Root folder').id;
-      final taskId = addTaskForTest('Task in root folder', folderId: folderId);
+      provider.addFolder('Child', parentFolderId: rootFolderId);
+      final childId = provider.folders.firstWhere((f) => f.name == 'Child').id;
+      final nestedTaskId = addTaskForTest('Nested', folderId: childId);
+      final rootFolderTaskId = addTaskForTest(
+        'In root folder',
+        folderId: rootFolderId,
+      );
+      final rootTaskId = addTaskForTest('At root');
 
-      provider.moveTaskToParentFolder(taskId);
-
-      expect(provider.allTasks.first.folderId, isNull);
+      expect(provider.canMoveTaskToParent(nestedTaskId), isTrue);
+      expect(provider.canMoveTaskToParent(rootFolderTaskId), isFalse);
+      expect(provider.canMoveTaskToParent(rootTaskId), isFalse);
+      expect(provider.canMoveTaskToParent('missing'), isFalse);
     });
 
     test('moveFolderToParentFolder moves a nested folder one level up', () {

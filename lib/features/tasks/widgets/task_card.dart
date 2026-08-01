@@ -313,6 +313,23 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     );
   }
 
+  /// Allows the swipe-to-parent gesture only when the task can actually move
+  /// up. When the move would land the task at the root (its folder has no
+  /// parent), the swipe is cancelled and the user is told why.
+  Future<bool> _confirmSwipeToParent(BuildContext context) async {
+    final provider = context.read<TaskProvider>();
+    if (provider.canMoveTaskToParent(widget.task.id)) return true;
+    if (!context.mounted) return false;
+    final settings = context.read<SettingsProvider>();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(settings.tr('task_move_to_root_denied')),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    return false;
+  }
+
   Widget _swipeBackground(Color color) {
     final settings = context.read<SettingsProvider>();
     return Container(
@@ -560,6 +577,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         resizeDuration: const Duration(milliseconds: 180),
         background: const ColoredBox(color: Colors.transparent),
         secondaryBackground: _swipeBackground(textSecondary),
+        // Reject the swipe when the task cannot move up (for example, its
+        // folder lives at the root level, so moving up would drop the task at
+        // the root where it would disappear). Snap the row back and explain.
+        confirmDismiss: (_) => _confirmSwipeToParent(context),
         onDismissed: (_) => widget.onSwipeToParent!(),
         child: swipeChild,
       );

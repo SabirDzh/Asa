@@ -482,9 +482,12 @@ class TaskProvider with ChangeNotifier {
 
   // ── Drag & Move methods ─────────────────────────────────────
   /// Moves a task into [targetFolderId]. Returns false when the task is not
-  /// found or the target is the protected streak folder, so callers can avoid
-  /// reporting a successful move that never happened.
+  /// found, the target is the root level (null), or the target is the
+  /// protected streak folder, so callers can avoid reporting a successful
+  /// move that never happened. Tasks are never moved to the root: root tasks
+  /// are not shown anywhere in the UI, so a move there would hide the task.
   bool moveTaskToFolder(String taskId, String? targetFolderId) {
+    if (targetFolderId == null) return false;
     if (targetFolderId == 'system_streak_folder') return false;
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index == -1) return false;
@@ -526,11 +529,9 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Moves a task out of its current folder into that folder's parent.
-  /// Tasks already at the root, or whose current folder no longer exists, are
-  /// left untouched.
-  /// Moves a task out of its current folder into that folder's parent.
-  /// Tasks already at the root, or whose current folder no longer exists, are
-  /// left untouched and false is returned.
+  /// Tasks already at the root, whose current folder no longer exists, or
+  /// whose folder lives at the root level (the move would land the task at
+  /// the root) are left untouched and false is returned.
   bool moveTaskToParentFolder(String taskId) {
     final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
     if (taskIndex == -1) return false;
@@ -543,6 +544,24 @@ class TaskProvider with ChangeNotifier {
     if (folderIndex == -1) return false;
 
     return moveTaskToFolder(taskId, _folders[folderIndex].parentFolderId);
+  }
+
+  /// Whether [taskId] can be moved one level up via swipe-to-parent.
+  /// False when the task is unknown, already at the root, or its current
+  /// folder has no parent (moving up would drop the task at the root, which
+  /// is not allowed).
+  bool canMoveTaskToParent(String taskId) {
+    final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
+    if (taskIndex == -1) return false;
+
+    final currentFolderId = _tasks[taskIndex].folderId;
+    if (currentFolderId == null) return false;
+    final folderIndex = _folders.indexWhere(
+      (folder) => folder.id == currentFolderId && !folder.isDeleted,
+    );
+    if (folderIndex == -1) return false;
+
+    return _folders[folderIndex].parentFolderId != null;
   }
 
   /// Moves a nested folder into its current parent's parent. Root folders are

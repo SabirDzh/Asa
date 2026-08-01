@@ -331,16 +331,34 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _buildTimeIndicator(BuildContext context) {
-    final hasTimeData =
+  Widget _buildScheduleIndicator(BuildContext context) {
+    final hasCalendar =
+        widget.task.calendarEventId != null && !_isInStreakFolder;
+    final hasTime =
         widget.task.startTime != null || widget.task.endTime != null;
-    if (!hasTimeData) return const SizedBox.shrink();
+    if (!hasCalendar && !hasTime) return const SizedBox.shrink();
 
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final iconColor =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
+    if (hasCalendar) {
+      return Padding(
+        padding: const EdgeInsets.only(
+          left: AppTheme.rowGap,
+          top: 16,
+          bottom: 16,
+        ),
+        child: Icon(
+          Iconsax.calendar,
+          key: const ValueKey('task_calendar_icon'),
+          color: AppColors.primary,
+          size: 20,
+        ),
+      );
+    }
+
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
     return Semantics(
       button: true,
       label: settings.tr('set_time'),
@@ -413,20 +431,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.task.calendarEventId != null && !_isInStreakFolder)
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: AppTheme.rowGap,
-                    top: 16,
-                    bottom: 16,
-                  ),
-                  child: Icon(
-                    Iconsax.calendar,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                ),
-              _buildTimeIndicator(context),
+              _buildScheduleIndicator(context),
               if (widget.showReorderHandle && widget.reorderIndex != null)
                 _reorderHandle(textSecondary),
               if (!widget.task.isCompleted)

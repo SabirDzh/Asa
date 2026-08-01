@@ -123,8 +123,16 @@ class _TaskDetailSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Icon(
-              Iconsax.clock,
-              key: const ValueKey('detail_timer_icon'),
+              task.calendarEventId != null &&
+                      task.folderId != 'system_streak_folder'
+                  ? Iconsax.calendar
+                  : Iconsax.timer_1,
+              key: ValueKey(
+                task.calendarEventId != null &&
+                        task.folderId != 'system_streak_folder'
+                    ? 'detail_calendar_icon'
+                    : 'detail_timer_icon',
+              ),
               color: textColor,
               size: 20,
             ),

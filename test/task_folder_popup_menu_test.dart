@@ -157,6 +157,97 @@ void main() {
     expect(find.text('Удалить'), findsNothing);
   });
 
+  testWidgets('calendar icon takes priority over time icon in task row', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'calendar-and-time-task',
+      title: 'Calendar and time',
+      calendarEventId: 'event-1',
+      calendarId: 'calendar-1',
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 11, 0),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('task_calendar_icon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task_timer_icon')), findsNothing);
+  });
+
+  testWidgets('time icon is used when task has no calendar event', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'time-only-task',
+      title: 'Time only',
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 11, 0),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('task_timer_icon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task_calendar_icon')), findsNothing);
+  });
+
+  testWidgets('calendar icon takes priority over time icon in task details', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'calendar-detail-task',
+      title: 'Calendar detail',
+      calendarEventId: 'event-1',
+      calendarId: 'calendar-1',
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 11, 0),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calendar detail'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('detail_calendar_icon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail_timer_icon')), findsNothing);
+  });
+
+  testWidgets('streak task keeps time icon when calendar id is stale', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'streak-calendar-task',
+      title: 'Streak task',
+      folderId: 'system_streak_folder',
+      calendarEventId: 'stale-event',
+      calendarId: 'stale-calendar',
+      startTime: DateTime(2025, 1, 1, 10, 0),
+      endTime: DateTime(2025, 1, 1, 11, 0),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(child: TaskRow(task: task, enableDrag: false)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('task_timer_icon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task_calendar_icon')), findsNothing);
+
+    await tester.tap(find.text('Streak task'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('detail_timer_icon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail_calendar_icon')), findsNothing);
+  });
+
   testWidgets('time editor opens from the timer icon', (tester) async {
     final task = TaskItem(
       id: 'timer-icon-task',

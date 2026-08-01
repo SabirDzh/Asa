@@ -3,8 +3,94 @@ import '../../../core/task_attachment_validation.dart';
 
 const int kMaxTaskInfoValue = 1000000000;
 const int kMaxTaskDescriptionLength = 10000;
+
+/// Built-in quantity units shown to users who do not need to invent a unit.
+/// The stored keys are language-independent so the display can follow the
+/// current app language without changing saved task data.
+const String kQuantityUnitTimes = 'unit_times';
+const String kQuantityUnitMinutes = 'unit_minutes';
+const String kQuantityUnitHours = 'unit_hours';
+const String kQuantityUnitPages = 'unit_pages';
+const String kQuantityUnitSteps = 'unit_steps';
+const String kQuantityUnitGlasses = 'unit_glasses';
+const String kQuantityUnitKilograms = 'unit_kilograms';
+const String kQuantityUnitKilometers = 'unit_kilometers';
+const String kQuantityUnitCustom = 'unit_custom';
+
+class QuantityUnitOption {
+  final String value;
+  final String labelKey;
+
+  const QuantityUnitOption(this.value, this.labelKey);
+}
+
+const quantityUnitOptions = <QuantityUnitOption>[
+  QuantityUnitOption(kQuantityUnitTimes, 'quantity_unit_times'),
+  QuantityUnitOption(kQuantityUnitMinutes, 'quantity_unit_minutes'),
+  QuantityUnitOption(kQuantityUnitHours, 'quantity_unit_hours'),
+  QuantityUnitOption(kQuantityUnitPages, 'quantity_unit_pages'),
+  QuantityUnitOption(kQuantityUnitSteps, 'quantity_unit_steps'),
+  QuantityUnitOption(kQuantityUnitGlasses, 'quantity_unit_glasses'),
+  QuantityUnitOption(kQuantityUnitKilograms, 'quantity_unit_kilograms'),
+  QuantityUnitOption(kQuantityUnitKilometers, 'quantity_unit_kilometers'),
+];
+
+bool isQuantityUnitOption(String value) =>
+    quantityUnitOptions.any((option) => option.value == value);
+
+const _legacyQuantityUnitValues = <String, String>{
+  'unit': kQuantityUnitTimes,
+  'units': kQuantityUnitTimes,
+  'раз': kQuantityUnitTimes,
+  'раза': kQuantityUnitTimes,
+  'times': kQuantityUnitTimes,
+  'time': kQuantityUnitTimes,
+  'минуты': kQuantityUnitMinutes,
+  'минут': kQuantityUnitMinutes,
+  'minutes': kQuantityUnitMinutes,
+  'minute': kQuantityUnitMinutes,
+  'часы': kQuantityUnitHours,
+  'часов': kQuantityUnitHours,
+  'hours': kQuantityUnitHours,
+  'hour': kQuantityUnitHours,
+  'страницы': kQuantityUnitPages,
+  'страниц': kQuantityUnitPages,
+  'pages': kQuantityUnitPages,
+  'page': kQuantityUnitPages,
+  'шаги': kQuantityUnitSteps,
+  'шагов': kQuantityUnitSteps,
+  'steps': kQuantityUnitSteps,
+  'step': kQuantityUnitSteps,
+  'стаканы': kQuantityUnitGlasses,
+  'стаканов': kQuantityUnitGlasses,
+  'glasses': kQuantityUnitGlasses,
+  'glass': kQuantityUnitGlasses,
+  'кг': kQuantityUnitKilograms,
+  'kg': kQuantityUnitKilograms,
+  'км': kQuantityUnitKilometers,
+  'km': kQuantityUnitKilometers,
+};
+
+/// Returns a built-in key for a saved unit, including legacy free-text values.
+String? quantityUnitOptionValue(String value) {
+  final normalized = value.trim();
+  if (isQuantityUnitOption(normalized)) return normalized;
+  return _legacyQuantityUnitValues[normalized.toLowerCase()];
+}
+
+/// Translates built-in units while preserving old/custom free-text values.
+String displayQuantityUnit(String value, String Function(String) translate) {
+  final optionValue = quantityUnitOptionValue(value);
+  if (optionValue == null) return value.trim();
+  final option = quantityUnitOptions.firstWhere(
+    (item) => item.value == optionValue,
+  );
+  return translate(option.labelKey);
+}
+
 const int kMaxTaskAttachmentsPerTask = 20;
 const int kMaxTaskDescriptionBlocksPerTask = 1;
+const int kMaxTaskQuantityBlocksPerTask = 3;
 
 /// The kinds of structured information a task can contain.
 enum TaskInfoBlockType { quantity, description }

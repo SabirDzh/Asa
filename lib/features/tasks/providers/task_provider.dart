@@ -700,7 +700,9 @@ class TaskProvider with ChangeNotifier {
 
   /// Adds a raw [task] directly, used by import/sync flows.
   void addTaskRaw(TaskItem task) {
-    _validateInfoBlocks(task.infoBlocks);
+    // Raw tasks come from import/sync. Preserve legacy quantity blocks even
+    // when they predate the current creation limit.
+    _validateInfoBlocks(task.infoBlocks, allowQuantityOverflow: true);
     _tasks.add(task);
     _notifyTasksChanged();
     _saveToPrefs();
@@ -710,8 +712,14 @@ class TaskProvider with ChangeNotifier {
   /// already exists. Returns true if the item was changed.
   bool upsertTask(TaskItem task) {
     final normalizedTask = _normalizeImportedTask(task);
-    _validateInfoBlocks(normalizedTask.infoBlocks);
     final index = _tasks.indexWhere((t) => t.id == normalizedTask.id);
+    // Preserve overflow for a new imported legacy task. For an existing task,
+    // apply the normal grandfathering rule so sync cannot add a new block.
+    _validateInfoBlocks(
+      normalizedTask.infoBlocks,
+      existingBlocks: index == -1 ? null : _tasks[index].infoBlocks,
+      allowQuantityOverflow: index == -1,
+    );
     if (index == -1) {
       _tasks.add(normalizedTask);
       return true;
@@ -801,8 +809,13 @@ class TaskProvider with ChangeNotifier {
     if (newTitle.length > 250) {
       throw Exception('Название длиннее 250 символов');
     }
-    if (infoBlocks != null) _validateInfoBlocks(infoBlocks);
     final index = _tasks.indexWhere((t) => t.id == id);
+    if (infoBlocks != null) {
+      _validateInfoBlocks(
+        infoBlocks,
+        existingBlocks: index == -1 ? null : _tasks[index].infoBlocks,
+      );
+    }
     if (index != -1) {
       _tasks[index] = _tasks[index].copyWith(
         title: newTitle,
@@ -816,8 +829,11 @@ class TaskProvider with ChangeNotifier {
   }
 
   void updateTaskInfoBlocks(String taskId, List<TaskInfoBlock> blocks) {
-    _validateInfoBlocks(blocks);
     final index = _tasks.indexWhere((task) => task.id == taskId);
+    _validateInfoBlocks(
+      blocks,
+      existingBlocks: index == -1 ? null : _tasks[index].infoBlocks,
+    );
     if (index == -1 || _tasks[index].isDeleted) return;
     _tasks[index] = _tasks[index].copyWith(
       infoBlocks: blocks,
@@ -861,7 +877,11 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
-  void _validateInfoBlocks(List<TaskInfoBlock> blocks) {
+  void _validateInfoBlocks(
+    List<TaskInfoBlock> blocks, {
+    List<TaskInfoBlock>? existingBlocks,
+    bool allowQuantityOverflow = false,
+  }) {
     final descriptionCount =
         blocks
             .where((block) => block.type == TaskInfoBlockType.description)
@@ -878,6 +898,27 @@ class TaskProvider with ChangeNotifier {
     );
     if (attachmentCount > kMaxTaskAttachmentsPerTask) {
       throw const FormatException('Too many task attachments');
+    }
+
+    if (allowQuantityOverflow) return;
+
+    final quantityCount =
+        blocks
+            .where((block) => block.type == TaskInfoBlockType.quantity)
+            .length;
+    final existingQuantityCount =
+        existingBlocks
+            ?.where((block) => block.type == TaskInfoBlockType.quantity)
+            .length ??
+        0;
+    // Legacy tasks may already exceed today's limit. They can be edited and
+    // saved without data loss, but cannot gain another quantity block.
+    final maxAllowedQuantityCount =
+        existingQuantityCount > kMaxTaskQuantityBlocksPerTask
+            ? existingQuantityCount
+            : kMaxTaskQuantityBlocksPerTask;
+    if (quantityCount > maxAllowedQuantityCount) {
+      throw const FormatException('Too many task quantity blocks');
     }
   }
 

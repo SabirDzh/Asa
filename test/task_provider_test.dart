@@ -133,6 +133,81 @@ void main() {
       },
     );
 
+    test('rejects new tasks with more than three quantity blocks', () {
+      final blocks = List.generate(
+        kMaxTaskQuantityBlocksPerTask + 1,
+        (index) => TaskInfoBlock.quantity(
+          id: 'quantity-$index',
+          targetValue: 1,
+          unit: 'times',
+        ),
+      );
+
+      expect(
+        () => provider.addTask('Too many quantities', infoBlocks: blocks),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects adding a fourth quantity block through an update', () {
+      final taskId = addTaskForTest('Quantity task');
+      final blocks = List.generate(
+        kMaxTaskQuantityBlocksPerTask + 1,
+        (index) => TaskInfoBlock.quantity(
+          id: 'quantity-$index',
+          targetValue: 1,
+          unit: 'times',
+        ),
+      );
+
+      expect(
+        () => provider.updateTaskInfoBlocks(taskId, blocks),
+        throwsA(isA<FormatException>()),
+      );
+      expect(provider.tasks.single.infoBlocks, isEmpty);
+    });
+
+    test('preserves legacy quantity blocks while rejecting new additions', () {
+      final legacyBlocks = List.generate(
+        kMaxTaskQuantityBlocksPerTask + 2,
+        (index) => TaskInfoBlock.quantity(
+          id: 'legacy-quantity-$index',
+          targetValue: index + 1,
+          unit: 'times',
+        ),
+      );
+      provider.addTaskRaw(
+        TaskItem(
+          id: 'legacy-quantity-task',
+          title: 'Legacy quantities',
+          infoBlocks: legacyBlocks,
+        ),
+      );
+
+      provider.updateTask('legacy-quantity-task', 'Renamed legacy task');
+      provider.updateTaskInfoBlocks('legacy-quantity-task', [
+        ...legacyBlocks.take(legacyBlocks.length - 1),
+        legacyBlocks.last.copyWith(targetValue: 99),
+      ]);
+
+      expect(provider.tasks.single.infoBlocks, hasLength(legacyBlocks.length));
+      expect(provider.tasks.single.infoBlocks.last.targetValue, 99);
+
+      expect(
+        () => provider.updateTaskInfoBlocks('legacy-quantity-task', [
+          ...legacyBlocks.take(legacyBlocks.length - 1),
+          legacyBlocks.last.copyWith(targetValue: 99),
+          TaskInfoBlock.quantity(
+            id: 'new-quantity',
+            targetValue: 1,
+            unit: 'times',
+          ),
+        ]),
+        throwsA(isA<FormatException>()),
+      );
+      expect(provider.tasks.single.infoBlocks, hasLength(legacyBlocks.length));
+    });
+
     test('completing a task fills every quantity block to its target', () {
       final blocks = [
         TaskInfoBlock.quantity(
@@ -220,6 +295,70 @@ void main() {
         throwsA(isA<FormatException>()),
       );
       expect(provider.tasks, hasLength(1));
+    });
+
+    test('upsertTask preserves imported quantity blocks above the limit', () {
+      final importedBlocks = List.generate(
+        kMaxTaskQuantityBlocksPerTask + 2,
+        (index) => TaskInfoBlock.quantity(
+          id: 'imported-quantity-$index',
+          targetValue: index + 1,
+          unit: 'times',
+        ),
+      );
+      final importedTask = TaskItem(
+        id: 'imported-quantity-task',
+        title: 'Imported quantities',
+        infoBlocks: importedBlocks,
+      );
+
+      expect(provider.upsertTask(importedTask), isTrue);
+      expect(
+        provider.tasks.single.infoBlocks,
+        hasLength(importedBlocks.length),
+      );
+      expect(
+        provider.tasks.single.infoBlocks.map((block) => block.id),
+        importedBlocks.map((block) => block.id),
+      );
+    });
+
+    test('upsertTask cannot add a fourth quantity block to a current task', () {
+      final currentBlocks = List.generate(
+        kMaxTaskQuantityBlocksPerTask,
+        (index) => TaskInfoBlock.quantity(
+          id: 'current-quantity-$index',
+          targetValue: index + 1,
+          unit: 'times',
+        ),
+      );
+      provider.addTask('Current task', infoBlocks: currentBlocks);
+      final currentId = provider.tasks.single.id;
+      final incomingBlocks = [
+        ...currentBlocks,
+        TaskInfoBlock.quantity(
+          id: 'incoming-quantity',
+          targetValue: 1,
+          unit: 'times',
+        ),
+      ];
+
+      expect(
+        () => provider.upsertTask(
+          TaskItem(
+            id: currentId,
+            title: 'Synced task',
+            infoBlocks: incomingBlocks,
+            updatedAt: DateTime.now().add(const Duration(days: 1)),
+          ),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      expect(provider.tasks.single.title, 'Current task');
+      expect(
+        provider.tasks.single.infoBlocks,
+        hasLength(kMaxTaskQuantityBlocksPerTask),
+      );
     });
 
     test('normalizes duplicate descriptions on upsert', () {

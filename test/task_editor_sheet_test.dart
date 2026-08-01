@@ -98,6 +98,126 @@ void main() {
 
     expect(find.byKey(const ValueKey('quantity-target-input')), findsOneWidget);
     expect(find.byKey(const ValueKey('quantity-unit-input')), findsOneWidget);
+    expect(find.text('Что считаем?'), findsOneWidget);
+    expect(find.text('Например: страницы, стаканы или минуты'), findsOneWidget);
+    expect(find.text('Раз'), findsOneWidget);
+  });
+
+  testWidgets('selects a ready-made quantity unit without typing', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    await tester.pumpWidget(createEditorTestApp(provider: provider));
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('task-title-input')),
+      'Read pages',
+    );
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-quantity-block')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('quantity-unit-input')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Страницы').last);
+    await tester.pumpAndSettle();
+    final saveButtonFinder = find.byKey(const ValueKey('save-task-editor'));
+    final saveButtonElement = saveButtonFinder.evaluate().last;
+    await Scrollable.ensureVisible(saveButtonElement, duration: Duration.zero);
+    await tester.pump();
+    await tester.tap(saveButtonFinder.last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(provider.tasks.single.infoBlocks.single.unit, kQuantityUnitPages);
+  });
+
+  testWidgets('allows a custom quantity unit through Other', (tester) async {
+    final provider = TaskProvider();
+    await tester.pumpWidget(createEditorTestApp(provider: provider));
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('task-title-input')),
+      'Track books',
+    );
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-quantity-block')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('quantity-unit-input')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Другое…').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('quantity-custom-unit-input')),
+      'книги',
+    );
+    final saveButtonFinder = find.byKey(const ValueKey('save-task-editor'));
+    final saveButtonElement = saveButtonFinder.evaluate().last;
+    await Scrollable.ensureVisible(saveButtonElement, duration: Duration.zero);
+    await tester.pump();
+    await tester.tap(saveButtonFinder.last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(provider.tasks.single.infoBlocks.single.unit, 'книги');
+  });
+
+  testWidgets('limits quantity blocks to three per task', (tester) async {
+    await tester.pumpWidget(createEditorTestApp());
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 3; index++) {
+      await tester.tap(find.byKey(const ValueKey('add-task-information')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add-quantity-block')));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.byType(DropdownButtonFormField<String>), findsNWidgets(3));
+    expect(
+      find.text('Можно добавить не больше 3 блоков количества'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-quantity-block')), findsNothing);
+    expect(find.byKey(const ValueKey('add-description-block')), findsOneWidget);
+  });
+
+  testWidgets('preserves existing quantity blocks above the new-item limit', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'legacy-quantity-task',
+      title: 'Legacy metrics',
+      infoBlocks: [
+        for (var index = 0; index < 4; index++)
+          TaskInfoBlock.quantity(
+            id: 'quantity-$index',
+            targetValue: index + 1,
+            unit: kQuantityUnitTimes,
+          ),
+      ],
+    );
+
+    await tester.pumpWidget(createEditorTestApp(task: task));
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DropdownButtonFormField<String>), findsNWidgets(4));
+    expect(
+      find.text('Можно добавить не больше 3 блоков количества'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-quantity-block')), findsNothing);
   });
 
   testWidgets('allows only one description block per task', (tester) async {
@@ -199,7 +319,9 @@ void main() {
       );
       await tester.tap(find.text('Open editor'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('attachment-action-menu')));
+      await tester.tap(
+        find.byKey(const ValueKey('attachment-action-selector')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Добавить файл').last);
       await tester.pumpAndSettle();
@@ -229,7 +351,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('add-description-block')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('attachment-action-menu')));
+      await tester.tap(
+        find.byKey(const ValueKey('attachment-action-selector')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Добавить файл').last);
       await tester.pumpAndSettle();
@@ -261,11 +385,19 @@ void main() {
       find.byKey(const ValueKey('quantity-target-input')),
       '3',
     );
+    await tester.tap(find.byKey(const ValueKey('quantity-unit-input')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Другое…').last);
+    await tester.pumpAndSettle();
     await tester.enterText(
-      find.byKey(const ValueKey('quantity-unit-input')),
+      find.byKey(const ValueKey('quantity-custom-unit-input')),
       'glasses',
     );
-    await tester.tap(find.byKey(const ValueKey('save-task-editor')));
+    final saveButtonFinder = find.byKey(const ValueKey('save-task-editor'));
+    final saveButtonElement = saveButtonFinder.evaluate().last;
+    await Scrollable.ensureVisible(saveButtonElement, duration: Duration.zero);
+    await tester.pump();
+    await tester.tap(saveButtonFinder.last, warnIfMissed: false);
     await tester.pumpAndSettle();
 
     expect(provider.tasks, hasLength(1));

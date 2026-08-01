@@ -365,7 +365,7 @@ class _TaskDetailSheet extends StatelessWidget {
               QuantityCounter(
                 currentValue: block.currentValue,
                 targetValue: block.targetValue,
-                unit: block.unit,
+                unit: displayQuantityUnit(block.unit, settings.tr),
                 textColor: textColor,
                 decreaseLabel: settings.tr('quantity_decrease'),
                 increaseLabel: settings.tr('quantity_increase'),

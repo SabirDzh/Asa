@@ -80,6 +80,8 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   final _currentControllers = <String, TextEditingController>{};
   final _targetControllers = <String, TextEditingController>{};
   final _unitControllers = <String, TextEditingController>{};
+  final _selectedUnitValues = <String, String>{};
+  final _customUnitValues = <String, String>{};
   final _descriptionControllers = <String, TextEditingController>{};
   final _descriptionFocusNodes = <String, FocusNode>{};
   final _fieldKeys = <String, Map<String, Key>>{};
@@ -95,6 +97,10 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   bool get _isEditing => widget.task != null;
   bool get _hasDescriptionBlock =>
       _blocks.any((block) => block.type == TaskInfoBlockType.description);
+  int get _quantityBlockCount =>
+      _blocks.where((block) => block.type == TaskInfoBlockType.quantity).length;
+  bool get _canAddQuantity =>
+      _quantityBlockCount < kMaxTaskQuantityBlocksPerTask;
 
   @override
   void initState() {
@@ -153,6 +159,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               'quantity-current-input',
               'quantity-target-input',
               'quantity-unit-input',
+              'quantity-custom-unit-input',
             ]
             : const ['description-text-input'];
     _fieldKeys[block.id] = {
@@ -167,7 +174,15 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       _targetControllers[block.id] = TextEditingController(
         text: _numberText(block.targetValue),
       );
-      _unitControllers[block.id] = TextEditingController(text: block.unit);
+      final unitOption = quantityUnitOptionValue(block.unit);
+      _selectedUnitValues[block.id] = unitOption ?? kQuantityUnitCustom;
+      _customUnitValues[block.id] = unitOption == null ? block.unit : '';
+      _unitControllers[block.id] = TextEditingController(
+        text: _customUnitValues[block.id],
+      );
+      _unitControllers[block.id]!.addListener(() {
+        _customUnitValues[block.id] = _unitControllers[block.id]!.text;
+      });
     } else {
       final controller = TextEditingController(text: block.text);
       controller.addListener(() => _updateMentionSuggestions(block.id));
@@ -307,22 +322,30 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     _mentionTriggers.remove(id);
     _mentionLayerLinks.remove(id);
     _selectedAttachmentActions.remove(id);
-    final maps =
-        type == TaskInfoBlockType.quantity
-            ? <Map<String, TextEditingController>>[
-              _labelControllers,
-              _currentControllers,
-              _targetControllers,
-              _unitControllers,
-            ]
-            : <Map<String, TextEditingController>>[_descriptionControllers];
-    for (final map in maps) {
-      map.remove(id)?.dispose();
+    if (type == TaskInfoBlockType.quantity) {
+      for (final map in <Map<String, TextEditingController>>[
+        _labelControllers,
+        _currentControllers,
+        _targetControllers,
+        _unitControllers,
+      ]) {
+        map.remove(id)?.dispose();
+      }
+      _selectedUnitValues.remove(id);
+      _customUnitValues.remove(id);
+    } else {
+      _descriptionControllers.remove(id)?.dispose();
     }
     _descriptionFocusNodes.remove(id)?.dispose();
   }
 
   Future<void> _showBlockChooser() async {
+    if (!_canAddQuantity && _hasDescriptionBlock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_settings.tr('quantity_block_limit'))),
+      );
+      return;
+    }
     // Do not animate the keyboard and the chooser route against each other.
     // The editor remains mounted while the nested sheet is open, but its
     // focused field should release focus before the route transition starts.
@@ -346,16 +369,17 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _chooserTile(
-                  ctx,
-                  key: const ValueKey('add-quantity-block'),
-                  icon: Iconsax.chart_2,
-                  label: _settings.tr('quantity_block'),
-                  color: textColor,
-                  onTap: () {
-                    Navigator.pop(ctx, TaskInfoBlockType.quantity);
-                  },
-                ),
+                if (_canAddQuantity)
+                  _chooserTile(
+                    ctx,
+                    key: const ValueKey('add-quantity-block'),
+                    icon: Iconsax.chart_2,
+                    label: _settings.tr('quantity_block'),
+                    color: textColor,
+                    onTap: () {
+                      Navigator.pop(ctx, TaskInfoBlockType.quantity);
+                    },
+                  ),
                 if (!_hasDescriptionBlock)
                   _chooserTile(
                     ctx,
@@ -406,10 +430,20 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     if (type == TaskInfoBlockType.description && _hasDescriptionBlock) {
       return;
     }
+    if (type == TaskInfoBlockType.quantity && !_canAddQuantity) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_settings.tr('quantity_block_limit'))),
+      );
+      return;
+    }
     final id = _uuid.v4();
     final block =
         type == TaskInfoBlockType.quantity
-            ? TaskInfoBlock.quantity(id: id, targetValue: 1, unit: 'unit')
+            ? TaskInfoBlock.quantity(
+              id: id,
+              targetValue: 1,
+              unit: kQuantityUnitTimes,
+            )
             : TaskInfoBlock.description(id: id);
     setState(() {
       _blocks.add(block);
@@ -644,7 +678,10 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               label: sanitizeText(_labelControllers[block.id]!.text),
               currentValue: current,
               targetValue: target,
-              unit: sanitizeText(_unitControllers[block.id]!.text),
+              unit:
+                  _selectedUnitValues[block.id] == kQuantityUnitCustom
+                      ? sanitizeText(_unitControllers[block.id]!.text)
+                      : _selectedUnitValues[block.id]!,
             ),
           );
         } else {
@@ -785,6 +822,14 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                     alignment: Alignment.centerLeft,
                   ),
                 ),
+                if (!_canAddQuantity)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _settings.tr('quantity_block_limit'),
+                      style: TextStyle(color: secondaryColor, fontSize: 12),
+                    ),
+                  ),
                 if (_blocks.isNotEmpty) const SizedBox(height: 12),
                 for (final block in _blocks) _buildBlock(block, textColor),
                 if (_submitError != null)
@@ -907,14 +952,50 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                   ),
                 ],
               ),
-              TextFormField(
+              DropdownButtonFormField<String>(
                 key: _fieldKey('quantity-unit-input', block.id),
-                controller: _unitControllers[block.id],
-                validator: _required,
+                initialValue: _selectedUnitValues[block.id],
                 decoration: InputDecoration(
                   labelText: _settings.tr('quantity_unit'),
+                  helperText: _settings.tr('quantity_unit_hint'),
                 ),
+                items: [
+                  for (final option in quantityUnitOptions)
+                    DropdownMenuItem<String>(
+                      value: option.value,
+                      child: Text(_settings.tr(option.labelKey)),
+                    ),
+                  DropdownMenuItem<String>(
+                    value: kQuantityUnitCustom,
+                    child: Text(_settings.tr('quantity_unit_custom')),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _selectedUnitValues[block.id] = value;
+                    if (value == kQuantityUnitCustom) {
+                      _unitControllers[block.id]!.value = TextEditingValue(
+                        text: _customUnitValues[block.id] ?? '',
+                      );
+                    }
+                  });
+                },
               ),
+              if (_selectedUnitValues[block.id] == kQuantityUnitCustom) ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  key: _fieldKey('quantity-custom-unit-input', block.id),
+                  controller: _unitControllers[block.id],
+                  maxLength: 24,
+                  validator: _required,
+                  decoration: InputDecoration(
+                    labelText: _settings.tr('quantity_custom_unit'),
+                    hintText: _settings.tr('quantity_custom_unit_hint'),
+                    counterText: '',
+                  ),
+                ),
+              ],
             ] else ...[
               CompositedTransformTarget(
                 link: _mentionLayerLinks[block.id]!,

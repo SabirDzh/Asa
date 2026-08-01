@@ -176,6 +176,23 @@ void main() {
       expect(block.attachments, hasLength(kMaxTaskAttachmentsPerTask + 1));
     });
 
+    test('translates built-in quantity units and preserves custom units', () {
+      expect(quantityUnitOptionValue(kQuantityUnitPages), kQuantityUnitPages);
+      expect(quantityUnitOptionValue('pages'), kQuantityUnitPages);
+      expect(
+        displayQuantityUnit(kQuantityUnitPages, (key) => 'translated:$key'),
+        'translated:quantity_unit_pages',
+      );
+      expect(
+        displayQuantityUnit('яблоки', (key) => 'translated:$key'),
+        'яблоки',
+      );
+      expect(
+        displayQuantityUnit('unit', (key) => 'translated:$key'),
+        'translated:quantity_unit_times',
+      );
+    });
+
     test('rejects invalid quantities and unsafe links', () {
       expect(
         () => TaskInfoBlock.quantity(

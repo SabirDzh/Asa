@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/description_markdown.dart';
+import '../../../core/drag_close_sheet.dart';
 import '../../../core/theme.dart';
 import '../models/task_info_block.dart';
 
@@ -75,14 +76,18 @@ Future<void> showFullDescriptionSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    enableDrag: false,
     builder:
-        (ctx) => DescriptionFullSheet(
-          text: text,
-          format: format,
-          attachments: attachments,
-          title: title,
-          onAttachmentTap: onAttachmentTap,
-          onExternalLinkTap: onExternalLinkTap,
+        (ctx) => DragToCloseSheet(
+          trackScrollableDrag: true,
+          child: DescriptionFullSheet(
+            text: text,
+            format: format,
+            attachments: attachments,
+            title: title,
+            onAttachmentTap: onAttachmentTap,
+            onExternalLinkTap: onExternalLinkTap,
+          ),
         ),
   );
 }

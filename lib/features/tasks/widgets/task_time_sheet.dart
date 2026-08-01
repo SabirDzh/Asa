@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/drag_close_sheet.dart';
 import '../../../core/theme.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
@@ -12,7 +13,8 @@ Future<void> showTaskTimeSheet(BuildContext context, TaskItem task) async {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _TaskTimeSheet(task: task),
+    enableDrag: false,
+    builder: (ctx) => DragToCloseSheet(child: _TaskTimeSheet(task: task)),
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/drag_close_sheet.dart';
 import '../../../core/task_attachment_service.dart';
 import '../../../core/theme.dart';
 import '../../browser/screens/in_app_browser_screen.dart';
@@ -20,7 +21,12 @@ Future<void> showTaskDetailSheet(BuildContext context, TaskItem task) async {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _TaskDetailSheet(task: task),
+    enableDrag: false,
+    builder:
+        (ctx) => DragToCloseSheet(
+          trackScrollableDrag: true,
+          child: _TaskDetailSheet(task: task),
+        ),
   );
 }
 

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/description_markdown.dart';
+import '../../../core/drag_close_sheet.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/task_attachment_service.dart';
 import '../../../core/task_attachment_validation.dart' as attachment_validation;
@@ -159,11 +160,17 @@ Future<void> showTaskEditorSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    enableDrag: false,
     builder:
-        (ctx) => Padding(
-          // Only this lightweight wrapper responds to keyboard insets.
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-          child: editor,
+        (ctx) => DragToCloseSheet(
+          trackScrollableDrag: true,
+          child: Padding(
+            // Only this lightweight wrapper responds to keyboard insets.
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: editor,
+          ),
         ),
   );
 }

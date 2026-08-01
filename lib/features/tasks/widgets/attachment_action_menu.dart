@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/anchored_popup_menu.dart';
 import '../../../core/theme.dart';
 
 /// The attachment operation selected in the editor.
@@ -58,50 +59,92 @@ class AttachmentActionMenu extends StatelessWidget {
         Expanded(
           child: SizedBox(
             height: 48,
-            child: PopupMenuButton<AttachmentAction>(
-              enabled: enabled,
-              tooltip: _label(selectedAction),
-              onSelected: onActionChanged,
-              constraints: const BoxConstraints(minWidth: 240),
-              itemBuilder:
-                  (context) => [
-                    for (final action in AttachmentAction.values)
-                      PopupMenuItem<AttachmentAction>(
-                        value: action,
+            child: Builder(
+              builder:
+                  (buttonContext) => Semantics(
+                    button: true,
+                    enabled: enabled,
+                    label: _label(selectedAction),
+                    child: GestureDetector(
+                      key: const ValueKey('attachment-action-selector'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap:
+                          enabled
+                              ? () async {
+                                final action = await showAnchoredPopupMenu<
+                                  AttachmentAction
+                                >(
+                                  context: buttonContext,
+                                  anchorContext: buttonContext,
+                                  menuKey: const ValueKey(
+                                    'attachment-action-dropdown',
+                                  ),
+                                  color:
+                                      Theme.of(
+                                        buttonContext,
+                                      ).colorScheme.surface,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.pillRadius,
+                                    ),
+                                  ),
+                                  gap: 6,
+                                  items: [
+                                    for (final action
+                                        in AttachmentAction.values)
+                                      AnchoredPopupMenuItem<AttachmentAction>(
+                                        key: ValueKey(
+                                          'attachment-action-option-${action.name}',
+                                        ),
+                                        value: action,
+                                        child: SizedBox(
+                                          width: 240,
+                                          child: Row(
+                                            children: [
+                                              Icon(_icon(action), size: 18),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  _label(action),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                                if (action != null) onActionChanged(action);
+                              }
+                              : null,
+                      child: Container(
                         height: 48,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: Row(
-                            children: [
-                              Icon(_icon(action), size: 18),
-                              const SizedBox(width: 10),
-                              Expanded(child: Text(_label(action))),
-                            ],
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: outline),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.pillRadius,
                           ),
                         ),
-                      ),
-                  ],
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  border: Border.all(color: outline),
-                  borderRadius: BorderRadius.circular(AppTheme.pillRadius),
-                ),
-                child: Row(
-                  children: [
-                    Icon(_icon(selectedAction), size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _label(selectedAction),
-                        overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Icon(_icon(selectedAction), size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _label(selectedAction),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.keyboard_arrow_down),
+                          ],
+                        ),
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down),
-                  ],
-                ),
-              ),
+                  ),
             ),
           ),
         ),

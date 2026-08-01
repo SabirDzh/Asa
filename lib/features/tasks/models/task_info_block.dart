@@ -1,3 +1,5 @@
+import '../../../core/task_attachment_validation.dart';
+
 const int kMaxTaskInfoValue = 1000000000;
 const int kMaxTaskDescriptionLength = 10000;
 const int kMaxTaskAttachmentsPerTask = 20;
@@ -32,17 +34,26 @@ class TaskAttachment {
     if (type == null) {
       throw FormatException('Unknown attachment type: $typeName');
     }
-    if (type == TaskAttachmentType.link &&
-        !isAllowedTaskAttachmentLink(value)) {
-      throw const FormatException('Only http and https links are allowed');
+    final mimeType =
+        json['mimeType'] is String
+            ? (json['mimeType'] as String).trim().toLowerCase()
+            : null;
+    final normalizedValue =
+        type == TaskAttachmentType.link
+            ? normalizeTaskAttachmentLink(value)
+            : value;
+    if (normalizedValue == null ||
+        (type != TaskAttachmentType.link &&
+            !isSafeTaskAttachmentMetadata(name, mimeType))) {
+      throw const FormatException('Invalid task attachment metadata');
     }
 
     return TaskAttachment(
       id: id,
       type: type,
-      name: name,
-      value: value,
-      mimeType: json['mimeType'] is String ? json['mimeType'] as String : null,
+      name: attachmentDisplayName(name),
+      value: normalizedValue,
+      mimeType: mimeType,
     );
   }
 
@@ -63,17 +74,23 @@ class TaskAttachment {
   }) {
     final nextType = type ?? this.type;
     final nextValue = value ?? this.value;
-    if (nextType == TaskAttachmentType.link &&
-        !isAllowedTaskAttachmentLink(nextValue)) {
-      throw const FormatException('Only http and https links are allowed');
+    final nextMimeType =
+        mimeType == const Object() ? this.mimeType : mimeType as String?;
+    final normalizedValue =
+        nextType == TaskAttachmentType.link
+            ? normalizeTaskAttachmentLink(nextValue)
+            : nextValue;
+    if (normalizedValue == null ||
+        (nextType != TaskAttachmentType.link &&
+            !isSafeTaskAttachmentMetadata(name ?? this.name, nextMimeType))) {
+      throw const FormatException('Invalid task attachment metadata');
     }
     return TaskAttachment(
       id: id ?? this.id,
       type: nextType,
-      name: name ?? this.name,
-      value: nextValue,
-      mimeType:
-          mimeType == const Object() ? this.mimeType : mimeType as String?,
+      name: attachmentDisplayName(name ?? this.name),
+      value: normalizedValue,
+      mimeType: nextMimeType,
     );
   }
 }
@@ -124,8 +141,31 @@ class TaskInfoBlock {
     String text = '',
     List<TaskAttachment> attachments = const [],
   }) {
-    if (text.length > kMaxTaskDescriptionLength) {
+    final safeText = sanitizeTaskDescription(text);
+    if (safeText.length > kMaxTaskDescriptionLength) {
       throw const FormatException('Description is too long');
+    }
+    final safeAttachments = <TaskAttachment>[];
+    for (final attachment in attachments) {
+      if (attachment.type == TaskAttachmentType.link) {
+        final normalized = normalizeTaskAttachmentLink(attachment.value);
+        if (normalized == null) {
+          throw const FormatException(
+            'Only safe http and https links are allowed',
+          );
+        }
+        safeAttachments.add(attachment.copyWith(value: normalized));
+      } else if (!isSafeTaskAttachmentMetadata(
+            attachment.name,
+            attachment.mimeType,
+          ) ||
+          !isSafeStoredTaskAttachmentValue(attachment.value)) {
+        throw const FormatException('Invalid task attachment metadata');
+      } else {
+        safeAttachments.add(
+          attachment.copyWith(name: attachmentDisplayName(attachment.name)),
+        );
+      }
     }
     return TaskInfoBlock._(
       id: id,
@@ -134,8 +174,8 @@ class TaskInfoBlock {
       currentValue: 0,
       targetValue: 0,
       unit: '',
-      text: text,
-      attachments: List.unmodifiable(attachments),
+      text: safeText,
+      attachments: List.unmodifiable(safeAttachments),
     );
   }
 
@@ -244,13 +284,6 @@ class TaskInfoBlock {
       throw const FormatException('Invalid quantity information block');
     }
   }
-}
-
-bool isAllowedTaskAttachmentLink(String value) {
-  final uri = Uri.tryParse(value.trim());
-  return uri != null &&
-      (uri.scheme == 'http' || uri.scheme == 'https') &&
-      uri.host.isNotEmpty;
 }
 
 String _requiredString(Map<String, dynamic> json, String key) {

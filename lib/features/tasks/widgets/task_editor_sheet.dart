@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/input_utils.dart';
 import '../../../core/task_attachment_service.dart';
+import '../../../core/task_attachment_validation.dart' as attachment_validation;
 import '../../../core/theme.dart';
 import '../../browser/screens/in_app_browser_screen.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -284,8 +287,11 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                     FilledButton(
                       key: const ValueKey('add-link-confirm'),
                       onPressed: () {
-                        final url = sanitizeText(urlController.text);
-                        if (!isAllowedTaskLink(url)) {
+                        final url = attachment_validation
+                            .normalizeTaskAttachmentLink(
+                              sanitizeText(urlController.text),
+                            );
+                        if (url == null) {
                           setDialogState(
                             () => error = _settings.tr('invalid_link'),
                           );
@@ -312,7 +318,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     final attachment = TaskAttachment(
       id: _uuid.v4(),
       type: TaskAttachmentType.link,
-      name: uri.host.isEmpty ? value : uri.host,
+      name: uri.host,
       value: value,
     );
     setState(() {
@@ -363,9 +369,13 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       if (type == TaskAttachmentType.image) {
         final image = await ImagePicker().pickImage(
           source: ImageSource.gallery,
+          maxWidth: 2048,
+          maxHeight: 2048,
+          imageQuality: 90,
         );
-        if (image == null) return null;
-        if (await image.length() > kMaxTaskAttachmentBytes) return null;
+        if (image == null || await image.length() > kMaxTaskAttachmentBytes) {
+          return null;
+        }
         final bytes = await image.readAsBytes();
         return storeTaskAttachment(
           type: type,
@@ -375,21 +385,49 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
           existingAttachmentCount: existingAttachmentCount,
         );
       }
-      final result = await FilePicker.platform.pickFiles(withData: true);
+      // Keep large files on disk while selecting. Only the bounded file
+      // contents are read after the picker has reported its size.
+      final result = await FilePicker.platform.pickFiles(
+        withData: false,
+        withReadStream: true,
+      );
       if (result == null || result.files.isEmpty) return null;
       final file = result.files.single;
-      if (file.size > kMaxTaskAttachmentBytes) return null;
-      final bytes = file.bytes;
+      if (file.size <= 0 || file.size > kMaxTaskAttachmentBytes) return null;
+      final bytes = await _readPickedFileBytes(file);
       if (bytes == null) return null;
       return storeTaskAttachment(
         type: type,
         name: file.name,
         bytes: bytes,
+        mimeType: attachment_validation.taskAttachmentMimeForName(file.name),
         existingAttachmentCount: existingAttachmentCount,
       );
     } on Object {
       return null;
     }
+  }
+
+  Future<List<int>?> _readPickedFileBytes(PlatformFile file) async {
+    final stream = file.readStream;
+    if (stream != null) {
+      final builder = BytesBuilder(copy: false);
+      var totalLength = 0;
+      await for (final chunk in stream) {
+        totalLength += chunk.length;
+        if (totalLength > kMaxTaskAttachmentBytes) return null;
+        builder.add(chunk);
+      }
+      if (totalLength == 0) return null;
+      return builder.takeBytes();
+    }
+    final bytes = file.bytes;
+    if (bytes == null ||
+        bytes.isEmpty ||
+        bytes.length > kMaxTaskAttachmentBytes) {
+      return null;
+    }
+    return bytes;
   }
 
   int get _attachmentCount =>

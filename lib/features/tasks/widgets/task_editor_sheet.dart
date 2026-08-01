@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/task_attachment_service.dart';
 import '../../../core/theme.dart';
+import '../../browser/screens/in_app_browser_screen.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
@@ -402,7 +403,14 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   }
 
   Future<void> _openAttachment(TaskAttachment attachment) async {
-    final opened = await openTaskAttachment(attachment);
+    final opened =
+        attachment.type == TaskAttachmentType.link
+            ? await openTaskLink(
+              context,
+              attachment.value,
+              title: attachment.name,
+            )
+            : await openTaskAttachment(attachment);
     if (!mounted || opened) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(_settings.tr('attachment_unavailable'))),

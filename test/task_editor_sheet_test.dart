@@ -20,8 +20,10 @@ Widget createEditorTestApp({
     providers: [
       ChangeNotifierProvider(
         create:
-            (_) =>
-                SettingsProvider(deviceNameProvider: () async => 'Test Device'),
+            (_) => SettingsProvider(
+              deviceNameProvider: () async => 'Test Device',
+              systemLanguageCodeProvider: () => 'ru',
+            ),
       ),
       ChangeNotifierProvider<TaskProvider>.value(
         value: provider ?? TaskProvider(),

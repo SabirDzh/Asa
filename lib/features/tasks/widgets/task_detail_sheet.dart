@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/task_attachment_service.dart';
 import '../../../core/theme.dart';
+import '../../browser/screens/in_app_browser_screen.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
@@ -200,7 +201,14 @@ class _TaskDetailSheet extends StatelessWidget {
     BuildContext context,
     TaskAttachment attachment,
   ) async {
-    final opened = await openTaskAttachment(attachment);
+    final opened =
+        attachment.type == TaskAttachmentType.link
+            ? await openTaskLink(
+              context,
+              attachment.value,
+              title: attachment.name,
+            )
+            : await openTaskAttachment(attachment);
     if (!context.mounted || opened) return;
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -274,12 +282,22 @@ class _TaskDetailSheet extends StatelessWidget {
                   '${settings.tr('task_status')}: ${_statusText(context)}',
                   textColor,
                 ),
-                _infoTile(Iconsax.timer_1, _timeInfo(context), textColor),
+                _infoTile(
+                  Iconsax.timer_1,
+                  _timeInfo(context),
+                  textColor,
+                  iconWidget: Icon(
+                    Iconsax.timer_1,
+                    key: const ValueKey('detail_timer_icon'),
+                    color: textColor,
+                    size: 20,
+                  ),
+                ),
                 _buildInfoBlocks(context, textColor),
                 if (task.effectiveDurationMinutes != null &&
                     task.effectiveDurationMinutes! > 0)
                   _infoTile(
-                    isTimerRunning ? Iconsax.pause_circle : Iconsax.play_circle,
+                    Iconsax.timer_1,
                     '${settings.tr(isTimerRunning ? 'timer_running' : 'timer_ready')}: ${_formatDuration(elapsed.inMinutes)}',
                     textColor,
                   ),
@@ -315,13 +333,14 @@ class _TaskDetailSheet extends StatelessWidget {
     String text,
     Color color, {
     bool bold = false,
+    Widget? iconWidget,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
+          iconWidget ?? Icon(icon, color: color, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

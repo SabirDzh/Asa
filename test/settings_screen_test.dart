@@ -189,7 +189,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('О приложении ASA'), findsOneWidget);
-    expect(find.text('Версия 1.1.0'), findsOneWidget);
+    expect(find.text('Версия 1.1.1'), findsOneWidget);
   });
 
   testWidgets('shows data management sheet on tap', (tester) async {

@@ -81,6 +81,63 @@ class AppPalette {
 
   List<Color> get customColors => [primary, surfaceLight, backgroundLight];
 
+  Color get navigationDark =>
+      this == base
+          ? const Color(0xFF3A3A3C)
+          : Color.lerp(surfaceFor(Brightness.dark), Colors.white, 0.18)!;
+
+  Color get sheetDark =>
+      this == base ? const Color(0xFF3A3A3C) : navigationDark;
+
+  Color get surfaceSecondaryLight =>
+      this == base
+          ? const Color(0xFFE5E5EA)
+          : Color.lerp(surfaceLight, backgroundLight, 0.55)!;
+
+  Color get surfaceSecondaryDark =>
+      this == base
+          ? const Color(0xFF3A3A3C)
+          : Color.lerp(surfaceFor(Brightness.dark), Colors.white, 0.12)!;
+
+  /// Creates a palette from one to three opaque RGB colors.
+  ///
+  /// The first color is the accent, the second is the light surface, and the
+  /// third is the light background. Missing semantic colors use the Base
+  /// defaults, which keeps the custom palette useful while enforcing the
+  /// three-color maximum requested by the profile editor.
+  factory AppPalette.fromCustomColors(List<Color> colors) {
+    if (colors.isEmpty || colors.length > 3) {
+      throw ArgumentError('A custom palette must contain 1 to 3 colors');
+    }
+    if (colors.any((color) => (color.a * 255).round() != 255)) {
+      throw ArgumentError('Custom palette colors must be opaque');
+    }
+
+    return AppPalette(
+      primary: colors[0],
+      surfaceLight: colors.length > 1 ? colors[1] : base.surfaceLight,
+      backgroundLight: colors.length > 2 ? colors[2] : base.backgroundLight,
+    );
+  }
+
+  /// Serializes an opaque color as a stable six-digit RGB hex string.
+  static String colorToHex(Color color) {
+    return color
+        .toARGB32()
+        .toRadixString(16)
+        .padLeft(8, '0')
+        .substring(2)
+        .toUpperCase();
+  }
+
+  /// Parses `#RRGGBB` (or `RRGGBB`) without accepting alpha values.
+  static Color? tryParseHex(String value) {
+    final normalized = value.trim().replaceFirst('#', '');
+    if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(normalized)) return null;
+    final parsed = int.tryParse(normalized, radix: 16);
+    return parsed == null ? null : Color(0xFF000000 | parsed);
+  }
+
   static Color _deriveDark(Color color, {bool brighten = false}) {
     final target = brighten ? Colors.white : Colors.black;
     return Color.lerp(color, target, brighten ? 0.2 : 0.72)!;
@@ -128,21 +185,11 @@ class AppColors {
   static Color get bgDark => _palette.backgroundFor(Brightness.dark);
 
   static Color get navLight => surfaceLight;
-  static Color get navDark =>
-      _palette == AppPalette.base
-          ? const Color(0xFF3A3A3C)
-          : Color.lerp(surfaceDark, Colors.white, 0.18)!;
+  static Color get navDark => _palette.navigationDark;
   static Color get sheetLight => surfaceLight;
-  static Color get sheetDark =>
-      _palette == AppPalette.base ? const Color(0xFF3A3A3C) : navDark;
-  static Color get surfaceSecondaryLight =>
-      _palette == AppPalette.base
-          ? const Color(0xFFE5E5EA)
-          : Color.lerp(surfaceLight, bgLight, 0.55)!;
-  static Color get surfaceSecondaryDark =>
-      _palette == AppPalette.base
-          ? const Color(0xFF3A3A3C)
-          : Color.lerp(surfaceDark, Colors.white, 0.12)!;
+  static Color get sheetDark => _palette.sheetDark;
+  static Color get surfaceSecondaryLight => _palette.surfaceSecondaryLight;
+  static Color get surfaceSecondaryDark => _palette.surfaceSecondaryDark;
 
   static const Color textLight = Color(0xFF000000);
   static const Color textDark = Color(0xFFFFFFFF);
@@ -210,7 +257,7 @@ class AppTheme {
         primary: primary,
         onPrimary:
             primary.computeLuminance() > 0.5 ? Colors.black : Colors.white,
-        secondary: isDark ? AppColors.navDark : palette.surfaceLight,
+        secondary: isDark ? palette.navigationDark : palette.surfaceLight,
         onSecondary: isDark ? Colors.white : Colors.black,
         surface: surface,
         onSurface: onSurface,

@@ -162,6 +162,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
     final themeMode = context.select<SettingsProvider, ThemeMode>(
       (settings) => settings.themeMode,
     );
+    final appPalette = context.select<SettingsProvider, AppPalette>(
+      (settings) => settings.appPalette,
+    );
     final appScale = context.select<SettingsProvider, double>(
       (settings) => settings.appScale,
     );
@@ -173,8 +176,8 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       title: 'ASA',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: AppTheme.lightThemeFor(appPalette),
+      darkTheme: AppTheme.darkThemeFor(appPalette),
       locale: Locale(languageCode),
       supportedLocales: const [Locale('ru'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,

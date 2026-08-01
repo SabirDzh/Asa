@@ -11,6 +11,7 @@ import '../../../core/home_widget_service.dart';
 import '../../../core/logger_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/scale_utils.dart';
+import '../../../core/theme.dart';
 
 enum WidgetDisplayMode { activeTasks, lastFolder }
 
@@ -18,6 +19,8 @@ class SettingsProvider with ChangeNotifier {
   final Future<String> Function() _deviceNameProvider;
 
   ThemeMode _themeMode = ThemeMode.system;
+  ColorPalette _colorPalette = ColorPalette.base;
+  AppPalette _customPalette = AppPalette.base;
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
@@ -47,6 +50,12 @@ class SettingsProvider with ChangeNotifier {
   Future<void> get ready => _initCompleter.future;
 
   ThemeMode get themeMode => _themeMode;
+  ColorPalette get colorPalette => _colorPalette;
+  AppPalette get appPalette =>
+      _colorPalette == ColorPalette.custom
+          ? _customPalette
+          : _paletteFor(_colorPalette);
+  List<Color> get customPaletteColors => _customPalette.customColors;
   bool get notificationsEnabled => _notificationsEnabled;
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
@@ -75,6 +84,26 @@ class SettingsProvider with ChangeNotifier {
       final themeIndex = prefs.getInt('themeMode') ?? ThemeMode.system.index;
       _themeMode =
           ThemeMode.values[themeIndex.clamp(0, ThemeMode.values.length - 1)];
+
+      final savedPalette = prefs.getString('colorPalette');
+      _colorPalette = _colorPaletteFromStorage(savedPalette);
+      final savedCustomColors = prefs.getStringList('customPaletteColors');
+      final parsedCustomColors =
+          savedCustomColors == null
+              ? null
+              : _parseCustomColors(savedCustomColors);
+      if (parsedCustomColors != null) {
+        _customPalette = AppPalette.fromCustomColors(parsedCustomColors);
+      }
+      if (_colorPalette == ColorPalette.custom && parsedCustomColors == null) {
+        _colorPalette = ColorPalette.base;
+        await prefs.setString('colorPalette', ColorPalette.base.name);
+        await prefs.remove('customPaletteColors');
+      } else if (savedCustomColors != null && parsedCustomColors == null) {
+        await prefs.remove('customPaletteColors');
+      }
+      AppColors.applyPalette(appPalette);
+
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
       _languageCode = prefs.getString('languageCode') ?? 'ru';
       NotificationService.setLanguage(_languageCode);
@@ -150,6 +179,30 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('themeMode', mode.index);
+  }
+
+  Future<void> setColorPalette(ColorPalette palette) async {
+    await ready;
+    _colorPalette = palette;
+    AppColors.applyPalette(appPalette);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('colorPalette', palette.name);
+  }
+
+  Future<void> setCustomPalette(List<Color> colors) async {
+    await ready;
+    final palette = AppPalette.fromCustomColors(colors);
+    _customPalette = palette;
+    _colorPalette = ColorPalette.custom;
+    AppColors.applyPalette(palette);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('colorPalette', ColorPalette.custom.name);
+    await prefs.setStringList(
+      'customPaletteColors',
+      palette.customColors.map(AppPalette.colorToHex).toList(),
+    );
   }
 
   Future<void> toggleNotifications(bool value) async {
@@ -374,6 +427,31 @@ class SettingsProvider with ChangeNotifier {
         return tr('widget_mode_active_tasks');
       case WidgetDisplayMode.lastFolder:
         return tr('widget_mode_last_folder');
+    }
+  }
+
+  static ColorPalette _colorPaletteFromStorage(String? value) {
+    return ColorPalette.values.firstWhere(
+      (palette) => palette.name == value,
+      orElse: () => ColorPalette.base,
+    );
+  }
+
+  static List<Color>? _parseCustomColors(List<String> values) {
+    if (values.isEmpty || values.length > 3) return null;
+    final colors = values.map(AppPalette.tryParseHex).toList();
+    if (colors.any((color) => color == null)) return null;
+    return colors.cast<Color>();
+  }
+
+  static AppPalette _paletteFor(ColorPalette palette) {
+    switch (palette) {
+      case ColorPalette.base:
+        return AppPalette.base;
+      case ColorPalette.ocean:
+        return AppPalette.ocean;
+      case ColorPalette.custom:
+        return AppPalette.base;
     }
   }
 

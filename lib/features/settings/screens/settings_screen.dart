@@ -18,6 +18,7 @@ import '../widgets/theme_mode_bottom_sheet.dart';
 import '../widgets/color_palette_bottom_sheet.dart';
 import '../../../core/sync_service.dart';
 import '../widgets/sync_bottom_sheet.dart' show showSyncBottomSheet;
+import '../widgets/notification_settings_bottom_sheet.dart';
 
 IconData _themeModeIcon(ThemeMode mode) {
   switch (mode) {
@@ -224,7 +225,15 @@ class SettingsScreen extends StatelessWidget {
                   label: settings.tr('notifications'),
                   trailing: Switch(
                     value: settings.notificationsEnabled,
-                    onChanged: settings.toggleNotifications,
+                    onChanged: (value) async {
+                      final enabled = await settings.toggleNotifications(value);
+                      if (!context.mounted) return;
+                      if (value &&
+                          !enabled &&
+                          settings.notificationsBlockedBySystem) {
+                        showOpenNotificationSettingsSheet(context, settings);
+                      }
+                    },
                     activeThumbColor: AppColors.primary,
                     trackOutlineColor: WidgetStateProperty.all(
                       Colors.transparent,

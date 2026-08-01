@@ -17,6 +17,7 @@ void main() {
       NotificationService.initializedOverride = null;
       NotificationService.notificationPermissionStateOverride = null;
       NotificationService.requestPermissionOverride = null;
+      NotificationService.permanentlyDeniedOverride = null;
       provider = SettingsProvider(systemLanguageCodeProvider: () => 'ru');
     });
 
@@ -24,6 +25,7 @@ void main() {
       NotificationService.initializedOverride = null;
       NotificationService.notificationPermissionStateOverride = null;
       NotificationService.requestPermissionOverride = null;
+      NotificationService.permanentlyDeniedOverride = null;
     });
 
     test('uses system theme by default', () {
@@ -268,6 +270,65 @@ void main() {
         await provider.toggleNotifications(false);
         await provider.syncNotificationPermission();
 
+        expect(provider.notificationsEnabled, false);
+      },
+    );
+
+    test('temporary denial does not mark blocked-by-system state', () async {
+      NotificationService.initializedOverride = true;
+      NotificationService.requestPermissionOverride =
+          ({required bool requestExactAlarms}) async => false;
+      NotificationService.permanentlyDeniedOverride = () async => false;
+      await provider.ready;
+
+      await provider.toggleNotifications(true);
+
+      expect(provider.notificationsEnabled, false);
+      expect(provider.notificationsBlockedBySystem, false);
+    });
+
+    test(
+      'permanent denial marks blocked state and restores after system grant',
+      () async {
+        NotificationService.initializedOverride = true;
+        NotificationService.requestPermissionOverride =
+            ({required bool requestExactAlarms}) async => false;
+        NotificationService.permanentlyDeniedOverride = () async => true;
+        await provider.ready;
+
+        await provider.toggleNotifications(true);
+        expect(provider.notificationsEnabled, false);
+        expect(provider.notificationsBlockedBySystem, true);
+
+        // The user enables notifications in the system settings; the app
+        // resumes and re-checks the permission.
+        NotificationService.notificationPermissionStateOverride =
+            () async => true;
+        await provider.syncNotificationPermission();
+
+        expect(provider.notificationsEnabled, true);
+        expect(provider.notificationsBlockedBySystem, false);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('notificationsEnabled'), true);
+        expect(prefs.getBool('notificationsBlockedBySystem'), false);
+      },
+    );
+
+    test(
+      'explicit in-app disable clears the blocked-by-system state',
+      () async {
+        NotificationService.initializedOverride = true;
+        NotificationService.requestPermissionOverride =
+            ({required bool requestExactAlarms}) async => false;
+        NotificationService.permanentlyDeniedOverride = () async => true;
+        await provider.ready;
+
+        await provider.toggleNotifications(true);
+        expect(provider.notificationsBlockedBySystem, true);
+
+        await provider.toggleNotifications(false);
+
+        expect(provider.notificationsBlockedBySystem, false);
         expect(provider.notificationsEnabled, false);
       },
     );

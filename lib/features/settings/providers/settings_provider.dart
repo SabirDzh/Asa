@@ -25,6 +25,7 @@ class SettingsProvider with ChangeNotifier {
   AppPalette _customPalette = AppPalette.base;
   bool _hasCustomPalette = false;
   bool _notificationsEnabled = true;
+  bool _notificationsBlockedBySystem = false;
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
   double _appScale = 1.0;
@@ -65,6 +66,11 @@ class SettingsProvider with ChangeNotifier {
   List<Color> get customPaletteColors => _customPalette.customColors;
   bool get hasCustomPalette => _hasCustomPalette;
   bool get notificationsEnabled => _notificationsEnabled;
+
+  /// True when the system revoked the notification permission behind the app's
+  /// back (e.g. the user disabled it in the system settings). While set, the
+  /// switch can be restored automatically once the permission is granted again.
+  bool get notificationsBlockedBySystem => _notificationsBlockedBySystem;
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
   double get appScale => _appScale;
@@ -130,6 +136,8 @@ class SettingsProvider with ChangeNotifier {
       AppColors.applyPalette(appPalette);
 
       _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+      _notificationsBlockedBySystem =
+          prefs.getBool('notificationsBlockedBySystem') ?? false;
       // An existing value means the user explicitly selected a language. If
       // it is absent, follow the device language for the initial experience:
       // ru -> Russian, everything else -> English. The fallback is kept in
@@ -265,12 +273,30 @@ class SettingsProvider with ChangeNotifier {
 
       try {
         final granted = await NotificationService.notificationPermissionState();
-        if (granted == false && _notificationsEnabled) {
-          _notificationsEnabled = false;
+        if (granted == false) {
+          if (_notificationsEnabled) {
+            _notificationsEnabled = false;
+            _notificationsBlockedBySystem = true;
+            notifyListeners();
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('notificationsEnabled', false);
+            await prefs.setBool('notificationsBlockedBySystem', true);
+            await NotificationService.cancelAll();
+          }
+          return granted;
+        }
+        // The system permission is granted. Restore the switch only when the
+        // user's intent was previously blocked by the system (the permission
+        // was revoked behind the app's back), never after an explicit in-app
+        // disable.
+        if (!_notificationsEnabled && _notificationsBlockedBySystem) {
+          _notificationsEnabled = true;
+          _notificationsBlockedBySystem = false;
           notifyListeners();
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('notificationsEnabled', false);
-          await NotificationService.cancelAll();
+          await prefs.setBool('notificationsEnabled', true);
+          await prefs.setBool('notificationsBlockedBySystem', false);
+          await NotificationService.rescheduleCachedTasks();
         }
         return granted;
       } on Object catch (error, stackTrace) {
@@ -284,7 +310,8 @@ class SettingsProvider with ChangeNotifier {
     });
   }
 
-  Future<void> toggleNotifications(bool value) {
+  /// Returns whether notifications ended up enabled.
+  Future<bool> toggleNotifications(bool value) {
     return _runNotificationPermissionOperation(() async {
       if (value) {
         var granted = false;
@@ -293,14 +320,28 @@ class SettingsProvider with ChangeNotifier {
             requestExactAlarms: false,
           );
         }
+        if (!granted) {
+          // The system may auto-deny future requests (Android "don't ask
+          // again"). Remember that so the UI can redirect the user to the
+          // system settings instead of leaving a dead end.
+          _notificationsBlockedBySystem =
+              await NotificationService.isPermissionPermanentlyDenied();
+        } else {
+          _notificationsBlockedBySystem = false;
+        }
         _notificationsEnabled = granted;
       } else {
         _notificationsEnabled = false;
+        _notificationsBlockedBySystem = false;
       }
 
       notifyListeners();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+      await prefs.setBool(
+        'notificationsBlockedBySystem',
+        _notificationsBlockedBySystem,
+      );
 
       if (_notificationsEnabled) {
         await NotificationService.showTestNotification();
@@ -308,6 +349,7 @@ class SettingsProvider with ChangeNotifier {
       } else if (NotificationService.isInitialized) {
         await NotificationService.cancelAll();
       }
+      return _notificationsEnabled;
     });
   }
 

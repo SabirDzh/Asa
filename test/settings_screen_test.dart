@@ -8,6 +8,7 @@ import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/core/home_widget_service.dart';
+import 'package:asa/core/notification_service.dart';
 import 'package:asa/core/theme.dart';
 import 'home_widget_channel_mock.dart';
 
@@ -44,6 +45,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
     installHomeWidgetChannelMock();
+    NotificationService.initializedOverride = null;
+    NotificationService.requestPermissionOverride = null;
+    NotificationService.permanentlyDeniedOverride = null;
   });
 
   tearDown(() async {
@@ -52,6 +56,9 @@ void main() {
       milliseconds: 300,
     );
     removeHomeWidgetChannelMock();
+    NotificationService.initializedOverride = null;
+    NotificationService.requestPermissionOverride = null;
+    NotificationService.permanentlyDeniedOverride = null;
   });
 
   testWidgets('renders all setting groups', (tester) async {
@@ -191,6 +198,38 @@ void main() {
     expect(find.text('О приложении ASA'), findsOneWidget);
     expect(find.text('Версия 1.1.1'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows open-settings sheet when notifications are permanently denied',
+    (tester) async {
+      // The switch starts off, matching the state after the system revoked
+      // the permission behind the app's back.
+      SharedPreferences.setMockInitialValues({'notificationsEnabled': false});
+      NotificationService.initializedOverride = true;
+      NotificationService.requestPermissionOverride =
+          ({required bool requestExactAlarms}) async => false;
+      NotificationService.permanentlyDeniedOverride = () async => true;
+      await pumpAndInit(tester, createTestApp());
+
+      final notificationsRow = find.text('Уведомления');
+      await tester.scrollUntilVisible(
+        notificationsRow,
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      final row = find.ancestor(
+        of: notificationsRow,
+        matching: find.byType(SettingRow),
+      );
+      await tester.tap(find.descendant(of: row, matching: find.byType(Switch)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Уведомления отключены'), findsOneWidget);
+      expect(find.text('Открыть настройки'), findsOneWidget);
+    },
+  );
 
   testWidgets('shows data management sheet on tap', (tester) async {
     await pumpAndInit(tester, createTestApp());

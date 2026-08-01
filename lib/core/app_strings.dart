@@ -85,6 +85,10 @@ class AppStrings {
           'Неподдерживаемый формат. Используйте JPEG, PNG, GIF или WebP',
       'avatar_too_large': 'Файл аватара слишком большой',
       'notifications': 'Уведомления',
+      'notifications_permission_needed': 'Уведомления отключены',
+      'notifications_permission_hint':
+          'Разрешение отключено в настройках системы. Откройте настройки, чтобы включить уведомления.',
+      'open_settings': 'Открыть настройки',
       'profile': 'Профиль',
       'appearance': 'Внешний вид',
       'widgets': 'Виджеты',
@@ -338,6 +342,10 @@ class AppStrings {
           'Unsupported format. Use JPEG, PNG, GIF, or WebP',
       'avatar_too_large': 'Avatar file is too large',
       'notifications': 'Notifications',
+      'notifications_permission_needed': 'Notifications are off',
+      'notifications_permission_hint':
+          'Permission is disabled in system settings. Open settings to enable notifications.',
+      'open_settings': 'Open settings',
       'profile': 'Profile',
       'appearance': 'Appearance',
       'widgets': 'Widgets',

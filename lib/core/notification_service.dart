@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     show
         AndroidFlutterLocalNotificationsPlugin,
@@ -40,6 +41,7 @@ class NotificationService {
   static const _startTimerActionId = 'start_timer';
   static const _taskPayloadPrefix = 'asa_task:';
   static const _pendingTimerTaskKey = 'pending_timer_task_id';
+  static const _platformChannel = MethodChannel('asa/notifications');
 
   /// Set by the app after providers are mounted. Background isolates persist
   /// the request instead; the app consumes it when it starts/resumes.
@@ -51,6 +53,9 @@ class NotificationService {
   @visibleForTesting
   static Future<bool> Function({required bool requestExactAlarms})?
   requestPermissionOverride;
+
+  @visibleForTesting
+  static Future<bool> Function()? permanentlyDeniedOverride;
 
   @visibleForTesting
   static bool? initializedOverride;
@@ -212,6 +217,47 @@ class NotificationService {
       granted = true;
     }
     return granted;
+  }
+
+  /// Returns whether the system will never show the notification permission
+  /// dialog again (Android "don't ask again" or repeated denials). Such users
+  /// must be redirected to the system settings to re-enable notifications.
+  static Future<bool> isPermissionPermanentlyDenied() async {
+    final override = permanentlyDeniedOverride;
+    if (override != null) return override();
+    if (kIsWeb || !Platform.isAndroid) return false;
+    try {
+      final denied = await _platformChannel.invokeMethod<bool>(
+        'notificationsPermanentlyDenied',
+      );
+      return denied ?? false;
+    } on MissingPluginException {
+      // No host implementation (tests, unsupported host): nothing to ask for.
+      return false;
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Notification permanent-denial check failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  }
+
+  /// Opens the system notification settings for this app on Android.
+  static Future<void> openNotificationSettings() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      await _platformChannel.invokeMethod<void>('openNotificationSettings');
+    } on MissingPluginException {
+      // No host implementation (tests, unsupported host): nothing to do.
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Failed to open notification settings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   /// Shows a one-time test notification so the user can verify it works.

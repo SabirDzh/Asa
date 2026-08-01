@@ -481,73 +481,87 @@ class TaskProvider with ChangeNotifier {
   }
 
   // ── Drag & Move methods ─────────────────────────────────────
-  void moveTaskToFolder(String taskId, String? targetFolderId) {
+  /// Moves a task into [targetFolderId]. Returns false when the task is not
+  /// found or the target is the protected streak folder, so callers can avoid
+  /// reporting a successful move that never happened.
+  bool moveTaskToFolder(String taskId, String? targetFolderId) {
+    if (targetFolderId == 'system_streak_folder') return false;
     final index = _tasks.indexWhere((t) => t.id == taskId);
-    if (index != -1) {
-      _tasks[index] = _tasks[index].copyWith(
-        folderId: targetFolderId,
-        updatedAt: DateTime.now(),
-      );
-      _notifyTasksChanged();
-      _saveToPrefs();
-    }
+    if (index == -1) return false;
+    _tasks[index] = _tasks[index].copyWith(
+      folderId: targetFolderId,
+      updatedAt: DateTime.now(),
+    );
+    _notifyTasksChanged();
+    _saveToPrefs();
+    return true;
   }
 
-  void moveFolderToFolder(String folderId, String? targetParentFolderId) {
-    if (folderId == targetParentFolderId) return;
+  /// Moves a folder into [targetParentFolderId]. Returns false when the move
+  /// is rejected (self-move, missing/deleted target, the protected streak
+  /// folder, a folder cycle, or a deleted/system folder source), so callers
+  /// can avoid reporting a successful move that never happened.
+  bool moveFolderToFolder(String folderId, String? targetParentFolderId) {
+    if (folderId == targetParentFolderId) return false;
     if (targetParentFolderId != null &&
         !_folders.any((f) => f.id == targetParentFolderId && !f.isDeleted)) {
-      return;
+      return false;
     }
-    if (targetParentFolderId == 'system_streak_folder') return;
-    if (_wouldCreateFolderCycle(folderId, targetParentFolderId)) return;
+    if (targetParentFolderId == 'system_streak_folder') return false;
+    if (_wouldCreateFolderCycle(folderId, targetParentFolderId)) return false;
 
     final index = _folders.indexWhere((f) => f.id == folderId);
-    if (index != -1 &&
-        !_folders[index].isDeleted &&
-        !_folders[index].isSystemStreak) {
-      _folders[index] = _folders[index].copyWith(
-        parentFolderId: targetParentFolderId,
-        updatedAt: DateTime.now(),
-      );
-      _notifyFoldersChanged();
-      _saveToPrefs();
+    if (index == -1 ||
+        _folders[index].isDeleted ||
+        _folders[index].isSystemStreak) {
+      return false;
     }
+    _folders[index] = _folders[index].copyWith(
+      parentFolderId: targetParentFolderId,
+      updatedAt: DateTime.now(),
+    );
+    _notifyFoldersChanged();
+    _saveToPrefs();
+    return true;
   }
 
   /// Moves a task out of its current folder into that folder's parent.
   /// Tasks already at the root, or whose current folder no longer exists, are
   /// left untouched.
-  void moveTaskToParentFolder(String taskId) {
+  /// Moves a task out of its current folder into that folder's parent.
+  /// Tasks already at the root, or whose current folder no longer exists, are
+  /// left untouched and false is returned.
+  bool moveTaskToParentFolder(String taskId) {
     final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
-    if (taskIndex == -1) return;
+    if (taskIndex == -1) return false;
 
     final currentFolderId = _tasks[taskIndex].folderId;
-    if (currentFolderId == null) return;
+    if (currentFolderId == null) return false;
     final folderIndex = _folders.indexWhere(
       (folder) => folder.id == currentFolderId && !folder.isDeleted,
     );
-    if (folderIndex == -1) return;
+    if (folderIndex == -1) return false;
 
-    moveTaskToFolder(taskId, _folders[folderIndex].parentFolderId);
+    return moveTaskToFolder(taskId, _folders[folderIndex].parentFolderId);
   }
 
   /// Moves a nested folder into its current parent's parent. Root folders are
-  /// already at the highest level and are intentionally left untouched.
-  void moveFolderToParentFolder(String folderId) {
+  /// already at the highest level and are intentionally left untouched (false
+  /// is returned).
+  bool moveFolderToParentFolder(String folderId) {
     final folderIndex = _folders.indexWhere(
       (folder) => folder.id == folderId && !folder.isDeleted,
     );
-    if (folderIndex == -1) return;
+    if (folderIndex == -1) return false;
 
     final currentParentId = _folders[folderIndex].parentFolderId;
-    if (currentParentId == null) return;
+    if (currentParentId == null) return false;
     final parentIndex = _folders.indexWhere(
       (folder) => folder.id == currentParentId && !folder.isDeleted,
     );
-    if (parentIndex == -1) return;
+    if (parentIndex == -1) return false;
 
-    moveFolderToFolder(folderId, _folders[parentIndex].parentFolderId);
+    return moveFolderToFolder(folderId, _folders[parentIndex].parentFolderId);
   }
 
   /// Returns true when [targetParentFolderId] is [folderId] or one of its

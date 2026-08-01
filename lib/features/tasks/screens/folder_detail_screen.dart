@@ -312,12 +312,13 @@ class _FolderContent extends StatelessWidget {
   const _FolderContent({required this.folder});
 
   void _moveTaskToParent(BuildContext context, String taskId) {
-    context.read<TaskProvider>().moveTaskToParentFolder(taskId);
+    final moved = context.read<TaskProvider>().moveTaskToParentFolder(taskId);
     if (!context.mounted) return;
+    final settings = context.read<SettingsProvider>();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          context.read<SettingsProvider>().tr('task_moved_to_parent'),
+          settings.tr(moved ? 'task_moved_to_parent' : 'move_denied'),
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -325,12 +326,15 @@ class _FolderContent extends StatelessWidget {
   }
 
   void _moveFolderToParent(BuildContext context, String folderId) {
-    context.read<TaskProvider>().moveFolderToParentFolder(folderId);
+    final moved = context.read<TaskProvider>().moveFolderToParentFolder(
+      folderId,
+    );
     if (!context.mounted) return;
+    final settings = context.read<SettingsProvider>();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          context.read<SettingsProvider>().tr('folder_moved_to_parent'),
+          settings.tr(moved ? 'folder_moved_to_parent' : 'move_denied'),
         ),
         duration: const Duration(seconds: 2),
       ),

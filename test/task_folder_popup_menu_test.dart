@@ -410,6 +410,156 @@ void main() {
     expect(find.text('Удаление'), findsOneWidget);
     await tester.tap(find.text('Отмена'));
   });
+
+  testWidgets('dropping a folder onto the streak folder shows a denial', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    provider.addFolder('Root');
+    final root = provider.folders.firstWhere((f) => f.name == 'Root');
+
+    await tester.pumpWidget(
+      _DropTestApp(
+        provider: provider,
+        source: root,
+        target: FolderItem(
+          id: 'system_streak_folder',
+          name: 'День 1',
+          isSystemStreak: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Root')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveTo(tester.getCenter(find.text('День 1')));
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сюда переместить нельзя'), findsOneWidget);
+    expect(find.textContaining('Папка перенесена'), findsNothing);
+    expect(
+      provider.folders.firstWhere((f) => f.id == root.id).parentFolderId,
+      isNull,
+    );
+  });
+
+  testWidgets('dropping a folder onto a regular folder moves it', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    provider.addFolder('Root');
+    provider.addFolder('Target');
+    final root = provider.folders.firstWhere((f) => f.name == 'Root');
+    final target = provider.folders.firstWhere((f) => f.name == 'Target');
+
+    await tester.pumpWidget(
+      _DropTestApp(provider: provider, source: root, target: target),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Root')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveTo(tester.getCenter(find.text('Target')));
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Папка перенесена в Target'), findsOneWidget);
+    expect(
+      provider.folders.firstWhere((f) => f.id == root.id).parentFolderId,
+      target.id,
+    );
+  });
+
+  testWidgets('dropping a task onto the streak folder shows a denial', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    provider.addTask('Task');
+
+    await tester.pumpWidget(
+      _DropTestApp(
+        provider: provider,
+        taskSource: true,
+        target: FolderItem(
+          id: 'system_streak_folder',
+          name: 'День 1',
+          isSystemStreak: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Task')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveTo(tester.getCenter(find.text('День 1')));
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сюда переместить нельзя'), findsOneWidget);
+    expect(find.textContaining('Задача перенесена'), findsNothing);
+    expect(provider.allTasks.single.folderId, isNot('system_streak_folder'));
+  });
+}
+
+class _DropTestApp extends StatelessWidget {
+  final TaskProvider provider;
+  final FolderItem? source;
+  final FolderItem target;
+  final bool taskSource;
+
+  const _DropTestApp({
+    required this.provider,
+    required this.target,
+    this.source,
+    this.taskSource = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create:
+              (_) => SettingsProvider(
+                deviceNameProvider: () async => 'Test Device',
+                systemLanguageCodeProvider: () => 'ru',
+              ),
+        ),
+        ChangeNotifierProvider.value(value: provider),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: AppTheme.rowWidth,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (taskSource)
+                    TaskRow(task: provider.allTasks.single, enableDrag: true)
+                  else
+                    FolderRow(folder: source!, enableDrag: true),
+                  const SizedBox(height: 12),
+                  FolderRow(folder: target, enableDrag: false),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 void _expectMenuBelowAnchor(WidgetTester tester) {

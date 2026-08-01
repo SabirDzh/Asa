@@ -302,29 +302,29 @@ class _FolderRowState extends State<FolderRow> {
         setState(() => _isDragHovered = false);
         final data = details.data;
         final provider = context.read<TaskProvider>();
+        final settings = context.read<SettingsProvider>();
+        // Report success only when the move actually applied. The streak
+        // folder, folder cycles, and missing targets silently reject moves,
+        // so show an honest denial instead of a fake success message.
+        bool moved = false;
+        String message = settings.tr('move_denied');
         if (data is TaskItem) {
-          provider.moveTaskToFolder(data.id, widget.folder.id);
-          final settings = context.read<SettingsProvider>();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${settings.tr('task_moved')} ${widget.folder.name}',
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          moved = provider.moveTaskToFolder(data.id, widget.folder.id);
+          if (moved) {
+            message = '${settings.tr('task_moved')} ${widget.folder.name}';
+          }
         } else if (data is FolderItem) {
-          provider.moveFolderToFolder(data.id, widget.folder.id);
-          final settings = context.read<SettingsProvider>();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${settings.tr('folder_moved')} ${widget.folder.name}',
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          moved = provider.moveFolderToFolder(data.id, widget.folder.id);
+          if (moved) {
+            message = '${settings.tr('folder_moved')} ${widget.folder.name}';
+          }
         }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       },
       builder: (context, candidateData, rejectedData) => rowChild,
     );

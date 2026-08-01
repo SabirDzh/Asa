@@ -653,10 +653,24 @@ void main() {
       final folderId = provider.filteredFolders.first.id;
       final taskId = addTaskForTest('Test task');
 
-      provider.moveTaskToFolder(taskId, folderId);
+      final moved = provider.moveTaskToFolder(taskId, folderId);
       final folderTasks = provider.getFolderTasks(folderId);
+      expect(moved, true);
       expect(folderTasks.length, 1);
       expect(folderTasks[0].id, taskId);
+    });
+
+    test('moveTaskToFolder rejects moving a task into the streak folder', () {
+      final taskId = addTaskForTest('Task for streak');
+
+      final moved = provider.moveTaskToFolder(taskId, 'system_streak_folder');
+
+      expect(moved, false);
+      expect(provider.allTasks.single.folderId, isNot('system_streak_folder'));
+    });
+
+    test('moveTaskToFolder reports false for an unknown task', () {
+      expect(provider.moveTaskToFolder('missing-task', null), false);
     });
 
     test('moveTaskToParentFolder moves a nested task one level up', () {
@@ -725,8 +739,9 @@ void main() {
       provider.addFolder('Child', parentFolderId: parentId);
       final childId = provider.getSubfolders(parentId).first.id;
 
-      provider.moveFolderToFolder(parentId, childId);
+      final moved = provider.moveFolderToFolder(parentId, childId);
 
+      expect(moved, false);
       expect(
         provider.folders.firstWhere((f) => f.id == parentId).parentFolderId,
         null,
@@ -737,13 +752,19 @@ void main() {
       );
     });
 
-    test('moveFolderToFolder ignores missing target parent', () {
+    test('moveFolderToFolder reports false for a missing target parent', () {
       provider.addFolder('Parent');
       final parentId = provider.filteredFolders.first.id;
 
-      provider.moveFolderToFolder(parentId, 'missing');
-
+      expect(provider.moveFolderToFolder(parentId, 'missing'), false);
       expect(provider.folders.first.parentFolderId, null);
+    });
+
+    test('moveFolderToFolder reports false for a self move', () {
+      provider.addFolder('Solo');
+      final folderId = provider.filteredFolders.first.id;
+
+      expect(provider.moveFolderToFolder(folderId, folderId), false);
     });
 
     test('user folders cannot be placed inside the streak folder', () {
@@ -754,8 +775,9 @@ void main() {
         'Invalid child',
         parentFolderId: 'system_streak_folder',
       );
-      provider.moveFolderToFolder(rootId, 'system_streak_folder');
+      final moved = provider.moveFolderToFolder(rootId, 'system_streak_folder');
 
+      expect(moved, false);
       expect(provider.folders.where((f) => f.name == 'Invalid child'), isEmpty);
       expect(
         provider.folders.firstWhere((f) => f.id == rootId).parentFolderId,

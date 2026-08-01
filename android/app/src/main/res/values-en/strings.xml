@@ -3,6 +3,11 @@
     <string name="widget_app_name">ASA</string>
     <string name="widget_description">ASA tasks and streak</string>
     <string name="widget_streak_format">Day %1$d</string>
+    <string name="widget_add_task">Add task</string>
+    <string name="widget_choose_folder">Choose folder</string>
+    <string name="widget_save_folder">Save</string>
+    <string name="widget_all_tasks">All tasks</string>
+    <string name="widget_empty_tasks">No active tasks</string>
     <plurals name="widget_active_tasks">
         <item quantity="zero">No active tasks</item>
         <item quantity="one">%1$d active task</item>

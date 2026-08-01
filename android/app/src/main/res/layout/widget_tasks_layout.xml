@@ -5,48 +5,89 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/asa_widget_background"
-    android:gravity="center_vertical"
     android:orientation="vertical"
     android:padding="12dp">
 
-    <TextView
-        android:id="@+id/widget_app_name"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/widget_app_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/widget_app_name"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1" />
+        <TextView
+            android:id="@+id/widget_add"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#FFFFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:contentDescription="@string/widget_add_task" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_folder_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:includeFontPadding="false"
         android:maxLines="1"
-        android:text="@string/widget_app_name"
-        android:textColor="#FFFFFF"
+        android:text="@string/widget_all_tasks"
+        android:textColor="#B3FFFFFF"
         android:textSize="12sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.1" />
+        android:contentDescription="@string/widget_choose_folder" />
 
     <TextView
         android:id="@+id/widget_streak"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:ellipsize="end"
-        android:includeFontPadding="false"
-        android:maxLines="1"
-        android:text=""
-        android:textColor="#FFFFFF"
-        android:textSize="17sp"
-        android:textStyle="bold"
-        tools:text="Последняя папка" />
-
-    <TextView
-        android:id="@+id/widget_active_tasks"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:ellipsize="end"
         android:includeFontPadding="false"
         android:maxLines="1"
-        android:text=""
-        android:textColor="#B3FFFFFF"
-        android:textSize="13sp"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
         tools:text="3 активные задачи" />
+
+    <ListView
+        android:id="@+id/widget_task_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="2dp"
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="2dp" />
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="8dp"
+        android:text="@string/widget_empty_tasks"
+        android:textColor="#B3FFFFFF"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/widget_active_tasks"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
 </LinearLayout>

@@ -3,6 +3,11 @@
     <string name="widget_app_name">ASA</string>
     <string name="widget_description">Задачи и серия ASA</string>
     <string name="widget_streak_format">День %1$d</string>
+    <string name="widget_add_task">Добавить задачу</string>
+    <string name="widget_choose_folder">Выбрать папку</string>
+    <string name="widget_save_folder">Сохранить</string>
+    <string name="widget_all_tasks">Все задачи</string>
+    <string name="widget_empty_tasks">Нет активных задач</string>
     <plurals name="widget_active_tasks">
         <item quantity="zero">Нет активных задач</item>
         <item quantity="one">%1$d активная задача</item>

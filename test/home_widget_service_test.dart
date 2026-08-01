@@ -22,6 +22,28 @@ void main() {
     );
   });
 
+  test('consumes a bounded queue of widget completions', () async {
+    SharedPreferences.setMockInitialValues({
+      HomeWidgetService.pendingCompletionKey: '["task-a", "task-b", "task-a"]',
+    });
+
+    final taskIds = await HomeWidgetService.consumePendingCompletions();
+
+    expect(taskIds, ['task-a', 'task-b', 'task-a']);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.containsKey(HomeWidgetService.pendingCompletionKey), false);
+  });
+
+  test('consumes the legacy single-ID completion format', () async {
+    SharedPreferences.setMockInitialValues({
+      HomeWidgetService.pendingCompletionKey: 'legacy-task',
+    });
+
+    expect(await HomeWidgetService.consumePendingCompletions(), [
+      'legacy-task',
+    ]);
+  });
+
   test(
     'coalesces a widget update queued during an active native update',
     () async {

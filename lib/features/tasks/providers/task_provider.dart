@@ -680,6 +680,30 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
+  /// Applies a completion action already persisted by an Android widget
+  /// background callback. Unlike [toggleTask], this is idempotent and cannot
+  /// accidentally reopen a task when the callback ran before the app resumed.
+  void completeTaskFromWidget(String id) {
+    final index = _tasks.indexWhere((task) => task.id == id);
+    if (index == -1 || _tasks[index].isCompleted) return;
+    final task = _tasks[index];
+    var elapsedSeconds = task.timerElapsedSeconds;
+    if (task.timerStartedAt != null) {
+      elapsedSeconds += DateTime.now()
+          .difference(task.timerStartedAt!)
+          .inSeconds
+          .clamp(0, 1 << 31);
+    }
+    _tasks[index] = task.copyWith(
+      isCompleted: true,
+      timerStartedAt: null,
+      timerElapsedSeconds: elapsedSeconds,
+      updatedAt: DateTime.now(),
+    );
+    _notifyTasksChanged();
+    _saveToPrefs();
+  }
+
   void removeTask(String id) {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {

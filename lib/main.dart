@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -12,6 +12,9 @@ import 'core/scale_utils.dart';
 import 'core/logger_service.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/tasks/providers/task_provider.dart';
+import 'features/tasks/screens/folder_detail_screen.dart';
+import 'features/tasks/widgets/task_editor_sheet.dart';
+import 'features/tasks/models/task_model.dart';
 import 'features/splash/splash_screen.dart';
 
 import 'core/theme_switcher.dart';
@@ -40,10 +43,16 @@ class AsaApp extends StatefulWidget {
 }
 
 class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<Uri?>? _widgetClickSubscription;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _widgetClickSubscription = HomeWidgetService.widgetClicks.listen(
+      (uri) => unawaited(_handleWidgetUri(uri)),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_initializeNonCriticalServices());
     });
@@ -57,6 +66,15 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
 
   Future<void> _initializeNonCriticalServices() async {
     try {
+      try {
+        await HomeWidgetService.registerInteractivityCallback();
+      } on Object catch (error, stackTrace) {
+        LoggerService.instance.w(
+          'Widget interactivity registration unavailable',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
       tz_data.initializeTimeZones();
       try {
         tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
@@ -84,6 +102,12 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       final tasks = context.read<TaskProvider>();
       await tasks.ready;
       if (!mounted) return;
+      await _consumePendingWidgetCompletion(tasks);
+      final initialWidgetUri =
+          await HomeWidgetService.initiallyLaunchedFromWidget();
+      if (initialWidgetUri != null) {
+        unawaited(_handleWidgetUri(initialWidgetUri));
+      }
       if (settings.notificationsEnabled) {
         // The default-enabled setting must still request Android runtime
         // notification permission before reminders are scheduled. Exact-alarm
@@ -116,9 +140,50 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
     if (taskId != null) tasks.startTimer(taskId);
   }
 
+  Future<void> _consumePendingWidgetCompletion(TaskProvider tasks) async {
+    final taskIds = await HomeWidgetService.consumePendingCompletions();
+    for (final taskId in taskIds) {
+      tasks.completeTaskFromWidget(taskId);
+    }
+  }
+
+  Future<void> _handleWidgetUri(Uri? uri) async {
+    if (uri == null || uri.scheme != 'asa' || uri.host != 'widget') return;
+    final tasks = context.read<TaskProvider>();
+    await tasks.ready;
+    if (!mounted) return;
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+
+    final action = uri.pathSegments.isEmpty ? '' : uri.pathSegments.first;
+    if (action == 'add') {
+      await showTaskEditorSheet(context, folderId: null);
+      return;
+    }
+    if (action == 'folder') {
+      final folderId = uri.queryParameters['folderId'];
+      if (folderId == null || folderId.isEmpty) return;
+      FolderItem? folder;
+      for (final candidate in tasks.folders) {
+        if (candidate.id == folderId) {
+          folder = candidate;
+          break;
+        }
+      }
+      if (folder != null && navigator.mounted) {
+        await navigator.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => FolderDetailScreen(folder: folder!),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     NotificationService.onStartTimerRequested = null;
+    _widgetClickSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -144,7 +209,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       return;
     }
     if (state != AppLifecycleState.resumed || !mounted) return;
+    unawaited(_consumePendingWidgetCompletion(tasks));
     final settings = context.read<SettingsProvider>();
+    unawaited(settings.syncNotificationPermission());
     _consumePendingTimerAction(tasks);
     HomeWidgetService.updateSettings(
       enabled: settings.showInWidget,
@@ -182,6 +249,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       supportedLocales: const [Locale('ru'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       builder: (context, child) => _ScaledApp(scale: appScale, child: child!),
+      navigatorKey: _navigatorKey,
       home: const SplashScreen(),
     );
   }

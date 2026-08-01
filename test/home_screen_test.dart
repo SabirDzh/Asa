@@ -13,7 +13,9 @@ import 'home_widget_channel_mock.dart';
 Widget createTestApp() {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(systemLanguageCodeProvider: () => 'ru'),
+      ),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
     child: const MaterialApp(home: HomeScreen()),

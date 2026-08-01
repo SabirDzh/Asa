@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
@@ -272,8 +271,6 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _sectionTitle(Iconsax.clock, settings.tr('time_period')),
-                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -349,25 +346,6 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _sectionTitle(IconData icon, String label) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.textDark : AppColors.textLight;
-    return Row(
-      children: [
-        Icon(icon, color: textColor, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 

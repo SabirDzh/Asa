@@ -153,7 +153,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Установить время'), findsOneWidget);
-    expect(find.text('Период'), findsOneWidget);
+    expect(find.text('Период'), findsNothing);
     expect(find.byType(TextField), findsNothing);
   });
 
@@ -176,7 +176,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Установить время'), findsOneWidget);
-    expect(find.text('Период'), findsOneWidget);
+    expect(find.text('Период'), findsNothing);
     expect(find.byType(TextField), findsNothing);
   });
 

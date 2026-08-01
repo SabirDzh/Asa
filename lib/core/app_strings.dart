@@ -129,7 +129,7 @@ class AppStrings {
       'about_title': 'О приложении ASA',
       'about_desc':
           'ASA — современный менеджер задач с поддержкой папок и гибкой фильтрацией.',
-      'version': 'Версия 1.1.0',
+      'version': 'Версия 1.1.1',
       'clear_tasks': 'Очистить все задачи',
       'clear_folders': 'Очистить все папки',
       'clear_all': 'Сбросить все данные',
@@ -380,7 +380,7 @@ class AppStrings {
       'about_title': 'About ASA App',
       'about_desc':
           'ASA is a modern task manager supporting folders and flexible filtering.',
-      'version': 'Version 1.1.0',
+      'version': 'Version 1.1.1',
       'clear_tasks': 'Clear all tasks',
       'clear_folders': 'Clear all folders',
       'clear_all': 'Reset all data',

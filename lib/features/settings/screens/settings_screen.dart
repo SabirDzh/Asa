@@ -16,6 +16,7 @@ import '../widgets/about_bottom_sheet.dart';
 import '../widgets/widget_mode_bottom_sheet.dart';
 import '../widgets/app_scale_bottom_sheet.dart';
 import '../widgets/theme_mode_bottom_sheet.dart';
+import '../widgets/color_palette_bottom_sheet.dart';
 import '../../../core/sync_service.dart';
 import '../widgets/sync_bottom_sheet.dart' show showSyncBottomSheet;
 
@@ -62,6 +63,17 @@ class SettingsScreen extends StatelessWidget {
                   icon: _themeModeIcon(settings.themeMode),
                   label: '${settings.tr('theme')}: ${themeModeLabel(settings)}',
                   onTap: () => showThemeModeSheet(context),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
+                ),
+                SettingRow(
+                  icon: Iconsax.colorfilter,
+                  label:
+                      '${settings.tr('color_palette')}: ${colorPaletteLabel(settings)}',
+                  onTap: () => showColorPaletteSheet(context),
                   trailing: Icon(
                     Icons.chevron_right,
                     color: textSecondary,

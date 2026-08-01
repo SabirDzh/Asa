@@ -12,32 +12,37 @@ class AppPalette {
   final Color? primaryDark;
   final Color? surfaceDark;
   final Color? backgroundDark;
+  final int _customColorCount;
 
-  const AppPalette({
+  const AppPalette._({
     required this.primary,
     required this.surfaceLight,
     required this.backgroundLight,
     this.primaryDark,
     this.surfaceDark,
     this.backgroundDark,
-  });
+    required int customColorCount,
+  }) : assert(customColorCount >= 1 && customColorCount <= 3),
+       _customColorCount = customColorCount;
 
-  static const base = AppPalette(
+  static const base = AppPalette._(
     primary: Color(0xFF24AC09),
     surfaceLight: Color(0xFFFFFFFF),
     backgroundLight: Color(0xFFF2F2F7),
     primaryDark: Color(0xFF24AC09),
     surfaceDark: Color(0xFF2C2C2E),
     backgroundDark: Color(0xFF1C1C1E),
+    customColorCount: 3,
   );
 
-  static const ocean = AppPalette(
+  static const ocean = AppPalette._(
     primary: Color(0xFF087EDE),
     surfaceLight: Color(0xFFFFFFFF),
     backgroundLight: Color(0xFFEAF4FF),
     primaryDark: Color(0xFF55B1FF),
     surfaceDark: Color(0xFF17324A),
     backgroundDark: Color(0xFF091A2A),
+    customColorCount: 3,
   );
 
   Color primaryFor(Brightness brightness) {
@@ -69,17 +74,22 @@ class AppPalette {
     Color? surfaceDark,
     Color? backgroundDark,
   }) {
-    return AppPalette(
+    return AppPalette._(
       primary: primary ?? this.primary,
       surfaceLight: surfaceLight ?? this.surfaceLight,
       backgroundLight: backgroundLight ?? this.backgroundLight,
       primaryDark: primaryDark ?? this.primaryDark,
       surfaceDark: surfaceDark ?? this.surfaceDark,
       backgroundDark: backgroundDark ?? this.backgroundDark,
+      customColorCount: _customColorCount,
     );
   }
 
-  List<Color> get customColors => [primary, surfaceLight, backgroundLight];
+  List<Color> get customColors => [
+    primary,
+    if (_customColorCount >= 2) surfaceLight,
+    if (_customColorCount >= 3) backgroundLight,
+  ];
 
   Color get navigationDark =>
       this == base
@@ -112,11 +122,15 @@ class AppPalette {
     if (colors.any((color) => (color.a * 255).round() != 255)) {
       throw ArgumentError('Custom palette colors must be opaque');
     }
+    if (colors.toSet().length != colors.length) {
+      throw ArgumentError('Custom palette colors must be unique');
+    }
 
-    return AppPalette(
+    return AppPalette._(
       primary: colors[0],
       surfaceLight: colors.length > 1 ? colors[1] : base.surfaceLight,
       backgroundLight: colors.length > 2 ? colors[2] : base.backgroundLight,
+      customColorCount: colors.length,
     );
   }
 
@@ -151,7 +165,8 @@ class AppPalette {
         other.backgroundLight == backgroundLight &&
         other.primaryDark == primaryDark &&
         other.surfaceDark == surfaceDark &&
-        other.backgroundDark == backgroundDark;
+        other.backgroundDark == backgroundDark &&
+        other._customColorCount == _customColorCount;
   }
 
   @override
@@ -162,6 +177,7 @@ class AppPalette {
     primaryDark,
     surfaceDark,
     backgroundDark,
+    _customColorCount,
   );
 }
 

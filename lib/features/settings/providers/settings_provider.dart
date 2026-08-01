@@ -21,6 +21,7 @@ class SettingsProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   ColorPalette _colorPalette = ColorPalette.base;
   AppPalette _customPalette = AppPalette.base;
+  bool _hasCustomPalette = false;
   bool _notificationsEnabled = true;
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
@@ -56,6 +57,7 @@ class SettingsProvider with ChangeNotifier {
           ? _customPalette
           : _paletteFor(_colorPalette);
   List<Color> get customPaletteColors => _customPalette.customColors;
+  bool get hasCustomPalette => _hasCustomPalette;
   bool get notificationsEnabled => _notificationsEnabled;
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
@@ -94,6 +96,7 @@ class SettingsProvider with ChangeNotifier {
               : _parseCustomColors(savedCustomColors);
       if (parsedCustomColors != null) {
         _customPalette = AppPalette.fromCustomColors(parsedCustomColors);
+        _hasCustomPalette = true;
       }
       if (_colorPalette == ColorPalette.custom && parsedCustomColors == null) {
         _colorPalette = ColorPalette.base;
@@ -183,6 +186,7 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> setColorPalette(ColorPalette palette) async {
     await ready;
+    if (palette == ColorPalette.custom && !_hasCustomPalette) return;
     _colorPalette = palette;
     AppColors.applyPalette(appPalette);
     notifyListeners();
@@ -194,6 +198,7 @@ class SettingsProvider with ChangeNotifier {
     await ready;
     final palette = AppPalette.fromCustomColors(colors);
     _customPalette = palette;
+    _hasCustomPalette = true;
     _colorPalette = ColorPalette.custom;
     AppColors.applyPalette(palette);
     notifyListeners();
@@ -441,7 +446,9 @@ class SettingsProvider with ChangeNotifier {
     if (values.isEmpty || values.length > 3) return null;
     final colors = values.map(AppPalette.tryParseHex).toList();
     if (colors.any((color) => color == null)) return null;
-    return colors.cast<Color>();
+    final parsed = colors.cast<Color>();
+    if (parsed.toSet().length != parsed.length) return null;
+    return parsed;
   }
 
   static AppPalette _paletteFor(ColorPalette palette) {

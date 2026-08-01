@@ -37,6 +37,9 @@ class FolderRow extends StatefulWidget {
 class _FolderRowState extends State<FolderRow> {
   bool _isDragHovered = false;
   final GlobalKey _rowKey = GlobalKey();
+  // Anchor of the "..." menu: the icon render box itself, so the menu is
+  // pinned to the visible icon's right edge (not the padded tap area).
+  final GlobalKey _menuIconKey = GlobalKey();
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -242,31 +245,39 @@ class _FolderRowState extends State<FolderRow> {
               if (widget.showReorderHandle && widget.reorderIndex != null)
                 _reorderHandle(textSecondary),
               if (!widget.folder.isSystemStreak)
-                Builder(
-                  builder:
-                      (iconCtx) => GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => _showPopupMenu(iconCtx),
-                        child: Padding(
-                          padding: const EdgeInsets.only(
-                            left: AppTheme.rowGap,
-                            right: AppTheme.rowPadH,
-                            top: AppTheme.rowPadV,
-                            bottom: AppTheme.rowPadV,
-                          ),
-                          child: Semantics(
-                            button: true,
-                            label: context.read<SettingsProvider>().tr(
-                              'more_options',
-                            ),
-                            child: Icon(
-                              Iconsax.more_square,
-                              color: textSecondary,
-                              size: 24,
-                            ),
-                          ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    // Anchor to the icon render box, not the padded tap
+                    // area, so the menu right edge aligns with the visible
+                    // "..." icon and the gap is measured from the icon.
+                    final anchor = _menuIconKey.currentContext;
+                    if (anchor == null) return;
+                    _showPopupMenu(anchor);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      left: AppTheme.rowGap,
+                      right: AppTheme.rowPadH,
+                      top: AppTheme.rowPadV,
+                      bottom: AppTheme.rowPadV,
+                    ),
+                    child: Semantics(
+                      button: true,
+                      label: context.read<SettingsProvider>().tr(
+                        'more_options',
+                      ),
+                      child: KeyedSubtree(
+                        key: const ValueKey('folder-row-menu-icon'),
+                        child: Icon(
+                          Iconsax.more_square,
+                          color: textSecondary,
+                          size: 24,
+                          key: _menuIconKey,
                         ),
                       ),
+                    ),
+                  ),
                 )
               else
                 const SizedBox(width: AppTheme.rowPadH),

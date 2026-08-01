@@ -40,6 +40,9 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   late final AnimationController _exitController;
   bool _isExiting = false;
   bool? _previousCompleted;
+  // Anchor of the "..." menu: the icon render box itself, so the menu is
+  // pinned to the visible icon's right edge (not the padded tap area).
+  final GlobalKey _menuIconKey = GlobalKey();
 
   /// The system streak folder is regenerated every day, so tasks inside it
   /// cannot be linked to calendar events.
@@ -464,30 +467,37 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
               if (widget.showReorderHandle && widget.reorderIndex != null)
                 _reorderHandle(textSecondary),
               if (!widget.task.isCompleted)
-                Builder(
-                  builder:
-                      (iconCtx) => GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => _showPopupMenu(iconCtx),
-                        child: Padding(
-                          padding: const EdgeInsets.only(
-                            left: AppTheme.rowGap,
-                            right: 0,
-                            top: AppTheme.rowPadV,
-                            bottom: AppTheme.rowPadV,
-                          ),
-                          child: Semantics(
-                            button: true,
-                            label: settings.tr('more_options'),
-                            child: Icon(
-                              key: const ValueKey('task-row-menu'),
-                              Iconsax.more_square,
-                              color: textSecondary,
-                              size: 24,
-                            ),
-                          ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    // Anchor to the icon render box, not the padded tap
+                    // area, so the menu right edge aligns with the visible
+                    // "..." icon and the gap is measured from the icon.
+                    final anchor = _menuIconKey.currentContext;
+                    if (anchor == null) return;
+                    _showPopupMenu(anchor);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      left: AppTheme.rowGap,
+                      right: 0,
+                      top: AppTheme.rowPadV,
+                      bottom: AppTheme.rowPadV,
+                    ),
+                    child: Semantics(
+                      button: true,
+                      label: settings.tr('more_options'),
+                      child: KeyedSubtree(
+                        key: const ValueKey('task-row-menu'),
+                        child: Icon(
+                          Iconsax.more_square,
+                          color: textSecondary,
+                          size: 24,
+                          key: _menuIconKey,
                         ),
                       ),
+                    ),
+                  ),
                 ),
               const SizedBox(width: AppTheme.rowGap),
               AnimatedTaskCheckbox(

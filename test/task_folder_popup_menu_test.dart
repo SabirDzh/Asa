@@ -413,13 +413,7 @@ void main() {
 }
 
 void _expectMenuBelowAnchor(WidgetTester tester) {
-  final anchor =
-      find
-          .ancestor(
-            of: find.byIcon(Iconsax.more_square),
-            matching: find.byType(GestureDetector),
-          )
-          .first;
+  final icon = find.byIcon(Iconsax.more_square);
   final menu =
       find
           .ancestor(
@@ -427,9 +421,11 @@ void _expectMenuBelowAnchor(WidgetTester tester) {
             matching: find.byType(Material),
           )
           .first;
-  final anchorRect = tester.getRect(anchor);
+  final iconRect = tester.getRect(icon);
   final menuRect = tester.getRect(menu);
-  expect(menuRect.top - anchorRect.bottom, closeTo(6, 0.01));
+  // The menu must sit 6 px below the icon and be pinned to its right edge.
+  expect(menuRect.top - iconRect.bottom, closeTo(6, 0.01));
+  expect(menuRect.right, closeTo(iconRect.right, 0.01));
 }
 
 class _TestApp extends StatelessWidget {

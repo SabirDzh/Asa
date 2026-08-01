@@ -19,7 +19,16 @@ import 'task_detail_sheet.dart';
 class TaskRow extends StatefulWidget {
   final TaskItem task;
   final bool enableDrag;
-  const TaskRow({super.key, required this.task, this.enableDrag = true});
+  final int? reorderIndex;
+  final bool showReorderHandle;
+
+  const TaskRow({
+    super.key,
+    required this.task,
+    this.enableDrag = true,
+    this.reorderIndex,
+    this.showReorderHandle = false,
+  });
 
   @override
   State<TaskRow> createState() => _TaskRowState();
@@ -299,6 +308,29 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     );
   }
 
+  Widget _reorderHandle(Color color) {
+    final settings = context.read<SettingsProvider>();
+    return ReorderableDragStartListener(
+      index: widget.reorderIndex!,
+      child: Semantics(
+        button: true,
+        label: settings.tr('reorder_item'),
+        child: Tooltip(
+          message: settings.tr('reorder_item'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Icon(
+              Icons.drag_handle,
+              key: const ValueKey('task-reorder-handle'),
+              color: color,
+              size: 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTimeIndicator(BuildContext context) {
     final hasTimeData =
         widget.task.startTime != null || widget.task.endTime != null;
@@ -395,6 +427,8 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                   ),
                 ),
               _buildTimeIndicator(context),
+              if (widget.showReorderHandle && widget.reorderIndex != null)
+                _reorderHandle(textSecondary),
               if (!widget.task.isCompleted)
                 Builder(
                   builder:

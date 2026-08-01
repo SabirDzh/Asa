@@ -568,16 +568,47 @@ class TaskProvider with ChangeNotifier {
     // Reordering a filtered/searched list is ambiguous and can cause data
     // loss, so only reorder when the full root list is visible.
     if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
+    // The app-owned streak folder is always pinned at the root position.
+    if (oldIndex == 0 || newIndex == 0) return;
     _reorderFoldersByParent(null, oldIndex, newIndex);
   }
 
   void reorderSubfolders(String parentFolderId, int oldIndex, int newIndex) {
+    if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
     _reorderFoldersByParent(parentFolderId, oldIndex, newIndex);
   }
 
-  void reorderFolderTasks(String folderId, int oldIndex, int newIndex) {
+  /// Replaces a folder's task order with [orderedTaskIds]. This is used by the
+  /// mixed folder-detail list, where active and completed tasks are rendered
+  /// as separate visual sections but still share one persisted task order.
+  void reorderFolderTasks(
+    String folderId,
+    int oldIndex,
+    int newIndex, {
+    List<String>? orderedTaskIds,
+  }) {
     final folderTasks =
         _tasks.where((t) => t.folderId == folderId && !t.isDeleted).toList();
+    if (orderedTaskIds != null) {
+      final byId = {for (final task in folderTasks) task.id: task};
+      final ordered = <TaskItem>[];
+      for (final id in orderedTaskIds) {
+        final task = byId.remove(id);
+        if (task != null) ordered.add(task);
+      }
+      ordered.addAll(byId.values);
+      final taskIdsInFolder = ordered.map((task) => task.id).toSet();
+      final newTasks = <TaskItem>[
+        ..._tasks.where((task) => !taskIdsInFolder.contains(task.id)),
+        ...ordered,
+      ];
+      _tasks
+        ..clear()
+        ..addAll(newTasks);
+      _notifyTasksChanged();
+      _saveToPrefs();
+      return;
+    }
     if (oldIndex < 0 ||
         newIndex < 0 ||
         oldIndex >= folderTasks.length ||
@@ -644,6 +675,7 @@ class TaskProvider with ChangeNotifier {
   /// already exists. Returns true if the item was changed.
   bool upsertTask(TaskItem task) {
     final normalizedTask = _normalizeImportedTask(task);
+    _validateInfoBlocks(normalizedTask.infoBlocks);
     final index = _tasks.indexWhere((t) => t.id == normalizedTask.id);
     if (index == -1) {
       _tasks.add(normalizedTask);
@@ -674,6 +706,7 @@ class TaskProvider with ChangeNotifier {
       isCompleted: completing,
       timerStartedAt: completing ? null : task.timerStartedAt,
       timerElapsedSeconds: elapsedSeconds,
+      infoBlocks: completing ? _completeQuantityBlocks(task.infoBlocks) : null,
       updatedAt: DateTime.now(),
     );
     _notifyTasksChanged();
@@ -698,6 +731,7 @@ class TaskProvider with ChangeNotifier {
       isCompleted: true,
       timerStartedAt: null,
       timerElapsedSeconds: elapsedSeconds,
+      infoBlocks: _completeQuantityBlocks(task.infoBlocks),
       updatedAt: DateTime.now(),
     );
     _notifyTasksChanged();
@@ -758,6 +792,15 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
+  List<TaskInfoBlock> _completeQuantityBlocks(List<TaskInfoBlock> blocks) {
+    return [
+      for (final block in blocks)
+        block.type == TaskInfoBlockType.quantity
+            ? block.copyWith(currentValue: block.targetValue)
+            : block,
+    ];
+  }
+
   void adjustQuantityBlock(String taskId, String blockId, double delta) {
     if (!delta.isFinite) return;
     final index = _tasks.indexWhere((task) => task.id == taskId);
@@ -784,6 +827,16 @@ class TaskProvider with ChangeNotifier {
   }
 
   void _validateInfoBlocks(List<TaskInfoBlock> blocks) {
+    final descriptionCount =
+        blocks
+            .where((block) => block.type == TaskInfoBlockType.description)
+            .length;
+    if (descriptionCount > kMaxTaskDescriptionBlocksPerTask) {
+      throw const FormatException(
+        'A task can contain only one description block',
+      );
+    }
+
     final attachmentCount = blocks.fold<int>(
       0,
       (total, block) => total + block.attachments.length,
@@ -796,25 +849,37 @@ class TaskProvider with ChangeNotifier {
   TaskItem _normalizeImportedTask(TaskItem task) {
     var remaining = kMaxTaskAttachmentsPerTask;
     var truncated = false;
-    final normalizedBlocks = <TaskInfoBlock>[];
+    final normalizedBlocks = normalizeTaskInfoBlocks(task.infoBlocks);
+    final mergedDescriptionBlocks =
+        normalizedBlocks.length != task.infoBlocks.length;
 
-    for (final block in task.infoBlocks) {
+    final attachmentBlocks = <TaskInfoBlock>[];
+    for (final block in normalizedBlocks) {
       if (block.type != TaskInfoBlockType.description) {
-        normalizedBlocks.add(block);
+        attachmentBlocks.add(block);
         continue;
       }
       final keepCount = block.attachments.length.clamp(0, remaining);
       if (keepCount != block.attachments.length) truncated = true;
-      normalizedBlocks.add(
+      attachmentBlocks.add(
         block.copyWith(attachments: block.attachments.take(keepCount).toList()),
       );
       remaining -= keepCount;
     }
 
-    if (!truncated) return task;
-    LoggerService.instance.w('Trimmed task attachments to the supported limit');
+    if (!truncated && !mergedDescriptionBlocks) return task;
+    if (mergedDescriptionBlocks) {
+      LoggerService.instance.w(
+        'Merged duplicate task description blocks during normalization',
+      );
+    }
+    if (truncated) {
+      LoggerService.instance.w(
+        'Trimmed task attachments to the supported limit',
+      );
+    }
     return task.copyWith(
-      infoBlocks: normalizedBlocks,
+      infoBlocks: attachmentBlocks,
       updatedAt: task.updatedAt,
     );
   }

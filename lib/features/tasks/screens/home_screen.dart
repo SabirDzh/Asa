@@ -404,7 +404,10 @@ class _HomeFolderList extends StatelessWidget {
       );
     }
 
+    final canReorder = searchQuery.isEmpty && provider.filter == TaskFilter.all;
+
     return ReorderableListView.builder(
+      buildDefaultDragHandles: false,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(
         horizontal: AppTheme.screenPad,
@@ -412,7 +415,9 @@ class _HomeFolderList extends StatelessWidget {
       ),
       itemCount: folders.length,
       onReorderItem: (oldIndex, newIndex) {
+        if (!canReorder) return;
         if (oldIndex < newIndex) newIndex -= 1;
+        if (oldIndex == 0 || newIndex == 0) return;
         context.read<TaskProvider>().reorderRootFolders(oldIndex, newIndex);
       },
       proxyDecorator: (child, index, animation) {
@@ -428,7 +433,11 @@ class _HomeFolderList extends StatelessWidget {
         return Padding(
           key: ValueKey(f.id),
           padding: const EdgeInsets.only(bottom: 8),
-          child: FolderRow(folder: f),
+          child: FolderRow(
+            folder: f,
+            reorderIndex: index,
+            showReorderHandle: canReorder && !f.isSystemStreak,
+          ),
         );
       },
     );

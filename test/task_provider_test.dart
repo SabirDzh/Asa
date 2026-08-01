@@ -133,6 +133,33 @@ void main() {
       },
     );
 
+    test('completing a task fills every quantity block to its target', () {
+      final blocks = [
+        TaskInfoBlock.quantity(
+          id: 'pages',
+          currentValue: 3,
+          targetValue: 10,
+          unit: 'pages',
+        ),
+        TaskInfoBlock.quantity(
+          id: 'minutes',
+          currentValue: 5,
+          targetValue: 25,
+          unit: 'minutes',
+        ),
+      ];
+      provider.addTask('Read and study', infoBlocks: blocks);
+      final taskId = provider.tasks.single.id;
+
+      provider.toggleTask(taskId);
+
+      expect(provider.tasks.single.isCompleted, isTrue);
+      expect(
+        provider.tasks.single.infoBlocks.map((block) => block.currentValue),
+        [10, 25],
+      );
+    });
+
     test(
       'adjustQuantityBlock clamps to target without completing the task',
       () {
@@ -154,6 +181,61 @@ void main() {
         expect(provider.tasks.single.infoBlocks.single.currentValue, 0);
       },
     );
+
+    test('rejects more than one description block per task', () {
+      final blocks = [
+        TaskInfoBlock.description(id: 'notes-1'),
+        TaskInfoBlock.description(id: 'notes-2'),
+      ];
+
+      expect(
+        () => provider.addTask('Two descriptions', infoBlocks: blocks),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects duplicate descriptions on update and raw add', () {
+      final taskId = addTaskForTest('Existing task');
+      final duplicateBlocks = [
+        TaskInfoBlock.description(id: 'notes-1'),
+        TaskInfoBlock.description(id: 'notes-2'),
+      ];
+
+      expect(
+        () => provider.updateTask(
+          taskId,
+          'Existing task',
+          infoBlocks: duplicateBlocks,
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => provider.addTaskRaw(
+          TaskItem(
+            id: 'raw-duplicate',
+            title: 'Raw',
+            infoBlocks: duplicateBlocks,
+          ),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      expect(provider.tasks, hasLength(1));
+    });
+
+    test('normalizes duplicate descriptions on upsert', () {
+      final duplicateTask = TaskItem(
+        id: 'remote-duplicate',
+        title: 'Remote task',
+        infoBlocks: [
+          TaskInfoBlock.description(id: 'notes-1', text: 'First'),
+          TaskInfoBlock.description(id: 'notes-2', text: 'Second'),
+        ],
+      );
+
+      expect(provider.upsertTask(duplicateTask), isTrue);
+      expect(provider.tasks.single.infoBlocks, hasLength(1));
+      expect(provider.tasks.single.infoBlocks.single.text, 'First\n\nSecond');
+    });
 
     test('rejects more than the task-wide attachment limit across blocks', () {
       final attachments = List.generate(
@@ -306,6 +388,87 @@ void main() {
         provider.setSearchQuery('work');
         expect(provider.filteredFolders.map((folder) => folder.name), [
           'Work Projects',
+        ]);
+      },
+    );
+
+    test(
+      'reorders root folders while keeping the streak folder first',
+      () async {
+        await provider.ready;
+        provider.addFolder('First');
+        provider.addFolder('Second');
+        provider.addFolder('Third');
+
+        final before =
+            provider.filteredFolders
+                .where((folder) => !folder.isSystemStreak)
+                .map((folder) => folder.id)
+                .toList();
+        final firstVisibleIndex = provider.filteredFolders.indexWhere(
+          (folder) => folder.id == before.first,
+        );
+        final secondVisibleIndex = provider.filteredFolders.indexWhere(
+          (folder) => folder.id == before[1],
+        );
+
+        provider.reorderRootFolders(firstVisibleIndex, secondVisibleIndex);
+
+        expect(
+          provider.filteredFolders
+              .where((folder) => !folder.isSystemStreak)
+              .map((folder) => folder.id),
+          [before[1], before[0], before[2]],
+        );
+        expect(provider.filteredFolders.first.isSystemStreak, isTrue);
+      },
+    );
+
+    test('reorders subfolders under the same parent', () {
+      provider.addFolder('Parent');
+      final parentId =
+          provider.folders.firstWhere((f) => f.name == 'Parent').id;
+      provider.addFolder('First child', parentFolderId: parentId);
+      provider.addFolder('Second child', parentFolderId: parentId);
+      final before = provider.getSubfolders(parentId).map((f) => f.id).toList();
+
+      provider.reorderSubfolders(parentId, 0, 1);
+
+      expect(provider.getSubfolders(parentId).map((folder) => folder.id), [
+        before[1],
+        before[0],
+      ]);
+    });
+
+    test(
+      'reorders tasks in a folder and accepts an explicit ordered id list',
+      () {
+        provider.addFolder('Reading');
+        final folderId =
+            provider.folders.firstWhere((f) => f.name == 'Reading').id;
+        provider.addTask('First task', folderId: folderId);
+        provider.addTask('Second task', folderId: folderId);
+        provider.addTask('Third task', folderId: folderId);
+        final before =
+            provider.getFolderTasks(folderId).map((task) => task.id).toList();
+
+        provider.reorderFolderTasks(folderId, 0, 2);
+        expect(provider.getFolderTasks(folderId).map((task) => task.id), [
+          before[1],
+          before[2],
+          before[0],
+        ]);
+
+        provider.reorderFolderTasks(
+          folderId,
+          0,
+          0,
+          orderedTaskIds: [before[0], before[2], before[1]],
+        );
+        expect(provider.getFolderTasks(folderId).map((task) => task.id), [
+          before[0],
+          before[2],
+          before[1],
         ]);
       },
     );
@@ -468,6 +631,61 @@ void main() {
       expect(
         restored.allTasks.where((task) => task.id == 'broken-task'),
         isEmpty,
+      );
+    });
+
+    test('merges duplicate descriptions when loading legacy data', () async {
+      final firstAttachment = const TaskAttachment(
+        id: 'first-file',
+        type: TaskAttachmentType.file,
+        name: 'first.pdf',
+        value: '/app/task_attachments/first.pdf',
+      );
+      final secondAttachment = const TaskAttachment(
+        id: 'second-file',
+        type: TaskAttachmentType.file,
+        name: 'second.pdf',
+        value: '/app/task_attachments/second.pdf',
+      );
+      final legacyTask = TaskItem(
+        id: 'legacy-duplicate',
+        title: 'Legacy task',
+        infoBlocks: [
+          TaskInfoBlock.description(
+            id: 'notes-1',
+            text: 'First',
+            attachments: [firstAttachment],
+          ),
+          TaskInfoBlock.quantity(id: 'pages', targetValue: 10, unit: 'pages'),
+          TaskInfoBlock.description(
+            id: 'notes-2',
+            text: 'Second',
+            attachments: [secondAttachment],
+          ),
+        ],
+      );
+      SharedPreferences.setMockInitialValues({
+        'saved_tasks': jsonEncode([legacyTask.toJson()]),
+      });
+
+      final restored = TaskProvider();
+      await restored.ready;
+
+      expect(restored.tasks.single.infoBlocks, hasLength(2));
+      expect(
+        restored.tasks.single.infoBlocks.first.type,
+        TaskInfoBlockType.description,
+      );
+      expect(restored.tasks.single.infoBlocks.first.text, 'First\n\nSecond');
+      expect(
+        restored.tasks.single.infoBlocks.first.attachments.map(
+          (item) => item.id,
+        ),
+        ['first-file', 'second-file'],
+      );
+      expect(
+        restored.tasks.single.infoBlocks.last.type,
+        TaskInfoBlockType.quantity,
       );
     });
 

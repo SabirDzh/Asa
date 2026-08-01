@@ -83,11 +83,42 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-task-information')));
     await tester.pumpAndSettle();
+
+    final chooser = tester.widget<Container>(
+      find.byKey(const ValueKey('task-block-chooser-sheet')),
+    );
+    expect(chooser.clipBehavior, Clip.antiAlias);
+    final decoration = chooser.decoration! as BoxDecoration;
+    final radius = decoration.borderRadius as BorderRadius;
+    expect(radius.topLeft, const Radius.circular(24));
+    expect(radius.topRight, const Radius.circular(24));
+
     await tester.tap(find.byKey(const ValueKey('add-quantity-block')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('quantity-target-input')), findsOneWidget);
     expect(find.byKey(const ValueKey('quantity-unit-input')), findsOneWidget);
+  });
+
+  testWidgets('allows only one description block per task', (tester) async {
+    await tester.pumpWidget(createEditorTestApp());
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-description-block')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('description-text-input')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('add-task-information')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-description-block')), findsNothing);
+    expect(find.byKey(const ValueKey('add-quantity-block')), findsOneWidget);
   });
 
   testWidgets('adds a description block and rejects an unsafe link', (
@@ -105,7 +136,7 @@ void main() {
       find.byKey(const ValueKey('description-text-input')),
       findsOneWidget,
     );
-    await tester.tap(find.byKey(const ValueKey('add-description-link')));
+    await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('add-link-url-input')),
@@ -168,11 +199,46 @@ void main() {
       );
       await tester.tap(find.text('Open editor'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('add-description-file')));
+      await tester.tap(find.byKey(const ValueKey('attachment-action-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Добавить файл').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
       await tester.pumpAndSettle();
 
       expect(pickerCalls, 0);
       expect(find.text('Достигнут лимит в 20 вложений'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'selecting an attachment action does not invoke picker until plus',
+    (tester) async {
+      var pickerCalls = 0;
+      await tester.pumpWidget(
+        createEditorTestApp(
+          attachmentPicker: (type, count) async {
+            pickerCalls++;
+            return null;
+          },
+        ),
+      );
+      await tester.tap(find.text('Open editor'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add-task-information')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add-description-block')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('attachment-action-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Добавить файл').last);
+      await tester.pumpAndSettle();
+
+      expect(pickerCalls, 0);
+      expect(find.text('Добавить файл'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('attachment-action-add')));
+      await tester.pumpAndSettle();
+      expect(pickerCalls, 1);
     },
   );
 

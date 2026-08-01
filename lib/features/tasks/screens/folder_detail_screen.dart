@@ -354,6 +354,9 @@ class _FolderContent extends StatelessWidget {
     final inProgress = folderTasks.where((t) => !t.isCompleted).toList();
     final completed = folderTasks.where((t) => t.isCompleted).toList();
 
+    final canReorder =
+        provider.searchQuery.isEmpty && provider.filter == TaskFilter.all;
+
     // Build task widgets. The first completed task carries the divider
     // above it so the divider is not an independent reorderable child.
     final completedWidgets = <Widget>[];
@@ -366,7 +369,11 @@ class _FolderContent extends StatelessWidget {
             hasDivider
                 ? const EdgeInsets.only(top: 8, bottom: 8)
                 : const EdgeInsets.only(bottom: 8),
-        child: TaskRow(task: t),
+        child: TaskRow(
+          task: t,
+          reorderIndex: subfolders.length + inProgress.length + i,
+          showReorderHandle: canReorder,
+        ),
       );
       if (hasDivider) {
         taskWidget = Column(
@@ -395,6 +402,7 @@ class _FolderContent extends StatelessWidget {
     }
 
     return ReorderableListView(
+      buildDefaultDragHandles: false,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(
         AppTheme.screenPad,
@@ -403,27 +411,40 @@ class _FolderContent extends StatelessWidget {
         80,
       ),
       onReorderItem: (oldIndex, newIndex) {
+        if (!canReorder) return;
         if (oldIndex < newIndex) newIndex -= 1;
         final sc = subfolders.length;
         final taskCount = inProgress.length + completed.length;
-        final taskStart = sc;
-        final taskEnd = sc + taskCount;
-        if (oldIndex < sc && newIndex < sc) {
+        if (oldIndex < sc) {
+          if (sc == 0) return;
+          final targetIndex = newIndex.clamp(0, sc - 1).toInt();
           context.read<TaskProvider>().reorderSubfolders(
             folder.id,
             oldIndex,
-            newIndex,
+            targetIndex,
           );
-        } else if (oldIndex >= taskStart &&
-            oldIndex < taskEnd &&
-            newIndex >= taskStart &&
-            newIndex < taskEnd) {
-          context.read<TaskProvider>().reorderFolderTasks(
-            folder.id,
-            oldIndex - taskStart,
-            newIndex - taskStart,
-          );
+          return;
         }
+        if (taskCount == 0) return;
+        final oldTaskIndex = oldIndex - sc;
+        final targetTaskIndex = (newIndex - sc).clamp(0, taskCount - 1).toInt();
+        final activeCount = inProgress.length;
+        final oldIsActive = oldTaskIndex < activeCount;
+        final targetIsActive = targetTaskIndex < activeCount;
+        if (oldIsActive != targetIsActive) return;
+
+        final orderedTaskIds = [
+          ...inProgress.map((task) => task.id),
+          ...completed.map((task) => task.id),
+        ];
+        final movedId = orderedTaskIds.removeAt(oldTaskIndex);
+        orderedTaskIds.insert(targetTaskIndex, movedId);
+        context.read<TaskProvider>().reorderFolderTasks(
+          folder.id,
+          oldTaskIndex,
+          targetTaskIndex,
+          orderedTaskIds: orderedTaskIds,
+        );
       },
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
@@ -434,17 +455,25 @@ class _FolderContent extends StatelessWidget {
         );
       },
       children: [
-        for (final sf in subfolders)
+        for (var i = 0; i < subfolders.length; i++)
           Padding(
-            key: ValueKey(sf.id),
+            key: ValueKey(subfolders[i].id),
             padding: const EdgeInsets.only(bottom: 8),
-            child: FolderRow(folder: sf),
+            child: FolderRow(
+              folder: subfolders[i],
+              reorderIndex: i,
+              showReorderHandle: canReorder,
+            ),
           ),
-        for (final t in inProgress)
+        for (var i = 0; i < inProgress.length; i++)
           Padding(
-            key: ValueKey(t.id),
+            key: ValueKey(inProgress[i].id),
             padding: const EdgeInsets.only(bottom: 8),
-            child: TaskRow(task: t),
+            child: TaskRow(
+              task: inProgress[i],
+              reorderIndex: subfolders.length + i,
+              showReorderHandle: canReorder,
+            ),
           ),
         ...completedWidgets,
       ],

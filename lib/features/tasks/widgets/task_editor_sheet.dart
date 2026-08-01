@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/description_markdown.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/task_attachment_service.dart';
 import '../../../core/task_attachment_validation.dart' as attachment_validation;
@@ -16,6 +17,8 @@ import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
+import 'attachment_action_menu.dart';
+import 'attachment_mention_overlay.dart';
 
 /// Lets tests or platform-specific integrations provide an attachment picker
 /// without making the editor depend on a platform channel.
@@ -70,12 +73,20 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   final _targetControllers = <String, TextEditingController>{};
   final _unitControllers = <String, TextEditingController>{};
   final _descriptionControllers = <String, TextEditingController>{};
+  final _descriptionFocusNodes = <String, FocusNode>{};
   final _fieldKeys = <String, Map<String, Key>>{};
+  final _selectedAttachmentActions = <String, AttachmentAction>{};
+  final _mentionSuggestions = <String, List<TaskAttachment>>{};
+  final _mentionTriggers = <String, MentionTrigger?>{};
+  final _mentionLayerLinks = <String, LayerLink>{};
+  final _mentionOverlayEntries = <String, OverlayEntry>{};
   late List<TaskInfoBlock> _blocks;
   String? _submitError;
 
   SettingsProvider get _settings => context.read<SettingsProvider>();
   bool get _isEditing => widget.task != null;
+  bool get _hasDescriptionBlock =>
+      _blocks.any((block) => block.type == TaskInfoBlockType.description);
 
   @override
   void initState() {
@@ -84,7 +95,9 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     _blocks =
         widget.task == null
             ? <TaskInfoBlock>[]
-            : widget.task!.infoBlocks.map(_copyBlock).toList();
+            : normalizeTaskInfoBlocks(
+              widget.task!.infoBlocks,
+            ).map(_copyBlock).toList();
     for (final block in _blocks) {
       _createControllers(block);
     }
@@ -101,6 +114,12 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       ..._descriptionControllers.values,
     ]) {
       controller.dispose();
+    }
+    for (final blockId in _mentionOverlayEntries.keys.toList()) {
+      _dismissMentionOverlay(blockId);
+    }
+    for (final focusNode in _descriptionFocusNodes.values) {
+      focusNode.dispose();
     }
     super.dispose();
   }
@@ -142,9 +161,129 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       );
       _unitControllers[block.id] = TextEditingController(text: block.unit);
     } else {
-      _descriptionControllers[block.id] = TextEditingController(
-        text: block.text,
-      );
+      final controller = TextEditingController(text: block.text);
+      controller.addListener(() => _updateMentionSuggestions(block.id));
+      _descriptionControllers[block.id] = controller;
+      _descriptionFocusNodes[block.id] = FocusNode();
+      _mentionLayerLinks[block.id] = LayerLink();
+    }
+  }
+
+  void _updateMentionSuggestions(String blockId) {
+    if (!mounted) return;
+    final controller = _descriptionControllers[blockId];
+    final blockIndex = _blocks.indexWhere((block) => block.id == blockId);
+    if (controller == null || blockIndex == -1) return;
+    final cursor = controller.selection.baseOffset;
+    final trigger = findMentionTrigger(controller.text, cursor);
+    final query = trigger?.query.toLowerCase() ?? '';
+    final matches =
+        trigger == null
+            ? const <TaskAttachment>[]
+            : _blocks[blockIndex].attachments
+                .where(
+                  (attachment) => attachment.name.toLowerCase().contains(query),
+                )
+                .toList();
+    final previous = _mentionSuggestions[blockId] ?? const <TaskAttachment>[];
+    final unchanged =
+        _mentionTriggers[blockId] == trigger &&
+        previous.length == matches.length &&
+        previous.asMap().entries.every(
+          (entry) => entry.value.id == matches[entry.key].id,
+        );
+    if (unchanged) return;
+    setState(() {
+      _mentionTriggers[blockId] = trigger;
+      _mentionSuggestions[blockId] = matches;
+    });
+    _syncMentionOverlay(blockId);
+  }
+
+  void _syncMentionOverlay(String blockId) {
+    final matches = _mentionSuggestions[blockId] ?? const <TaskAttachment>[];
+    final existing = _mentionOverlayEntries[blockId];
+    if (matches.isEmpty || _mentionLayerLinks[blockId] == null) {
+      _dismissMentionOverlay(blockId);
+      return;
+    }
+
+    if (existing != null) {
+      existing.markNeedsBuild();
+      return;
+    }
+
+    final entry = OverlayEntry(
+      builder: (context) {
+        final current =
+            _mentionSuggestions[blockId] ?? const <TaskAttachment>[];
+        if (current.isEmpty) return const SizedBox.shrink();
+        final popupWidth =
+            (MediaQuery.sizeOf(context).width - 32)
+                .clamp(160.0, 320.0)
+                .toDouble();
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _dismissMentionOverlay(blockId),
+                child: const SizedBox.expand(),
+              ),
+            ),
+            CompositedTransformFollower(
+              link: _mentionLayerLinks[blockId]!,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.topLeft,
+              followerAnchor: Alignment.bottomLeft,
+              offset: const Offset(0, -4),
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: popupWidth,
+                  child: AttachmentMentionSuggestions(
+                    attachments: current,
+                    typeLinkLabel: _settings.tr('attachment_type_link'),
+                    typeImageLabel: _settings.tr('attachment_type_image'),
+                    typeFileLabel: _settings.tr('attachment_type_file'),
+                    onSelected:
+                        (attachment) => _selectMention(blockId, attachment),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    _mentionOverlayEntries[blockId] = entry;
+    Overlay.of(context).insert(entry);
+  }
+
+  void _dismissMentionOverlay(String blockId) {
+    final entry = _mentionOverlayEntries.remove(blockId);
+    entry?.remove();
+  }
+
+  void _selectMention(String blockId, TaskAttachment attachment) {
+    final controller = _descriptionControllers[blockId];
+    final trigger = _mentionTriggers[blockId];
+    if (controller == null || trigger == null) return;
+    controller.value = replaceMentionTrigger(
+      controller.value,
+      trigger,
+      attachment,
+    );
+    _dismissMentionOverlay(blockId);
+    setState(() {
+      _mentionTriggers.remove(blockId);
+      _mentionSuggestions.remove(blockId);
+    });
+    final focusNode = _descriptionFocusNodes[blockId];
+    if (focusNode != null) {
+      FocusScope.of(context).requestFocus(focusNode);
     }
   }
 
@@ -155,6 +294,11 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   }
 
   void _disposeControllers(String id, TaskInfoBlockType type) {
+    _dismissMentionOverlay(id);
+    _mentionSuggestions.remove(id);
+    _mentionTriggers.remove(id);
+    _mentionLayerLinks.remove(id);
+    _selectedAttachmentActions.remove(id);
     final maps =
         type == TaskInfoBlockType.quantity
             ? <Map<String, TextEditingController>>[
@@ -167,6 +311,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     for (final map in maps) {
       map.remove(id)?.dispose();
     }
+    _descriptionFocusNodes.remove(id)?.dispose();
   }
 
   Future<void> _showBlockChooser() async {
@@ -178,7 +323,12 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
         final sheetColor = isDark ? AppColors.sheetDark : AppColors.sheetLight;
         final textColor = isDark ? AppColors.textDark : AppColors.textLight;
         return Container(
-          color: sheetColor,
+          key: const ValueKey('task-block-chooser-sheet'),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: sheetColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           child: SafeArea(
             child: Column(
@@ -195,17 +345,18 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                     _addBlock(TaskInfoBlockType.quantity);
                   },
                 ),
-                _chooserTile(
-                  ctx,
-                  key: const ValueKey('add-description-block'),
-                  icon: Iconsax.document_text,
-                  label: _settings.tr('description_block'),
-                  color: textColor,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _addBlock(TaskInfoBlockType.description);
-                  },
-                ),
+                if (!_hasDescriptionBlock)
+                  _chooserTile(
+                    ctx,
+                    key: const ValueKey('add-description-block'),
+                    icon: Iconsax.document_text,
+                    label: _settings.tr('description_block'),
+                    color: textColor,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _addBlock(TaskInfoBlockType.description);
+                    },
+                  ),
               ],
             ),
           ),
@@ -239,6 +390,9 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   }
 
   void _addBlock(TaskInfoBlockType type) {
+    if (type == TaskInfoBlockType.description && _hasDescriptionBlock) {
+      return;
+    }
     final id = _uuid.v4();
     final block =
         type == TaskInfoBlockType.quantity
@@ -485,6 +639,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             TaskInfoBlock.description(
               id: block.id,
               text: sanitizeText(_descriptionControllers[block.id]!.text),
+              format: DescriptionFormat.markdown,
               attachments: block.attachments,
             ),
           );
@@ -753,52 +908,48 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 ),
               ),
             ] else ...[
-              TextFormField(
-                key: _fieldKey('description-text-input', block.id),
-                controller: _descriptionControllers[block.id],
-                maxLength: kMaxTaskDescriptionLength,
-                maxLines: 5,
-                minLines: 3,
-                inputFormatters: [
-                  textInputFormatter(maxLength: kMaxTaskDescriptionLength),
-                ],
-                decoration: InputDecoration(
-                  labelText: _settings.tr('description_text'),
-                  alignLabelWithHint: true,
+              CompositedTransformTarget(
+                link: _mentionLayerLinks[block.id]!,
+                child: TextFormField(
+                  key: _fieldKey('description-text-input', block.id),
+                  controller: _descriptionControllers[block.id],
+                  focusNode: _descriptionFocusNodes[block.id],
+                  maxLength: kMaxTaskDescriptionLength,
+                  maxLines: 5,
+                  minLines: 3,
+                  inputFormatters: [
+                    textInputFormatter(maxLength: kMaxTaskDescriptionLength),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: _settings.tr('description_text'),
+                    alignLabelWithHint: true,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _attachmentButton(
-                    key: const ValueKey('add-description-link'),
-                    icon: Icons.link,
-                    label: _settings.tr('add_link'),
-                    onPressed: () => _addLink(block),
-                  ),
-                  _attachmentButton(
-                    key: const ValueKey('add-description-image'),
-                    icon: Icons.image_outlined,
-                    label: _settings.tr('add_image'),
-                    onPressed:
-                        () => _addPickedAttachment(
-                          block,
-                          TaskAttachmentType.image,
-                        ),
-                  ),
-                  _attachmentButton(
-                    key: const ValueKey('add-description-file'),
-                    icon: Icons.attach_file,
-                    label: _settings.tr('add_file'),
-                    onPressed:
-                        () => _addPickedAttachment(
-                          block,
-                          TaskAttachmentType.file,
-                        ),
-                  ),
-                ],
+              AttachmentActionMenu(
+                selectedAction:
+                    _selectedAttachmentActions[block.id] ??
+                    AttachmentAction.link,
+                linkLabel: _settings.tr('add_link'),
+                imageLabel: _settings.tr('add_image'),
+                fileLabel: _settings.tr('add_file'),
+                addLabel: _settings.tr('add'),
+                onActionChanged: (action) {
+                  setState(() => _selectedAttachmentActions[block.id] = action);
+                },
+                onAdd: () {
+                  final action =
+                      _selectedAttachmentActions[block.id] ??
+                      AttachmentAction.link;
+                  if (action == AttachmentAction.link) {
+                    _addLink(block);
+                  } else if (action == AttachmentAction.image) {
+                    _addPickedAttachment(block, TaskAttachmentType.image);
+                  } else {
+                    _addPickedAttachment(block, TaskAttachmentType.file);
+                  }
+                },
               ),
               if (block.attachments.isNotEmpty) ...[
                 const SizedBox(height: 8),
@@ -847,20 +998,5 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
 
   Key _fieldKey(String base, String blockId) {
     return _fieldKeys[blockId]![base]!;
-  }
-
-  Widget _attachmentButton({
-    required Key key,
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return OutlinedButton.icon(
-      key: key,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-    );
   }
 }

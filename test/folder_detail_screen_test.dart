@@ -11,13 +11,13 @@ import 'package:asa/features/tasks/screens/folder_detail_screen.dart';
 import 'package:asa/core/home_widget_service.dart';
 import 'home_widget_channel_mock.dart';
 
-Widget createTestApp(FolderItem folder) {
+Widget createTestApp(FolderItem folder, {TaskProvider? provider}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(
         create: (_) => SettingsProvider(systemLanguageCodeProvider: () => 'ru'),
       ),
-      ChangeNotifierProvider(create: (_) => TaskProvider()),
+      ChangeNotifierProvider(create: (_) => provider ?? TaskProvider()),
     ],
     child: MaterialApp(home: FolderDetailScreen(folder: folder)),
   );
@@ -58,6 +58,21 @@ void main() {
 
     expect(find.text('День 5'), findsOneWidget);
     expect(find.byIcon(Iconsax.calendar_1), findsOneWidget);
+  });
+
+  testWidgets('shows reorder handles for subfolders and tasks', (tester) async {
+    final provider = TaskProvider();
+    provider.addFolder('Work');
+    final folder = provider.folders.firstWhere((item) => item.name == 'Work');
+    provider.addFolder('Subfolder', parentFolderId: folder.id);
+    provider.addTask('First task', folderId: folder.id);
+    provider.addTask('Second task', folderId: folder.id);
+
+    await tester.pumpWidget(createTestApp(folder, provider: provider));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('folder-reorder-handle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-reorder-handle')), findsNWidgets(2));
   });
 
   testWidgets('shows tasks inside folder', (tester) async {

@@ -1,8 +1,10 @@
+import '../../../core/description_format.dart';
 import '../../../core/task_attachment_validation.dart';
 
 const int kMaxTaskInfoValue = 1000000000;
 const int kMaxTaskDescriptionLength = 10000;
 const int kMaxTaskAttachmentsPerTask = 20;
+const int kMaxTaskDescriptionBlocksPerTask = 1;
 
 /// The kinds of structured information a task can contain.
 enum TaskInfoBlockType { quantity, description }
@@ -103,6 +105,7 @@ class TaskInfoBlock {
   final double targetValue;
   final String unit;
   final String text;
+  final DescriptionFormat descriptionFormat;
   final List<TaskAttachment> attachments;
 
   const TaskInfoBlock._({
@@ -113,6 +116,7 @@ class TaskInfoBlock {
     required this.targetValue,
     required this.unit,
     required this.text,
+    required this.descriptionFormat,
     required this.attachments,
   });
 
@@ -132,6 +136,7 @@ class TaskInfoBlock {
       targetValue: targetValue,
       unit: unit,
       text: '',
+      descriptionFormat: DescriptionFormat.plainText,
       attachments: const [],
     );
   }
@@ -139,6 +144,7 @@ class TaskInfoBlock {
   factory TaskInfoBlock.description({
     required String id,
     String text = '',
+    DescriptionFormat format = DescriptionFormat.markdown,
     List<TaskAttachment> attachments = const [],
   }) {
     final safeText = sanitizeTaskDescription(text);
@@ -175,6 +181,7 @@ class TaskInfoBlock {
       targetValue: 0,
       unit: '',
       text: safeText,
+      descriptionFormat: format,
       attachments: List.unmodifiable(safeAttachments),
     );
   }
@@ -224,6 +231,9 @@ class TaskInfoBlock {
         return TaskInfoBlock.description(
           id: id,
           text: json['text'] is String ? json['text'] as String : '',
+          format: descriptionFormatFromName(
+            json.containsKey('format') ? json['format'] : null,
+          ),
           attachments: attachments,
         );
     }
@@ -237,6 +247,8 @@ class TaskInfoBlock {
     'targetValue': targetValue,
     'unit': unit,
     'text': text,
+    if (type == TaskInfoBlockType.description)
+      'format': descriptionFormatName(descriptionFormat),
     'attachments':
         attachments.map((attachment) => attachment.toJson()).toList(),
   };
@@ -249,6 +261,7 @@ class TaskInfoBlock {
     double? targetValue,
     String? unit,
     String? text,
+    DescriptionFormat? descriptionFormat,
     List<TaskAttachment>? attachments,
   }) {
     final nextType = type ?? this.type;
@@ -264,6 +277,7 @@ class TaskInfoBlock {
     return TaskInfoBlock.description(
       id: id ?? this.id,
       text: text ?? this.text,
+      format: descriptionFormat ?? this.descriptionFormat,
       attachments: attachments ?? this.attachments,
     );
   }
@@ -300,4 +314,48 @@ double _number(Map<String, dynamic> json, String key) {
     throw FormatException('$key must be a number');
   }
   return value.toDouble();
+}
+
+/// Merges legacy/imported duplicate description blocks into the first one.
+/// New task creation is still guarded by [TaskProvider], but old data must be
+/// normalized without losing text or attachment references when it is loaded.
+List<TaskInfoBlock> normalizeTaskInfoBlocks(List<TaskInfoBlock> blocks) {
+  final normalized = <TaskInfoBlock>[];
+  TaskInfoBlock? description;
+  var descriptionIndex = -1;
+
+  for (final block in blocks) {
+    if (block.type != TaskInfoBlockType.description) {
+      normalized.add(block);
+      continue;
+    }
+
+    if (description == null) {
+      description = block;
+      descriptionIndex = normalized.length;
+      normalized.add(block);
+      continue;
+    }
+
+    final parts =
+        [
+          description.text.trim(),
+          block.text.trim(),
+        ].where((part) => part.isNotEmpty).toList();
+    final combinedText = String.fromCharCodes(
+      parts.join('\n\n').runes.take(kMaxTaskDescriptionLength),
+    );
+    description = description.copyWith(
+      text: combinedText,
+      descriptionFormat:
+          description.descriptionFormat == DescriptionFormat.markdown ||
+                  block.descriptionFormat == DescriptionFormat.markdown
+              ? DescriptionFormat.markdown
+              : DescriptionFormat.plainText,
+      attachments: [...description.attachments, ...block.attachments],
+    );
+    normalized[descriptionIndex] = description;
+  }
+
+  return normalized;
 }

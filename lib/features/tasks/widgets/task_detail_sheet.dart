@@ -9,6 +9,8 @@ import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
+import 'description_full_sheet.dart';
+import 'quantity_counter.dart';
 
 /// Shows a read-only bottom sheet with detailed task information.
 Future<void> showTaskDetailSheet(BuildContext context, TaskItem task) async {
@@ -63,47 +65,138 @@ class _TaskDetailSheet extends StatelessWidget {
     return '$h:${m.toString().padLeft(2, '0')}';
   }
 
-  String _timeInfo(BuildContext context) {
+  String _timeValue(DateTime? value) {
+    if (value == null) return '–';
+    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildTimeBlock(
+    BuildContext context,
+    Color textColor,
+    bool isTimerRunning,
+    Duration elapsed,
+  ) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final buffer = StringBuffer();
-    final duration = task.effectiveDurationMinutes;
-    if (duration != null) {
-      buffer.write('${settings.tr('duration')}: ${_formatDuration(duration)}');
+    final hasPlannedDuration = task.effectiveDurationMinutes != null;
+    final hasPeriod = task.startTime != null || task.endTime != null;
+    final hasActualTime =
+        isTimerRunning ||
+        task.timerElapsedSeconds > 0 ||
+        hasPlannedDuration ||
+        hasPeriod;
+    if (!hasPlannedDuration && !hasPeriod && !hasActualTime) {
+      return const SizedBox.shrink();
     }
-    if (task.startTime != null || task.endTime != null) {
-      if (buffer.isNotEmpty) buffer.write('  ·  ');
-      final start =
-          task.startTime != null
-              ? '${task.startTime!.hour.toString().padLeft(2, '0')}:${task.startTime!.minute.toString().padLeft(2, '0')}'
-              : '–';
-      final end =
-          task.endTime != null
-              ? '${task.endTime!.hour.toString().padLeft(2, '0')}:${task.endTime!.minute.toString().padLeft(2, '0')}'
-              : '–';
-      buffer.write('${settings.tr('time_period')}: $start – $end');
+
+    final lines = <({String label, String value})>[];
+    if (hasPlannedDuration) {
+      lines.add((
+        label: settings.tr('duration'),
+        value: _formatDuration(task.effectiveDurationMinutes!),
+      ));
     }
-    if (buffer.isEmpty) return settings.tr('no_duration');
-    return buffer.toString();
+    if (hasPeriod) {
+      lines.add((
+        label: settings.tr('time_period'),
+        value: '${_timeValue(task.startTime)} - ${_timeValue(task.endTime)}',
+      ));
+    }
+    if (hasActualTime) {
+      lines.add((
+        label: settings.tr('actual_time'),
+        value: _formatDuration(elapsed.inMinutes),
+      ));
+    }
+
+    return Container(
+      key: const ValueKey('detail-time-block'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: textColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppTheme.pillRadius),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(
+              Iconsax.clock,
+              key: const ValueKey('detail_timer_icon'),
+              color: textColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final line in lines)
+                  Padding(
+                    key: ValueKey('detail-time-line-${line.label}'),
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Semantics(
+                      label: '${line.label}: ${line.value}',
+                      child: RichText(
+                        text: TextSpan(
+                          style: TextStyle(color: textColor, fontSize: 15),
+                          children: [
+                            TextSpan(
+                              text: '${line.label}: ',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            TextSpan(text: line.value),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  String _quantityText(TaskInfoBlock block, SettingsProvider settings) {
-    final name =
-        block.label.trim().isEmpty
-            ? settings.tr('quantity_block')
-            : block.label.trim();
-    final current = _formatNumber(block.currentValue);
-    final target = _formatNumber(block.targetValue);
-    return '$name: $current / $target ${block.unit.trim()}';
+  Widget _buildAttachmentNamesLine(
+    BuildContext context,
+    List<TaskAttachment> attachments,
+    Color textColor,
+  ) {
+    if (attachments.isEmpty) return const SizedBox.shrink();
+    final names = attachments.map((attachment) => attachment.name).join(' · ');
+    return Semantics(
+      container: true,
+      label:
+          '${Provider.of<SettingsProvider>(context, listen: false).tr('attachments')}: $names',
+      child: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          names,
+          key: const ValueKey('detail-attachment-names'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: textColor.withValues(alpha: 0.75),
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
   }
 
-  String _formatNumber(double value) {
-    return value == value.roundToDouble()
-        ? value.toInt().toString()
-        : value.toString();
-  }
-
-  Widget _buildInfoBlocks(BuildContext context, Color textColor) {
-    if (task.infoBlocks.isEmpty) return const SizedBox.shrink();
+  Widget _buildInfoBlocks(
+    BuildContext context,
+    Color textColor,
+    TaskItem currentTask,
+  ) {
+    if (currentTask.infoBlocks.isEmpty) return const SizedBox.shrink();
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,25 +204,29 @@ class _TaskDetailSheet extends StatelessWidget {
         const SizedBox(height: 4),
         _sectionHeader(
           Iconsax.document_text,
-          settings.tr('add_information'),
+          settings.tr('additional_information'),
           textColor,
         ),
         const SizedBox(height: 8),
-        for (final block in task.infoBlocks)
-          _buildInfoBlock(context, block, settings, textColor),
+        for (final block in currentTask.infoBlocks)
+          _buildInfoBlock(context, currentTask, block, settings, textColor),
       ],
     );
   }
 
   Widget _buildInfoBlock(
     BuildContext context,
+    TaskItem currentTask,
     TaskInfoBlock block,
     SettingsProvider settings,
     Color textColor,
   ) {
+    final isQuantity = block.type == TaskInfoBlockType.quantity;
     final title =
-        block.type == TaskInfoBlockType.quantity
-            ? _quantityText(block, settings)
+        isQuantity
+            ? (block.label.trim().isEmpty
+                ? settings.tr('quantity_block')
+                : block.label.trim())
             : settings.tr('description_block');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -144,36 +241,92 @@ class _TaskDetailSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _sectionHeader(
-              block.type == TaskInfoBlockType.quantity
-                  ? Iconsax.chart_2
-                  : Iconsax.document_text,
+              isQuantity ? Iconsax.chart_2 : Iconsax.document_text,
               title,
               textColor,
             ),
+            if (isQuantity) ...[
+              const SizedBox(height: 8),
+              QuantityCounter(
+                currentValue: block.currentValue,
+                targetValue: block.targetValue,
+                unit: block.unit,
+                textColor: textColor,
+                decreaseLabel: settings.tr('quantity_decrease'),
+                increaseLabel: settings.tr('quantity_increase'),
+                onAdjust:
+                    (delta) => context.read<TaskProvider>().adjustQuantityBlock(
+                      currentTask.id,
+                      block.id,
+                      delta,
+                    ),
+              ),
+            ],
             if (block.type == TaskInfoBlockType.description &&
                 block.text.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(block.text.trim(), style: TextStyle(color: textColor)),
+              DescriptionPreview(
+                text: block.text,
+                format: block.descriptionFormat,
+                attachments: block.attachments,
+                textColor: textColor,
+                semanticsLabel: settings.tr('full_description'),
+                onTap:
+                    () => showFullDescriptionSheet(
+                      context,
+                      text: block.text,
+                      format: block.descriptionFormat,
+                      attachments: block.attachments,
+                      title: settings.tr('full_description'),
+                      onAttachmentTap:
+                          (attachment) => _openAttachment(context, attachment),
+                      onExternalLinkTap:
+                          (href, {title}) =>
+                              _openExternalLink(context, href, title: title),
+                    ),
+                onAttachmentTap:
+                    (attachment) => _openAttachment(context, attachment),
+                onExternalLinkTap:
+                    (href, {title}) =>
+                        _openExternalLink(context, href, title: title),
+              ),
             ],
             if (block.attachments.isNotEmpty) ...[
+              _buildAttachmentNamesLine(context, block.attachments, textColor),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final attachment in block.attachments)
-                    ActionChip(
-                      key: ValueKey('detail-attachment-${attachment.id}'),
-                      avatar: Icon(
-                        attachment.type == TaskAttachmentType.link
-                            ? Icons.link
-                            : Icons.attach_file,
-                        size: 18,
-                      ),
-                      label: Text(attachment.name),
-                      onPressed: () => _openAttachment(context, attachment),
-                    ),
-                ],
+              SizedBox(
+                key: const ValueKey('detail-attachment-chips'),
+                height: 40,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final attachment in block.attachments) ...[
+                        ActionChip(
+                          key: ValueKey('detail-attachment-${attachment.id}'),
+                          avatar: Icon(
+                            attachment.type == TaskAttachmentType.link
+                                ? Icons.link
+                                : attachment.type == TaskAttachmentType.image
+                                ? Icons.image_outlined
+                                : Icons.attach_file,
+                            size: 18,
+                          ),
+                          label: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Text(
+                              attachment.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          onPressed: () => _openAttachment(context, attachment),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ],
           ],
@@ -195,6 +348,16 @@ class _TaskDetailSheet extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _openExternalLink(
+    BuildContext context,
+    String href, {
+    String? title,
+  }) async {
+    final normalized = normalizeTaskAttachmentLink(href);
+    if (normalized == null) return;
+    await openTaskLink(context, normalized, title: title);
   }
 
   Future<void> _openAttachment(
@@ -220,8 +383,12 @@ class _TaskDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final taskProvider = context.watch<TaskProvider>();
-    final isTimerRunning = taskProvider.isTimerRunning(task.id);
-    final elapsed = taskProvider.elapsedForTask(task.id);
+    final currentTask = taskProvider.allTasks.firstWhere(
+      (candidate) => candidate.id == task.id,
+      orElse: () => task,
+    );
+    final isTimerRunning = taskProvider.isTimerRunning(currentTask.id);
+    final elapsed = taskProvider.elapsedForTask(currentTask.id);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark ? AppColors.sheetDark : AppColors.sheetLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
@@ -282,25 +449,8 @@ class _TaskDetailSheet extends StatelessWidget {
                   '${settings.tr('task_status')}: ${_statusText(context)}',
                   textColor,
                 ),
-                _infoTile(
-                  Iconsax.timer_1,
-                  _timeInfo(context),
-                  textColor,
-                  iconWidget: Icon(
-                    Iconsax.timer_1,
-                    key: const ValueKey('detail_timer_icon'),
-                    color: textColor,
-                    size: 20,
-                  ),
-                ),
-                _buildInfoBlocks(context, textColor),
-                if (task.effectiveDurationMinutes != null &&
-                    task.effectiveDurationMinutes! > 0)
-                  _infoTile(
-                    Iconsax.timer_1,
-                    '${settings.tr(isTimerRunning ? 'timer_running' : 'timer_ready')}: ${_formatDuration(elapsed.inMinutes)}',
-                    textColor,
-                  ),
+                _buildTimeBlock(context, textColor, isTimerRunning, elapsed),
+                _buildInfoBlocks(context, textColor, currentTask),
                 if (!_isInStreakFolder)
                   _infoTile(
                     task.calendarEventId != null

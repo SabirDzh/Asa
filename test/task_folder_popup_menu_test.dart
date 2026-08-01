@@ -122,15 +122,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('detail_timer_icon')), findsOneWidget);
-    expect(find.textContaining('Плановая длительность: 1:00'), findsOneWidget);
-    expect(find.textContaining('Период: 10:00 – 11:00'), findsOneWidget);
-    expect(find.textContaining('Страницы: 12 / 120 стр.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('detail-time-line-Плановая длительность')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('detail-time-line-Период')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('detail-time-line-Фактическое время')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('detail-time-block')), findsOneWidget);
+    expect(find.text('Страницы'), findsOneWidget);
+    expect(find.textContaining('12 / 120 стр.'), findsOneWidget);
     expect(find.text('Прочитать первую главу'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('detail-attachment-book-link')),
       findsOneWidget,
     );
-    expect(find.text('Источник'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('detail-attachment-names')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('detail-attachment-book-link')),
+      findsOneWidget,
+    );
+    expect(find.text('Добавить информацию'), findsNothing);
+    expect(find.text('Дополнительная информация'), findsOneWidget);
     expect(find.text('Редактировать'), findsNothing);
     expect(find.text('Установить время'), findsNothing);
     expect(find.text('Удалить'), findsNothing);

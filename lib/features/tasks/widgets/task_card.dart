@@ -1,6 +1,5 @@
 import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
@@ -324,12 +323,11 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
               top: AppTheme.rowPadV,
               bottom: AppTheme.rowPadV,
             ),
-            child: SvgPicture.asset(
+            child: Icon(
+              Iconsax.timer_1,
               key: const ValueKey('task_timer_icon'),
-              'assets/icons/timer.svg',
-              width: 24,
-              height: 24,
-              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+              color: iconColor,
+              size: 24,
             ),
           ),
         ),
@@ -414,6 +412,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                             button: true,
                             label: settings.tr('more_options'),
                             child: Icon(
+                              key: const ValueKey('task-row-menu'),
                               Iconsax.more_square,
                               color: textSecondary,
                               size: 24,
@@ -424,6 +423,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                 ),
               const SizedBox(width: AppTheme.rowGap),
               AnimatedTaskCheckbox(
+                key: const ValueKey('task-row-checkbox'),
                 isCompleted: widget.task.isCompleted,
                 onTap: _handleToggle,
                 textSecondary: textSecondary,
@@ -524,9 +524,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                     Semantics(
                       excludeSemantics: true,
                       child: Padding(
+                        key: const ValueKey('task-drag-feedback-menu'),
                         padding: const EdgeInsets.only(
                           left: AppTheme.rowGap,
-                          right: AppTheme.rowGap,
+                          right: 0,
                           top: AppTheme.rowPadV,
                           bottom: AppTheme.rowPadV,
                         ),
@@ -538,6 +539,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                       ),
                     ),
                   AnimatedTaskCheckbox(
+                    key: const ValueKey('task-drag-feedback-checkbox'),
                     isCompleted: widget.task.isCompleted,
                     onTap: () {},
                     textSecondary: textSecondary,

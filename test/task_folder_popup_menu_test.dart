@@ -30,6 +30,29 @@ void main() {
     removeHomeWidgetChannelMock();
   });
 
+  testWidgets('long press keeps the drag feedback menu spacing compact', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _TestApp(
+        child: TaskRow(task: TaskItem(id: 'drag-task', title: 'Drag task')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Drag task')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+
+    final feedbackMenu = find.byKey(const ValueKey('task-drag-feedback-menu'));
+    expect(feedbackMenu, findsOneWidget);
+    expect(tester.getSize(feedbackMenu).width, 24 + AppTheme.rowGap);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('task ellipsis opens the task action menu', (tester) async {
     await tester.pumpWidget(
       _TestApp(
@@ -98,6 +121,7 @@ void main() {
     await tester.tap(find.text('Time task'));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('detail_timer_icon')), findsOneWidget);
     expect(find.textContaining('Плановая длительность: 1:00'), findsOneWidget);
     expect(find.textContaining('Период: 10:00 – 11:00'), findsOneWidget);
     expect(find.textContaining('Страницы: 12 / 120 стр.'), findsOneWidget);
@@ -234,6 +258,7 @@ class _TestApp extends StatelessWidget {
           create:
               (_) => SettingsProvider(
                 deviceNameProvider: () async => 'Test Device',
+                systemLanguageCodeProvider: () => 'ru',
               ),
         ),
         ChangeNotifierProvider(create: (_) => TaskProvider()),

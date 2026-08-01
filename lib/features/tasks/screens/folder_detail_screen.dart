@@ -14,6 +14,7 @@ import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../widgets/task_card.dart';
 import '../widgets/folder_card.dart';
+import '../widgets/task_editor_sheet.dart';
 import '../../settings/providers/settings_provider.dart';
 
 class FolderDetailScreen extends StatefulWidget {
@@ -49,38 +50,47 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
 
   void _showCreateSheet(BuildContext context, {required bool isTask}) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
+    if (!isTask &&
+        (widget.folder.isSystemStreak ||
+            widget.folder.id == 'system_streak_folder')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(settings.tr('streak_folder_subfolder_denied'))),
+      );
+      return;
+    }
+
+    if (isTask) {
+      // Task creation uses the full editor so users can add quantity and
+      // description blocks with links, images, and files from the start.
+      showTaskEditorSheet(context, folderId: widget.folder.id);
+      return;
+    }
+
     final controller = TextEditingController();
     String? selectedIcon;
     showInputSheet(
       context: context,
-      icon: isTask ? Iconsax.clipboard_tick : Iconsax.folder_minus,
-      hintText: isTask ? settings.tr('new_task') : settings.tr('new_folder'),
+      icon: Iconsax.folder_minus,
+      hintText: settings.tr('new_folder'),
       controller: controller,
       paste: InputPasteOptions(
         tooltip: settings.tr('paste'),
         errorText: settings.tr('paste_error'),
       ),
-      folderIconAssets: isTask ? null : folderIconAssets,
+      folderIconAssets: folderIconAssets,
       onIconSelected: (asset) => selectedIcon = asset,
       noIconLabel: settings.tr('default_icon'),
-      iconLabels: isTask ? null : folderIconLabels(settings.tr),
+      iconLabels: folderIconLabels(settings.tr),
       iconPickerTitle: settings.tr('folder_icon'),
       onSubmit: (val, sheetCtx) {
         final v = sanitizeText(val);
         if (v.isNotEmpty) {
           try {
-            if (isTask) {
-              context.read<TaskProvider>().addTask(
-                v,
-                folderId: widget.folder.id,
-              );
-            } else {
-              context.read<TaskProvider>().addFolder(
-                v,
-                parentFolderId: widget.folder.id,
-                iconAsset: selectedIcon,
-              );
-            }
+            context.read<TaskProvider>().addFolder(
+              v,
+              parentFolderId: widget.folder.id,
+              iconAsset: selectedIcon,
+            );
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

@@ -14,7 +14,9 @@ import 'home_widget_channel_mock.dart';
 Widget createTestApp(FolderItem folder) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(systemLanguageCodeProvider: () => 'ru'),
+      ),
       ChangeNotifierProvider(create: (_) => TaskProvider()),
     ],
     child: MaterialApp(home: FolderDetailScreen(folder: folder)),
@@ -64,7 +66,10 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(
+            create:
+                (_) => SettingsProvider(systemLanguageCodeProvider: () => 'ru'),
+          ),
           ChangeNotifierProvider.value(value: taskProvider),
         ],
         child: MaterialApp(
@@ -77,5 +82,48 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('В этой папке пока нет задач'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows a notice instead of opening folder creation in streak folder',
+    (tester) async {
+      final folder = FolderItem(
+        id: 'system_streak_folder',
+        name: 'День 1',
+        isSystemStreak: true,
+      );
+      await tester.pumpWidget(createTestApp(folder));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Создать папку'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('В системной папке нельзя создавать подпапки'),
+        findsOneWidget,
+      );
+      expect(find.text('новая папка...'), findsNothing);
+    },
+  );
+
+  testWidgets('creating a task opens the full editor with add-information', (
+    tester,
+  ) async {
+    final folder = FolderItem(id: 'test_folder', name: 'Work');
+    await tester.pumpWidget(createTestApp(folder));
+    await tester.pumpAndSettle();
+
+    // Open the floating menu and choose task creation.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Создать задачу'));
+    await tester.pumpAndSettle();
+
+    // The full editor (not the generic one-line input) must appear.
+    expect(find.byKey(const ValueKey('task-title-input')), findsOneWidget);
+    expect(find.byKey(const ValueKey('add-task-information')), findsOneWidget);
+    expect(find.byKey(const ValueKey('save-task-editor')), findsOneWidget);
   });
 }

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/calendar_service.dart';
 import '../../../core/anchored_popup_menu.dart';
+import '../../../core/snackbar_deduper.dart';
 import '../../../core/theme.dart';
 import 'task_editor_sheet.dart';
 import '../models/task_model.dart';
@@ -321,11 +322,10 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     if (provider.canMoveTaskToParent(widget.task.id)) return true;
     if (!context.mounted) return false;
     final settings = context.read<SettingsProvider>();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(settings.tr('task_move_to_root_denied')),
-        duration: const Duration(seconds: 2),
-      ),
+    SnackBarDeduper.show(
+      context,
+      settings.tr('task_move_to_root_denied'),
+      baseDuration: const Duration(seconds: 2),
     );
     return false;
   }

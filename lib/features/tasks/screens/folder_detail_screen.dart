@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/snackbar_deduper.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
@@ -315,13 +316,10 @@ class _FolderContent extends StatelessWidget {
     final moved = context.read<TaskProvider>().moveTaskToParentFolder(taskId);
     if (!context.mounted) return;
     final settings = context.read<SettingsProvider>();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          settings.tr(moved ? 'task_moved_to_parent' : 'move_denied'),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
+    SnackBarDeduper.show(
+      context,
+      settings.tr(moved ? 'task_moved_to_parent' : 'move_denied'),
+      baseDuration: const Duration(seconds: 2),
     );
   }
 
@@ -331,13 +329,10 @@ class _FolderContent extends StatelessWidget {
     );
     if (!context.mounted) return;
     final settings = context.read<SettingsProvider>();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          settings.tr(moved ? 'folder_moved_to_parent' : 'move_denied'),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
+    SnackBarDeduper.show(
+      context,
+      settings.tr(moved ? 'folder_moved_to_parent' : 'move_denied'),
+      baseDuration: const Duration(seconds: 2),
     );
   }
 

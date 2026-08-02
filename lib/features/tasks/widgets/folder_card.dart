@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/anchored_popup_menu.dart';
+import '../../../core/snackbar_deduper.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
@@ -316,11 +317,10 @@ class _FolderRowState extends State<FolderRow> {
             message = '${settings.tr('folder_moved')} ${widget.folder.name}';
           }
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 2),
-          ),
+        SnackBarDeduper.show(
+          context,
+          message,
+          baseDuration: const Duration(seconds: 2),
         );
       },
       builder: (context, candidateData, rejectedData) => rowChild,

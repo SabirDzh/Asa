@@ -174,6 +174,11 @@ class AppStrings {
       'update_unavailable_platform':
           'Автоустановка недоступна на этой платформе',
       'view_all_versions': 'Все версии',
+      'whats_new': 'Что нового',
+      'releases_empty': 'Релизов пока нет',
+      'releases_error': 'Не удалось загрузить историю версий',
+      'retry': 'Повторить',
+      'published': 'Опубликовано',
       'sync_and_share': 'Синхронизация и обмен',
       'sync': 'Синхронизация',
       'sync_device_name': 'Имя устройства',
@@ -436,6 +441,11 @@ class AppStrings {
       'update_unavailable_platform':
           'In-app install is not available on this platform',
       'view_all_versions': 'All versions',
+      'whats_new': "What's New",
+      'releases_empty': 'No releases yet',
+      'releases_error': 'Could not load release history',
+      'retry': 'Retry',
+      'published': 'Published',
       'sync_and_share': 'Sync & Share',
       'sync': 'Sync',
       'sync_device_name': 'Device name',

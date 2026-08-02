@@ -19,6 +19,7 @@ import '../widgets/color_palette_bottom_sheet.dart';
 import '../../../core/sync_service.dart';
 import '../widgets/sync_bottom_sheet.dart' show showSyncBottomSheet;
 import '../widgets/notification_settings_bottom_sheet.dart';
+import 'whats_new_screen.dart';
 
 IconData _themeModeIcon(ThemeMode mode) {
   switch (mode) {
@@ -256,6 +257,21 @@ class SettingsScreen extends StatelessWidget {
             SettingGroup(
               title: settings.tr('other'),
               children: [
+                SettingRow(
+                  icon: Iconsax.star,
+                  label: settings.tr('whats_new'),
+                  onTap:
+                      () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const WhatsNewScreen(),
+                        ),
+                      ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: textSecondary,
+                    size: 22,
+                  ),
+                ),
                 SettingRow(
                   icon: Iconsax.info_circle,
                   label: settings.tr('about'),

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/settings/providers/settings_provider.dart';
+import '../features/settings/screens/whats_new_screen.dart';
 import 'logger_service.dart';
 import 'update_dialog.dart';
 import 'update_installer.dart';
@@ -525,6 +526,11 @@ class UpdateChecker {
               return installed
                   ? UpdateInstallOutcome.installed
                   : UpdateInstallOutcome.failed;
+            },
+            onViewHistory: () {
+              Navigator.of(ctx).push(
+                MaterialPageRoute<void>(builder: (_) => const WhatsNewScreen()),
+              );
             },
           ),
     );

@@ -145,4 +145,77 @@ void main() {
       );
     });
   });
+
+  group('NotificationService due-date helpers', () {
+    test('due-date notification ID does not collide with start-time ID', () {
+      final startId = NotificationService.notificationIdForTask('task-1');
+      final dueId = NotificationService.dueDateNotificationIdForTask('task-1');
+
+      expect(startId, isNot(dueId));
+      expect(startId, greaterThan(0));
+      expect(dueId, greaterThan(0));
+    });
+
+    test('hasSchedulableDueDate rejects tasks without due date', () {
+      expect(
+        NotificationService.hasSchedulableDueDate(
+          TaskItem(id: 'no-date', title: 'No date'),
+        ),
+        isFalse,
+      );
+    });
+
+    test('hasSchedulableDueDate rejects past dates', () {
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      expect(
+        NotificationService.hasSchedulableDueDate(
+          TaskItem(id: 'past', title: 'Past', dueDate: yesterday),
+        ),
+        isFalse,
+      );
+    });
+
+    test('hasSchedulableDueDate accepts today and future dates', () {
+      final today = DateTime.now();
+      final nextWeek = DateTime.now().add(const Duration(days: 7));
+      expect(
+        NotificationService.hasSchedulableDueDate(
+          TaskItem(id: 'today', title: 'Today', dueDate: today),
+        ),
+        isTrue,
+      );
+      expect(
+        NotificationService.hasSchedulableDueDate(
+          TaskItem(id: 'future', title: 'Future', dueDate: nextWeek),
+        ),
+        isTrue,
+      );
+    });
+
+    test('hasSchedulableDueDate rejects completed and deleted tasks', () {
+      final nextWeek = DateTime.now().add(const Duration(days: 7));
+      expect(
+        NotificationService.hasSchedulableDueDate(
+          TaskItem(
+            id: 'completed',
+            title: 'Completed',
+            isCompleted: true,
+            dueDate: nextWeek,
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        NotificationService.hasSchedulableDueDate(
+          TaskItem(
+            id: 'deleted',
+            title: 'Deleted',
+            isDeleted: true,
+            dueDate: nextWeek,
+          ),
+        ),
+        isFalse,
+      );
+    });
+  });
 }

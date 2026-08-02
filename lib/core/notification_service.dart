@@ -29,19 +29,22 @@ import '../features/tasks/models/task_model.dart';
 import 'logger_service.dart';
 
 /// Thin wrapper around flutter_local_notifications.
-/// Handles permissions, task-start reminders, and timer actions.
+/// Handles permissions, task-start reminders, due-date reminders, and timer actions.
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
   static String _languageCode = 'ru';
   static final Map<int, String> _scheduledFingerprints = <int, String>{};
+  static final Map<int, String> _dueDateFingerprints = <int, String>{};
   static const _taskChannelId = 'asa_task_start_channel';
+  static const _dueDateChannelId = 'asa_due_date_channel';
   static const _taskCategoryIdRu = 'asa_task_start_category_ru';
   static const _taskCategoryIdEn = 'asa_task_start_category_en';
   static const _startTimerActionId = 'start_timer';
   static const _taskPayloadPrefix = 'asa_task:';
   static const _pendingTimerTaskKey = 'pending_timer_task_id';
   static const _platformChannel = MethodChannel('asa/notifications');
+  static const _dueDateHour = 9;
 
   /// Set by the app after providers are mounted. Background isolates persist
   /// the request instead; the app consumes it when it starts/resumes.
@@ -66,6 +69,7 @@ class NotificationService {
     if (languageCode == 'ru' || languageCode == 'en') {
       _languageCode = languageCode;
       _scheduledFingerprints.clear();
+      _dueDateFingerprints.clear();
       unawaited(rescheduleCachedTasks());
     }
   }
@@ -127,6 +131,27 @@ class NotificationService {
       hash = (hash * 16777619) & 0x7fffffff;
     }
     return 100000 + (hash % 100000000);
+  }
+
+  /// Returns a deterministic ID for a task's due-date notification.
+  /// Offset from [notificationIdForTask] by 50 000 to avoid collisions.
+  static int dueDateNotificationIdForTask(String taskId) {
+    var hash = 2166136261;
+    for (final unit in taskId.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 16777619) & 0x7fffffff;
+    }
+    return 150000 + (hash % 100000000);
+  }
+
+  /// Returns whether a task has a future due date worth reminding about.
+  @visibleForTesting
+  static bool hasSchedulableDueDate(TaskItem task) {
+    if (task.isDeleted || task.isCompleted) return false;
+    if (task.dueDate == null) return false;
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return !task.dueDate!.isBefore(todayStart);
   }
 
   /// Initializes the plugin. Must be called before any other method.
@@ -281,9 +306,9 @@ class NotificationService {
     );
   }
 
-  /// Synchronizes all task-start reminders. Tasks without a complete period
-  /// (start and end), completed tasks, and deleted tasks have their reminder
-  /// cancelled.
+  /// Synchronizes all task-start and due-date reminders. Tasks without a
+  /// complete period (start and end), completed tasks, and deleted tasks
+  /// have their reminder cancelled.
   static Future<void> syncTasks(Iterable<TaskItem> tasks) async {
     final taskList = tasks.toList(growable: false);
     for (final task in taskList) {
@@ -293,6 +318,7 @@ class NotificationService {
     for (final task in taskList) {
       try {
         await syncTaskStart(task);
+        await syncTaskDueDate(task);
       } on Object catch (error, stackTrace) {
         // One unsupported or malformed task must not prevent other reminders
         // from being synchronized.
@@ -412,6 +438,89 @@ class NotificationService {
     }
   }
 
+  /// Schedules or cancels the due-date reminder for one task.
+  /// Fires at 9:00 AM on the task's [TaskItem.dueDate].
+  /// Past dates and tasks without a due date are cancelled.
+  static Future<void> syncTaskDueDate(TaskItem task) async {
+    _cachedTasks[task.id] = task;
+    if (!_canUseNotifications) return;
+
+    final id = dueDateNotificationIdForTask(task.id);
+    final prefs = await SharedPreferences.getInstance();
+    final fingerprint =
+        '${task.title}|${task.dueDate?.toIso8601String()}|${task.isCompleted}|${task.isDeleted}|$_languageCode';
+    if (_dueDateFingerprints[id] == fingerprint) return;
+    await _plugin.cancel(id);
+    if (prefs.getBool('notificationsEnabled') == false ||
+        !hasSchedulableDueDate(task)) {
+      _dueDateFingerprints.remove(id);
+      return;
+    }
+
+    final dueDate = task.dueDate!;
+    final scheduled = tz.TZDateTime(
+      tz.local,
+      dueDate.year,
+      dueDate.month,
+      dueDate.day,
+      _dueDateHour,
+    );
+
+    // If 9:00 AM on the due date has already passed today, do not schedule
+    // a past notification. Instead, skip silently — the user will see the
+    // task in the app.
+    final now = tz.TZDateTime.now(tz.local);
+    if (!scheduled.isAfter(now)) {
+      _dueDateFingerprints.remove(id);
+      return;
+    }
+
+    final androidDetails = AndroidNotificationDetails(
+      _dueDateChannelId,
+      _tr('Задача на сегодня', 'Task due today'),
+      channelDescription: _tr(
+        'Напоминания о задачах, назначенных на дату',
+        'Reminders for tasks assigned to a date',
+      ),
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iOSDetails = DarwinNotificationDetails();
+
+    final body = task.title;
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iOSDetails,
+    );
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        _tr('Задача на сегодня', 'Task due today'),
+        body,
+        scheduled,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: taskPayloadForId(task.id),
+      );
+      _dueDateFingerprints[id] = fingerprint;
+    } on Object {
+      await _plugin.zonedSchedule(
+        id,
+        _tr('Задача на сегодня', 'Task due today'),
+        body,
+        scheduled,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: taskPayloadForId(task.id),
+      );
+      _dueDateFingerprints[id] = fingerprint;
+    }
+  }
+
   static final Map<String, TaskItem> _cachedTasks = <String, TaskItem>{};
 
   static bool get _canUseNotifications =>
@@ -421,8 +530,10 @@ class NotificationService {
   static Future<void> rescheduleCachedTasks() async {
     if (!_canUseNotifications) return;
     _scheduledFingerprints.clear();
+    _dueDateFingerprints.clear();
     for (final task in _cachedTasks.values) {
       await syncTaskStart(task);
+      await syncTaskDueDate(task);
     }
   }
 
@@ -432,19 +543,22 @@ class NotificationService {
     return remainder == 0 ? '${hours}h' : '${hours}h ${remainder}m';
   }
 
-  /// Cancels a task reminder without affecting the test notification or other
-  /// task reminders.
-  static Future<void> cancelTaskStart(String taskId) async {
-    final id = notificationIdForTask(taskId);
+  /// Cancels both the start-time and due-date reminders for a task.
+  static Future<void> cancelTaskReminders(String taskId) async {
+    final startId = notificationIdForTask(taskId);
+    final dueDateId = dueDateNotificationIdForTask(taskId);
     _cachedTasks.remove(taskId);
-    _scheduledFingerprints.remove(id);
+    _scheduledFingerprints.remove(startId);
+    _dueDateFingerprints.remove(dueDateId);
     if (!_canUseNotifications) return;
-    await _plugin.cancel(id);
+    await _plugin.cancel(startId);
+    await _plugin.cancel(dueDateId);
   }
 
   /// Cancels all active notifications.
   static Future<void> cancelAll() async {
     _scheduledFingerprints.clear();
+    _dueDateFingerprints.clear();
     if (kIsWeb || !_initialized) return;
     await _plugin.cancelAll();
   }

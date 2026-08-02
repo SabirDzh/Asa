@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../features/settings/providers/settings_provider.dart';
 import 'logger_service.dart';
 import 'theme.dart';
+import 'update_installer.dart';
 
 /// Public facade kept for the existing splash-screen integration.
 class VersionService {
@@ -44,6 +45,30 @@ class VersionService {
     String owner = VersionService.owner,
     String repo = VersionService.repo,
   }) => UpdateChecker.isSafeReleaseUrl(value, owner: owner, repo: repo);
+
+  /// True when this platform can install an APK from a local file.
+  static bool get canAutoInstall => canInstallApkLocally;
+
+  /// Fetches the latest [limit] published releases, newest first, with a
+  /// cached fallback when the network is unavailable.
+  static Future<List<UpdateInfo>> fetchReleaseHistory({int limit = 10}) =>
+      _defaultChecker.fetchReleaseHistory(limit: limit);
+
+  /// Downloads the release APK to local storage. Returns the local path or
+  /// null when the platform cannot install or the URL is unsafe.
+  static Future<String?> downloadUpdate(
+    UpdateInfo info, {
+    void Function(int received, int? total)? onProgress,
+    Future<String> Function()? directoryProvider,
+  }) => _defaultChecker.downloadUpdate(
+    info,
+    onProgress: onProgress,
+    directoryProvider: directoryProvider,
+  );
+
+  /// Opens a downloaded APK with the system package installer.
+  static Future<bool> installUpdate(String path) =>
+      _defaultChecker.installUpdate(path);
 }
 
 /// Handles release fetching independently from the dialog UI.
@@ -170,6 +195,27 @@ class UpdateChecker {
       _isPresenting = false;
     }
   }
+
+  /// Downloads the release APK to local storage. Returns the local path or
+  /// null when the platform cannot install or the URL is unsafe.
+  Future<String?> downloadUpdate(
+    UpdateInfo info, {
+    void Function(int received, int? total)? onProgress,
+    Future<String> Function()? directoryProvider,
+  }) async {
+    final assetUrl = info.assetUrl;
+    if (assetUrl == null || !canInstallApkLocally) return null;
+    if (!isSafeAssetUrl(assetUrl, owner: owner, repo: repo)) return null;
+    return downloadUpdateFile(
+      assetUrl,
+      client: _client,
+      onProgress: onProgress,
+      directoryProvider: directoryProvider,
+    );
+  }
+
+  /// Opens a downloaded APK with the system package installer.
+  Future<bool> installUpdate(String path) => openApkInstaller(path);
 
   Future<_FetchResult> _fetchWithDeduplication(SharedPreferences prefs) async {
     final existing = _inFlight;

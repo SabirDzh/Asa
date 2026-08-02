@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,23 @@ class _FakeClient extends http.BaseClient {
       response.statusCode,
       headers: response.headers,
       reasonPhrase: response.reasonPhrase,
+      request: request,
+    );
+  }
+}
+
+class _StreamRecordingClient extends http.BaseClient {
+  _StreamRecordingClient(this.recorded);
+
+  final List<Uri> recorded;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    recorded.add(request.url);
+    return http.StreamedResponse(
+      Stream.value(utf8.encode('fake apk')),
+      200,
+      contentLength: 'fake apk'.length,
       request: request,
     );
   }
@@ -302,6 +320,109 @@ void main() {
       expect(info?.version, '1.3.0');
       expect(info?.assetUrl, isNull);
       expect(info?.assetName, isNull);
+    });
+
+    test('downloadUpdate rejects an unsafe asset URL', () async {
+      final checker = UpdateChecker(
+        owner: 'SabirDzh',
+        repo: 'Asa',
+        currentVersion: '1.1.0',
+        client: _FakeClient((uri, headers) async {
+          return http.Response('nope', 200);
+        }),
+      );
+      final info = UpdateInfo(
+        version: '1.2.0',
+        url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+        notes: '',
+        assetUrl: 'https://evil.example/app.apk',
+        assetName: 'app.apk',
+      );
+      final path = await checker.downloadUpdate(info);
+      expect(path, isNull);
+    });
+    test(
+      'downloadUpdate invokes the injected client with the safe asset URL',
+      () async {
+        final recorded = <Uri>[];
+        final dir = await Directory.systemTemp.createTemp(
+          'asa_download_checker',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+        final checker = UpdateChecker(
+          owner: 'SabirDzh',
+          repo: 'Asa',
+          currentVersion: '1.1.0',
+          client: _StreamRecordingClient(recorded),
+        );
+        final info = UpdateInfo(
+          version: '1.2.0',
+          url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+          notes: '',
+          assetUrl:
+              'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-arm64-v8a-release.apk',
+          assetName: 'app-arm64-v8a-release.apk',
+        );
+
+        final path = await checker.downloadUpdate(
+          info,
+          directoryProvider: () async => dir.path,
+        );
+        expect(path, isNotNull);
+        expect(recorded, hasLength(1));
+        expect(
+          recorded.single,
+          Uri.parse(
+            'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-arm64-v8a-release.apk',
+          ),
+        );
+      },
+    );
+
+    test(
+      'downloadUpdate returns null when no asset or platform unsupported',
+      () async {
+        final checker = UpdateChecker(
+          owner: 'SabirDzh',
+          repo: 'Asa',
+          currentVersion: '1.1.0',
+          client: _FakeClient((uri, headers) async {
+            return http.Response('nope', 200);
+          }),
+        );
+        final noAsset = UpdateInfo(
+          version: '1.2.0',
+          url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+          notes: '',
+        );
+        expect(await checker.downloadUpdate(noAsset), isNull);
+        expect(
+          checker.installUpdate('/tmp/asa-update.apk'),
+          isA<Future<bool>>(),
+        );
+      },
+    );
+
+    test('VersionService facade exposes history and install helpers', () async {
+      expect(VersionService.canAutoInstall, isA<bool>());
+      expect(
+        VersionService.fetchReleaseHistory(limit: 3),
+        isA<Future<List<UpdateInfo>>>(),
+      );
+      expect(
+        VersionService.downloadUpdate(
+          const UpdateInfo(
+            version: '1.2.0',
+            url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+            notes: '',
+          ),
+        ),
+        isA<Future<String?>>(),
+      );
+      expect(
+        VersionService.installUpdate('/tmp/asa-update.apk'),
+        isA<Future<bool>>(),
+      );
     });
 
     test('history cache drops an unsafe cached asset on read', () async {

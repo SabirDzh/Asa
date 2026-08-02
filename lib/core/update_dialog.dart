@@ -98,7 +98,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${settings.tr('version')} → ${widget.info.version}',
+              '${settings.tr('version')} ${VersionService.currentVersion} → ${widget.info.version}',
               style: TextStyle(color: textSecondary),
             ),
             const SizedBox(height: 12),

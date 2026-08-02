@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:asa/core/version_service.dart';
 import 'package:asa/features/settings/screens/settings_screen.dart';
 import 'package:asa/features/settings/screens/whats_new_screen.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
@@ -215,7 +216,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('О приложении ASA'), findsOneWidget);
-    expect(find.text('Версия 1.1.1'), findsOneWidget);
+    expect(find.textContaining(VersionService.currentVersion), findsOneWidget);
   });
 
   testWidgets(

@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/version_service.dart';
 import '../providers/settings_provider.dart';
 
 void showAboutSheet(BuildContext context) {
@@ -52,7 +53,7 @@ void showAboutSheet(BuildContext context) {
               ),
               const SizedBox(height: 8),
               Text(
-                settings.tr('version'),
+                '${settings.tr('version')} ${VersionService.currentVersion}',
                 style: TextStyle(color: textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 16),

@@ -122,6 +122,14 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
           await settings.toggleNotifications(false);
         }
       }
+      // When the user revokes and later re-grants notification permission
+      // through system settings while the app is killed, the saved blocked
+      // flag must be cleared on the next launch so the toggle is interactive.
+      if (!settings.notificationsEnabled &&
+          settings.notificationsBlockedBySystem &&
+          mounted) {
+        await settings.syncNotificationPermission();
+      }
       // Sync the loaded task snapshot directly. The notification cache is
       // populated by this call, avoiding a startup race with TaskProvider.
       await NotificationService.syncTasks(tasks.allTasks);

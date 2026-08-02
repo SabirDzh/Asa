@@ -4,11 +4,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../features/settings/providers/settings_provider.dart';
 import 'logger_service.dart';
-import 'theme.dart';
+import 'update_dialog.dart';
 import 'update_installer.dart';
 
 /// Public facade kept for the existing splash-screen integration.
@@ -507,84 +506,26 @@ class UpdateChecker {
     UpdateInfo info,
     SharedPreferences prefs,
   ) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF2C2C2E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final textSecondary =
-        isDark ? const Color(0xFF8E8E93) : const Color(0xFF6B7280);
-
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder:
-          (ctx) => AlertDialog(
-            backgroundColor: bg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: Text(
-              settings.tr('update_available'),
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${settings.tr('version')} → ${info.version}',
-                    style: TextStyle(color: textSecondary),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    settings.tr('update_notes'),
-                    style: TextStyle(
-                      color: textColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    info.notes.isEmpty ? '—' : info.notes,
-                    style: TextStyle(color: textColor),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  await prefs.setBool(_postponedKey, true);
-                  if (!ctx.mounted) return;
-                  Navigator.of(ctx).pop();
-                },
-                child: Text(
-                  settings.tr('update_postpone'),
-                  style: const TextStyle(color: Color(0xFF8E8E93)),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  await prefs.setBool(_postponedKey, false);
-                  final uri = Uri.tryParse(info.url);
-                  if (uri != null &&
-                      isSafeReleaseUrl(info.url, owner: owner, repo: repo) &&
-                      await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                  if (!ctx.mounted) return;
-                  Navigator.of(ctx).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(settings.tr('update_install')),
-              ),
-            ],
+          (ctx) => UpdateDialog(
+            settings: settings,
+            info: info,
+            onPostpone: () async {
+              await prefs.setBool(_postponedKey, true);
+              if (!ctx.mounted) return;
+              Navigator.of(ctx).pop();
+            },
+            onInstall: (onProgress) async {
+              final path = await downloadUpdate(info, onProgress: onProgress);
+              if (path == null) return UpdateInstallOutcome.unavailable;
+              final installed = await installUpdate(path);
+              return installed
+                  ? UpdateInstallOutcome.installed
+                  : UpdateInstallOutcome.failed;
+            },
           ),
     );
     await prefs.setInt(_lastPromptKey, _now().millisecondsSinceEpoch);

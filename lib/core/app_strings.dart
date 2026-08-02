@@ -169,6 +169,11 @@ class AppStrings {
       'update_install': 'Установить',
       'update_notes': 'Что нового',
       'update_remind_later': 'Напомним позже',
+      'update_downloading': 'Загрузка обновления…',
+      'update_download_failed': 'Не удалось загрузить обновление',
+      'update_unavailable_platform':
+          'Автоустановка недоступна на этой платформе',
+      'view_all_versions': 'Все версии',
       'sync_and_share': 'Синхронизация и обмен',
       'sync': 'Синхронизация',
       'sync_device_name': 'Имя устройства',
@@ -426,6 +431,11 @@ class AppStrings {
       'update_install': 'Install',
       'update_notes': 'What\'s new',
       'update_remind_later': 'Remind later',
+      'update_downloading': 'Downloading update…',
+      'update_download_failed': 'Failed to download the update',
+      'update_unavailable_platform':
+          'In-app install is not available on this platform',
+      'view_all_versions': 'All versions',
       'sync_and_share': 'Sync & Share',
       'sync': 'Sync',
       'sync_device_name': 'Device name',

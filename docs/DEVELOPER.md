@@ -302,7 +302,7 @@ if (settings.syncEnabled) {
 
 [`lib/core/version_service.dart`](../lib/core/version_service.dart)
 
-Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, or every 24 hours after the user postpones.
+Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, or every 24 hours after the user postpones. The update dialog (`lib/core/update_dialog.dart`) can download the release APK in-app and open the system package installer via `open_filex` on Android (`UpdateChecker.downloadUpdate` / `installUpdate`). Release history is available through `fetchReleaseHistory()` (GitHub `/releases` list with a `SharedPreferences` cache fallback) and powers the "What's New" screen. The displayed app version comes from `VersionService.currentVersion`, which reads the compile-time `--dart-define=APP_VERSION` (defaulting to the `pubspec.yaml` version) so it never drifts.
 
 ### 7.9 LoggerService
 
@@ -469,7 +469,25 @@ flutter build apk --target-platform android-arm64 --split-per-abi --release
 
 Output: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
 
-### 12.3 Run tests
+### 12.4 Release automation
+
+`./scripts/release.sh <version> <build> [--no-push] [--dry-run]` performs the full
+release flow:
+
+1. Bumps `pubspec.yaml` to `<version>+<build>` and updates the `APP_VERSION`
+   default in `lib/core/version_service.dart`.
+2. Commits the bump, builds the arm64 APK with
+   `--dart-define=APP_VERSION=<version>`, and copies the artifact to
+   `Asa-<version>+<build>-arm64-v8a.apk`.
+3. Tags `v<version>+<build>`, pushes (unless `--no-push`), and creates the GitHub
+   release with the APK asset — via the `gh` CLI when available, otherwise via the
+   GitHub REST API with `GITHUB_TOKEN`.
+
+In-app updates download the release's arm64 APK and open the system package
+installer (`open_filex`). The "What's New" screen shows release history from the
+GitHub `/releases` endpoint with a local cache fallback.
+
+### 12.5 Run tests
 
 ```bash
 flutter test

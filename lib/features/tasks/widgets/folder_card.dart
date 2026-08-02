@@ -37,9 +37,9 @@ class FolderRow extends StatefulWidget {
 class _FolderRowState extends State<FolderRow> {
   bool _isDragHovered = false;
   final GlobalKey _rowKey = GlobalKey();
-  // Anchor of the "..." menu: the icon render box itself, so the menu is
-  // pinned to the visible icon's right edge (not the padded tap area).
-  final GlobalKey _menuIconKey = GlobalKey();
+  // Anchor of the "..." menu: the folder card itself, so the menu is
+  // pinned to the right edge of the row with a 6 px gap.
+  final GlobalKey _cardKey = GlobalKey();
 
   void _showEditSheet(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -206,6 +206,7 @@ class _FolderRowState extends State<FolderRow> {
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),
         onLongPress: null,
         child: AnimatedContainer(
+          key: _cardKey,
           duration: const Duration(milliseconds: 200),
           height: AppTheme.rowHeight,
           decoration: BoxDecoration(
@@ -248,10 +249,7 @@ class _FolderRowState extends State<FolderRow> {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
-                    // Anchor to the icon render box, not the padded tap
-                    // area, so the menu right edge aligns with the visible
-                    // "..." icon and the gap is measured from the icon.
-                    final anchor = _menuIconKey.currentContext;
+                    final anchor = _cardKey.currentContext;
                     if (anchor == null) return;
                     _showPopupMenu(anchor);
                   },
@@ -273,7 +271,6 @@ class _FolderRowState extends State<FolderRow> {
                           Iconsax.more_square,
                           color: textSecondary,
                           size: 24,
-                          key: _menuIconKey,
                         ),
                       ),
                     ),

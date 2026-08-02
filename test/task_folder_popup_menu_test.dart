@@ -564,6 +564,15 @@ class _DropTestApp extends StatelessWidget {
 
 void _expectMenuBelowAnchor(WidgetTester tester) {
   final icon = find.byIcon(Iconsax.more_square);
+  final card =
+      find
+          .ancestor(
+            of: icon,
+            matching: find.byWidgetPredicate(
+              (w) => w is Container || w is AnimatedContainer,
+            ),
+          )
+          .first;
   final menu =
       find
           .ancestor(
@@ -571,11 +580,11 @@ void _expectMenuBelowAnchor(WidgetTester tester) {
             matching: find.byType(Material),
           )
           .first;
-  final iconRect = tester.getRect(icon);
+  final cardRect = tester.getRect(card);
   final menuRect = tester.getRect(menu);
-  // The menu must sit 6 px below the icon and be pinned to its right edge.
-  expect(menuRect.top - iconRect.bottom, closeTo(6, 0.01));
-  expect(menuRect.right, closeTo(iconRect.right, 0.01));
+  // The menu must sit 6 px below the task/folder card and be pinned to its right edge.
+  expect(menuRect.top - cardRect.bottom, closeTo(6, 0.01));
+  expect(menuRect.right, closeTo(cardRect.right, 0.01));
 }
 
 class _TestApp extends StatelessWidget {

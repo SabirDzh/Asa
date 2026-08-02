@@ -40,9 +40,9 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   late final AnimationController _exitController;
   bool _isExiting = false;
   bool? _previousCompleted;
-  // Anchor of the "..." menu: the icon render box itself, so the menu is
-  // pinned to the visible icon's right edge (not the padded tap area).
-  final GlobalKey _menuIconKey = GlobalKey();
+  // Anchor of the "..." menu: the task card itself, so the menu is pinned
+  // to the right edge of the row with a 6 px gap (AppTheme.popupMenuGap).
+  final GlobalKey _cardKey = GlobalKey();
 
   /// The system streak folder is regenerated every day, so tasks inside it
   /// cannot be linked to calendar events.
@@ -443,6 +443,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     final settings = context.read<SettingsProvider>();
 
     final cardChild = Container(
+      key: _cardKey,
       height: AppTheme.rowHeight,
       decoration: BoxDecoration(
         color: surface,
@@ -487,10 +488,9 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
-                    // Anchor to the icon render box, not the padded tap
-                    // area, so the menu right edge aligns with the visible
-                    // "..." icon and the gap is measured from the icon.
-                    final anchor = _menuIconKey.currentContext;
+                    // Anchor to the task card itself so the menu right edge
+                    // aligns with the row, not the "..." icon.
+                    final anchor = _cardKey.currentContext;
                     if (anchor == null) return;
                     _showPopupMenu(anchor);
                   },
@@ -510,7 +510,6 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
                           Iconsax.more_square,
                           color: textSecondary,
                           size: 24,
-                          key: _menuIconKey,
                         ),
                       ),
                     ),

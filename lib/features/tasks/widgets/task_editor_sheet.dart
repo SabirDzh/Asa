@@ -199,8 +199,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   final _currentControllers = <String, TextEditingController>{};
   final _targetControllers = <String, TextEditingController>{};
   final _unitControllers = <String, TextEditingController>{};
-  final _selectedUnitValues = <String, String>{};
-  final _customUnitValues = <String, String>{};
   final _descriptionControllers = <String, TextEditingController>{};
   final _descriptionFocusNodes = <String, FocusNode>{};
   final _fieldKeys = <String, Map<String, Key>>{};
@@ -278,7 +276,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               'quantity-current-input',
               'quantity-target-input',
               'quantity-unit-input',
-              'quantity-custom-unit-input',
             ]
             : const ['description-text-input'];
     _fieldKeys[block.id] = {
@@ -293,15 +290,9 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       _targetControllers[block.id] = TextEditingController(
         text: _numberText(block.targetValue),
       );
-      final unitOption = quantityUnitOptionValue(block.unit);
-      _selectedUnitValues[block.id] = unitOption ?? kQuantityUnitCustom;
-      _customUnitValues[block.id] = unitOption == null ? block.unit : '';
       _unitControllers[block.id] = TextEditingController(
-        text: _customUnitValues[block.id],
+        text: displayQuantityUnit(block.unit, _settings.tr),
       );
-      _unitControllers[block.id]!.addListener(() {
-        _customUnitValues[block.id] = _unitControllers[block.id]!.text;
-      });
     } else {
       final controller = TextEditingController(text: block.text);
       controller.addListener(() => _updateMentionSuggestions(block.id));
@@ -450,8 +441,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       ]) {
         map.remove(id)?.dispose();
       }
-      _selectedUnitValues.remove(id);
-      _customUnitValues.remove(id);
     } else {
       _descriptionControllers.remove(id)?.dispose();
     }
@@ -768,10 +757,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               label: sanitizeText(_labelControllers[block.id]!.text),
               currentValue: current,
               targetValue: target,
-              unit:
-                  _selectedUnitValues[block.id] == kQuantityUnitCustom
-                      ? sanitizeText(_unitControllers[block.id]!.text)
-                      : _selectedUnitValues[block.id]!,
+              unit: sanitizeText(_unitControllers[block.id]!.text),
             ),
           );
         } else {
@@ -1042,50 +1028,17 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                   ),
                 ],
               ),
-              DropdownButtonFormField<String>(
+              TextFormField(
                 key: _fieldKey('quantity-unit-input', block.id),
-                initialValue: _selectedUnitValues[block.id],
+                controller: _unitControllers[block.id],
+                maxLength: 24,
+                validator: _required,
                 decoration: InputDecoration(
                   labelText: _settings.tr('quantity_unit'),
                   helperText: _settings.tr('quantity_unit_hint'),
+                  counterText: '',
                 ),
-                items: [
-                  for (final option in quantityUnitOptions)
-                    DropdownMenuItem<String>(
-                      value: option.value,
-                      child: Text(_settings.tr(option.labelKey)),
-                    ),
-                  DropdownMenuItem<String>(
-                    value: kQuantityUnitCustom,
-                    child: Text(_settings.tr('quantity_unit_custom')),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _selectedUnitValues[block.id] = value;
-                    if (value == kQuantityUnitCustom) {
-                      _unitControllers[block.id]!.value = TextEditingValue(
-                        text: _customUnitValues[block.id] ?? '',
-                      );
-                    }
-                  });
-                },
               ),
-              if (_selectedUnitValues[block.id] == kQuantityUnitCustom) ...[
-                const SizedBox(height: 8),
-                TextFormField(
-                  key: _fieldKey('quantity-custom-unit-input', block.id),
-                  controller: _unitControllers[block.id],
-                  maxLength: 24,
-                  validator: _required,
-                  decoration: InputDecoration(
-                    labelText: _settings.tr('quantity_custom_unit'),
-                    hintText: _settings.tr('quantity_custom_unit_hint'),
-                    counterText: '',
-                  ),
-                ),
-              ],
             ] else ...[
               CompositedTransformTarget(
                 link: _mentionLayerLinks[block.id]!,

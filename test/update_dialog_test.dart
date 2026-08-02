@@ -7,7 +7,7 @@ import 'package:asa/core/update_dialog.dart';
 import 'package:asa/core/version_service.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 
-Widget _harness(WidgetTester tester, UpdateInstallCallback onInstall) {
+Widget _harness(UpdateInstallCallback onInstall) {
   return ChangeNotifierProvider(
     create:
         (_) => SettingsProvider(
@@ -61,7 +61,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _harness(tester, (onProgress) async {
+      _harness((onProgress) async {
         onProgress(50, 100);
         // Let the progress frame render before the install completes.
         await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -83,7 +83,7 @@ void main() {
 
   testWidgets('failed install shows error and allows retry', (tester) async {
     await tester.pumpWidget(
-      _harness(tester, (onProgress) async => UpdateInstallOutcome.failed),
+      _harness((onProgress) async => UpdateInstallOutcome.failed),
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
@@ -96,7 +96,7 @@ void main() {
 
   testWidgets('unavailable outcome hides the install button', (tester) async {
     await tester.pumpWidget(
-      _harness(tester, (onProgress) async => UpdateInstallOutcome.unavailable),
+      _harness((onProgress) async => UpdateInstallOutcome.unavailable),
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();

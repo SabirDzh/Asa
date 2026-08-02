@@ -258,8 +258,10 @@ class DescriptionBody extends StatelessWidget {
       // Never let user-authored Markdown trigger an arbitrary network/image
       // request. Images are represented as text until an attachment-specific
       // image flow is added with an explicit allowlist.
-      imageBuilder: (uri, title, alt) =>
-          Text('[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}]'),
+      imageBuilder:
+          (uri, title, alt) => Text(
+            '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}]',
+          ),
       builders: {
         'a': DescriptionLinkBuilder(
           attachments: attachments,

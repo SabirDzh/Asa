@@ -87,6 +87,7 @@ class UpdateChecker {
   static const String _cachedPublishedAtKey = 'update_release_published_at';
   static const String _cachedAssetUrlKey = 'update_release_asset_url';
   static const String _cachedAssetNameKey = 'update_release_asset_name';
+  static const String _historyKey = 'update_release_history';
   static const int _maxNotesLength = 20 * 1024;
 
   Future<_FetchResult>? _inFlight;
@@ -205,15 +206,99 @@ class UpdateChecker {
     return result.info;
   }
 
+  Map<String, String> _releaseHeaders() => {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'ASA-UpdateChecker',
+  };
+
+  /// Fetches the latest [limit] published releases, newest first. Falls back
+  /// to the last successful cache when the network is unavailable.
+  @visibleForTesting
+  Future<List<UpdateInfo>> fetchReleaseHistory({
+    SharedPreferences? preferences,
+    int limit = 10,
+  }) async {
+    final prefs = preferences ?? await _preferencesProvider();
+    final uri = Uri.https('api.github.com', '/repos/$owner/$repo/releases', {
+      'per_page': '$limit',
+    });
+    try {
+      final response = await _client
+          .get(uri, headers: _releaseHeaders())
+          .timeout(requestTimeout);
+      if (response.statusCode != 200) return _readCachedHistory(prefs);
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return _readCachedHistory(prefs);
+
+      final releases = <UpdateInfo>[];
+      for (final item in decoded) {
+        final info = UpdateInfo.fromJson(item);
+        if (info == null) continue;
+        if (!isSafeReleaseUrl(info.url, owner: owner, repo: repo)) continue;
+        if (info.assetUrl != null &&
+            !isSafeAssetUrl(info.assetUrl!, owner: owner, repo: repo)) {
+          // Keep the release but drop an unsafe asset reference.
+          releases.add(_withoutAsset(info));
+          continue;
+        }
+        releases.add(info);
+      }
+      releases.sort((a, b) {
+        final aTime = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bTime.compareTo(aTime);
+      });
+      await _writeCachedHistory(prefs, releases);
+      return releases;
+    } on Object {
+      return _readCachedHistory(prefs);
+    }
+  }
+
+  List<UpdateInfo> _readCachedHistory(SharedPreferences prefs) {
+    final raw = prefs.getString(_historyKey);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      final releases = <UpdateInfo>[];
+      for (final item in decoded) {
+        final info = UpdateInfo.fromCacheJson(item);
+        if (info == null ||
+            !isSafeReleaseUrl(info.url, owner: owner, repo: repo)) {
+          continue;
+        }
+        if (info.assetUrl != null &&
+            !isSafeAssetUrl(info.assetUrl!, owner: owner, repo: repo)) {
+          // Defense in depth: the cache is user-modifiable storage, so
+          // re-validate the asset URL on read and drop unsafe references.
+          releases.add(_withoutAsset(info));
+          continue;
+        }
+        releases.add(info);
+      }
+      return releases;
+    } on Object {
+      return const [];
+    }
+  }
+
+  Future<void> _writeCachedHistory(
+    SharedPreferences prefs,
+    List<UpdateInfo> releases,
+  ) async {
+    await prefs.setString(
+      _historyKey,
+      jsonEncode([for (final release in releases) release.toCacheJson()]),
+    );
+  }
+
   Future<_FetchResult> _fetchLatest(SharedPreferences prefs) async {
     final uri = Uri.https(
       'api.github.com',
       '/repos/$owner/$repo/releases/latest',
     );
-    final headers = <String, String>{
-      'Accept': 'application/vnd.github+json',
-      'User-Agent': 'ASA-UpdateChecker',
-    };
+    final headers = _releaseHeaders();
     final etag = prefs.getString(_etagKey);
     if (etag != null && etag.isNotEmpty) headers['If-None-Match'] = etag;
 
@@ -277,6 +362,15 @@ class UpdateChecker {
         segments[4].isNotEmpty;
   }
 
+  /// Returns a copy of [info] without its asset reference. Used whenever an
+  /// asset URL fails validation so the release itself is still shown.
+  static UpdateInfo _withoutAsset(UpdateInfo info) => UpdateInfo(
+    version: info.version,
+    url: info.url,
+    notes: info.notes,
+    publishedAt: info.publishedAt,
+  );
+
   static bool isSafeAssetUrl(
     String value, {
     required String owner,
@@ -314,22 +408,22 @@ class UpdateChecker {
     final publishedRaw = prefs.getString(_cachedPublishedAtKey);
     final assetUrl = prefs.getString(_cachedAssetUrlKey);
     final assetName = prefs.getString(_cachedAssetNameKey);
-    if (assetUrl != null &&
-        !isSafeAssetUrl(assetUrl, owner: owner, repo: repo)) {
-      return UpdateInfo(
-        version: version,
-        url: url,
-        notes: prefs.getString(_cachedNotesKey) ?? '',
-        publishedAt:
-            publishedRaw == null ? null : DateTime.tryParse(publishedRaw),
-      );
-    }
-    return UpdateInfo(
+    final base = UpdateInfo(
       version: version,
       url: url,
       notes: prefs.getString(_cachedNotesKey) ?? '',
       publishedAt:
           publishedRaw == null ? null : DateTime.tryParse(publishedRaw),
+    );
+    if (assetUrl != null &&
+        !isSafeAssetUrl(assetUrl, owner: owner, repo: repo)) {
+      return base;
+    }
+    return UpdateInfo(
+      version: base.version,
+      url: base.url,
+      notes: base.notes,
+      publishedAt: base.publishedAt,
       assetUrl: assetUrl,
       assetName: assetName,
     );
@@ -505,6 +599,35 @@ class UpdateInfo {
       publishedAt: publishedAt,
       assetUrl: asset?.browserUrl,
       assetName: asset?.name,
+    );
+  }
+
+  Map<String, Object?> toCacheJson() => {
+    'version': version,
+    'url': url,
+    'notes': notes,
+    'publishedAt': publishedAt?.toIso8601String(),
+    'assetUrl': assetUrl,
+    'assetName': assetName,
+  };
+
+  static UpdateInfo? fromCacheJson(Object? value) {
+    if (value is! Map<String, dynamic>) return null;
+    final version = value['version'];
+    final url = value['url'];
+    if (version is! String || url is! String) return null;
+    if (SemanticVersion.tryParse(version) == null) return null;
+    final publishedRaw = value['publishedAt'];
+    return UpdateInfo(
+      version: version,
+      url: url,
+      notes: value['notes'] is String ? value['notes'] as String : '',
+      publishedAt:
+          publishedRaw is String ? DateTime.tryParse(publishedRaw) : null,
+      assetUrl:
+          value['assetUrl'] is String ? value['assetUrl'] as String : null,
+      assetName:
+          value['assetName'] is String ? value['assetName'] as String : null,
     );
   }
 

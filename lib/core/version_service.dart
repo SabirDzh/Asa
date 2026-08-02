@@ -84,6 +84,9 @@ class UpdateChecker {
   static const String _cachedVersionKey = 'update_release_version';
   static const String _cachedUrlKey = 'update_release_url';
   static const String _cachedNotesKey = 'update_release_notes';
+  static const String _cachedPublishedAtKey = 'update_release_published_at';
+  static const String _cachedAssetUrlKey = 'update_release_asset_url';
+  static const String _cachedAssetNameKey = 'update_release_asset_name';
   static const int _maxNotesLength = 20 * 1024;
 
   Future<_FetchResult>? _inFlight;
@@ -274,6 +277,32 @@ class UpdateChecker {
         segments[4].isNotEmpty;
   }
 
+  static bool isSafeAssetUrl(
+    String value, {
+    required String owner,
+    required String repo,
+  }) {
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        uri.scheme.toLowerCase() != 'https' ||
+        uri.host.toLowerCase() != 'github.com' ||
+        uri.hasPort ||
+        uri.userInfo.isNotEmpty) {
+      return false;
+    }
+
+    final segments = uri.pathSegments;
+    return segments.length == 6 &&
+        uri.query.isEmpty &&
+        uri.fragment.isEmpty &&
+        segments[0].toLowerCase() == owner.toLowerCase() &&
+        segments[1].toLowerCase() == repo.toLowerCase() &&
+        segments[2] == 'releases' &&
+        segments[3] == 'download' &&
+        segments[4].isNotEmpty &&
+        segments[5].toLowerCase().endsWith('.apk');
+  }
+
   UpdateInfo? _readCachedInfo(SharedPreferences prefs) {
     final version = prefs.getString(_cachedVersionKey);
     final url = prefs.getString(_cachedUrlKey);
@@ -282,10 +311,27 @@ class UpdateChecker {
         !isSafeReleaseUrl(url, owner: owner, repo: repo)) {
       return null;
     }
+    final publishedRaw = prefs.getString(_cachedPublishedAtKey);
+    final assetUrl = prefs.getString(_cachedAssetUrlKey);
+    final assetName = prefs.getString(_cachedAssetNameKey);
+    if (assetUrl != null &&
+        !isSafeAssetUrl(assetUrl, owner: owner, repo: repo)) {
+      return UpdateInfo(
+        version: version,
+        url: url,
+        notes: prefs.getString(_cachedNotesKey) ?? '',
+        publishedAt:
+            publishedRaw == null ? null : DateTime.tryParse(publishedRaw),
+      );
+    }
     return UpdateInfo(
       version: version,
       url: url,
       notes: prefs.getString(_cachedNotesKey) ?? '',
+      publishedAt:
+          publishedRaw == null ? null : DateTime.tryParse(publishedRaw),
+      assetUrl: assetUrl,
+      assetName: assetName,
     );
   }
 
@@ -296,6 +342,18 @@ class UpdateChecker {
     await prefs.setString(_cachedVersionKey, info.version);
     await prefs.setString(_cachedUrlKey, info.url);
     await prefs.setString(_cachedNotesKey, info.notes);
+    if (info.publishedAt != null) {
+      await prefs.setString(
+        _cachedPublishedAtKey,
+        info.publishedAt!.toIso8601String(),
+      );
+    }
+    if (info.assetUrl != null) {
+      await prefs.setString(_cachedAssetUrlKey, info.assetUrl!);
+    }
+    if (info.assetName != null) {
+      await prefs.setString(_cachedAssetNameKey, info.assetName!);
+    }
   }
 
   static DateTime? _readTime(SharedPreferences prefs, String key) {
@@ -408,11 +466,17 @@ class UpdateInfo {
     required this.version,
     required this.url,
     required this.notes,
+    this.publishedAt,
+    this.assetUrl,
+    this.assetName,
   });
 
   final String version;
   final String url;
   final String notes;
+  final DateTime? publishedAt;
+  final String? assetUrl;
+  final String? assetName;
 
   static UpdateInfo? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
@@ -428,11 +492,39 @@ class UpdateInfo {
 
     final rawNotes = value['body'];
     final notes = rawNotes is String ? _truncate(rawNotes) : '';
+
+    final publishedRaw = value['published_at'];
+    final publishedAt =
+        publishedRaw is String ? DateTime.tryParse(publishedRaw) : null;
+
+    final asset = _pickApkAsset(value['assets']);
     return UpdateInfo(
       version: normalizedVersion,
       url: url.trim(),
       notes: notes,
+      publishedAt: publishedAt,
+      assetUrl: asset?.browserUrl,
+      assetName: asset?.name,
     );
+  }
+
+  /// Picks the arm64-v8a APK when available, otherwise any `.apk` asset.
+  static ({String name, String browserUrl})? _pickApkAsset(Object? value) {
+    if (value is! List) return null;
+    final candidates = <({String name, String browserUrl})>[];
+    for (final item in value) {
+      if (item is! Map<String, dynamic>) continue;
+      final name = item['name'];
+      final browserUrl = item['browser_download_url'];
+      if (name is! String || browserUrl is! String) continue;
+      if (!name.toLowerCase().endsWith('.apk')) continue;
+      candidates.add((name: name, browserUrl: browserUrl));
+    }
+    if (candidates.isEmpty) return null;
+    for (final candidate in candidates) {
+      if (candidate.name.toLowerCase().contains('arm64')) return candidate;
+    }
+    return candidates.first;
   }
 
   static String _truncate(String value) {

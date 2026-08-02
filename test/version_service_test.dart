@@ -163,6 +163,72 @@ void main() {
       expect(info?.notes, 'Cached notes');
     });
 
+    test('304 cache round-trips the asset and published date', () async {
+      await prefs.setString('update_release_etag', '"cached-assets"');
+      await prefs.setString('update_release_version', '1.3.0');
+      await prefs.setString(
+        'update_release_url',
+        'https://github.com/SabirDzh/Asa/releases/tag/v1.3.0',
+      );
+      await prefs.setString('update_release_notes', 'Cached notes');
+      await prefs.setString(
+        'update_release_published_at',
+        '2026-08-01T10:00:00.000Z',
+      );
+      await prefs.setString(
+        'update_release_asset_url',
+        'https://github.com/SabirDzh/Asa/releases/download/v1.3.0/app-arm64-v8a-release.apk',
+      );
+      await prefs.setString(
+        'update_release_asset_name',
+        'app-arm64-v8a-release.apk',
+      );
+
+      final checker = UpdateChecker(
+        owner: 'SabirDzh',
+        repo: 'Asa',
+        currentVersion: '1.1.0',
+        client: _FakeClient((uri, headers) async {
+          return http.Response('', 304);
+        }),
+      );
+
+      final info = await checker.fetchLatest(preferences: prefs);
+
+      expect(info?.publishedAt, DateTime.utc(2026, 8, 1, 10));
+      expect(info?.assetUrl, isNotNull);
+      expect(info?.assetName, 'app-arm64-v8a-release.apk');
+    });
+
+    test('drops an unsafe cached asset but keeps the release', () async {
+      await prefs.setString('update_release_etag', '"cached-unsafe"');
+      await prefs.setString('update_release_version', '1.3.0');
+      await prefs.setString(
+        'update_release_url',
+        'https://github.com/SabirDzh/Asa/releases/tag/v1.3.0',
+      );
+      await prefs.setString(
+        'update_release_asset_url',
+        'https://evil.example/app.apk',
+      );
+      await prefs.setString('update_release_asset_name', 'app.apk');
+
+      final checker = UpdateChecker(
+        owner: 'SabirDzh',
+        repo: 'Asa',
+        currentVersion: '1.1.0',
+        client: _FakeClient((uri, headers) async {
+          return http.Response('', 304);
+        }),
+      );
+
+      final info = await checker.fetchLatest(preferences: prefs);
+
+      expect(info?.version, '1.3.0');
+      expect(info?.assetUrl, isNull);
+      expect(info?.assetName, isNull);
+    });
+
     test('rejects releases with unsafe URLs or invalid JSON shape', () async {
       final responses = <http.Response>[
         http.Response(
@@ -211,6 +277,127 @@ void main() {
       expect(info, isNotNull);
       expect(info!.notes.endsWith('\n…'), isTrue);
       expect(info.notes.runes.length, 20 * 1024 + 2);
+    });
+  });
+
+  group('UpdateInfo assets', () {
+    test('parses published date and prefers the arm64 APK asset', () {
+      final info = UpdateInfo.fromJson({
+        'tag_name': 'v1.2.0',
+        'html_url': 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+        'published_at': '2026-08-01T18:42:29Z',
+        'body': 'Bug fixes',
+        'assets': [
+          {
+            'name': 'app-x86_64-release.apk',
+            'browser_download_url':
+                'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-x86_64-release.apk',
+          },
+          {
+            'name': 'app-arm64-v8a-release.apk',
+            'browser_download_url':
+                'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-arm64-v8a-release.apk',
+          },
+        ],
+      });
+      expect(info, isNotNull);
+      expect(info!.publishedAt, DateTime.utc(2026, 8, 1, 18, 42, 29));
+      expect(info.assetName, 'app-arm64-v8a-release.apk');
+      expect(
+        info.assetUrl,
+        'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-arm64-v8a-release.apk',
+      );
+    });
+
+    test('falls back to any apk when no arm64 asset exists', () {
+      final info = UpdateInfo.fromJson({
+        'tag_name': '1.1.0',
+        'html_url': 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.0',
+        'assets': [
+          {
+            'name': 'Asa-v1.1.0+2-arm64-v8a.apk',
+            'browser_download_url':
+                'https://github.com/SabirDzh/Asa/releases/download/v1.1.0%2B2/Asa-v1.1.0%2B2-arm64-v8a.apk',
+          },
+        ],
+      });
+      expect(info?.assetUrl, isNotNull);
+      expect(info?.publishedAt, isNull);
+    });
+  });
+
+  group('Asset URL validation', () {
+    test('accepts only github.com owner/repo releases/download apk URLs', () {
+      final ok =
+          'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-arm64-v8a-release.apk';
+      expect(
+        UpdateChecker.isSafeAssetUrl(ok, owner: 'SabirDzh', repo: 'Asa'),
+        isTrue,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://github.com/SabirDzh/Asa/releases/download/v1.1.0%2B2/Asa-v1.1.0%2B2-arm64-v8a.apk',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isTrue,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app.apk?x=1',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app.apk#frag',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'http://github.com/SabirDzh/Asa/releases/download/v1.2.0/app.apk',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://evil.example/SabirDzh/Asa/releases/download/v1.2.0/app.apk',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/notes.txt',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateChecker.isSafeAssetUrl(
+          'https://github.com/SabirDzh/Other/releases/download/v1.2.0/app.apk',
+          owner: 'SabirDzh',
+          repo: 'Asa',
+        ),
+        isFalse,
+      );
     });
   });
 }

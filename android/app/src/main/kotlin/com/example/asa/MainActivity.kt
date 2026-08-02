@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -18,15 +19,44 @@ class MainActivity : FlutterActivity() {
             CHANNEL,
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "isNotificationGranted" ->
+                    result.success(isNotificationGranted())
                 "notificationsPermanentlyDenied" ->
                     result.success(isNotificationPermissionPermanentlyDenied())
                 "openNotificationSettings" -> {
                     openNotificationSettings()
                     result.success(null)
                 }
+                "isIgnoringBatteryOptimizations" ->
+                    result.success(isIgnoringBatteryOptimizations())
+                "requestIgnoreBatteryOptimizations" -> {
+                    requestIgnoreBatteryOptimizations()
+                    result.success(null)
+                }
+                "openBatterySettings" -> {
+                    openBatterySettings()
+                    result.success(null)
+                }
+                "isAutoStartAvailable" ->
+                    result.success(isAutoStartAvailable())
+                "openAutoStartSettings" -> {
+                    openAutoStartSettings()
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /**
+     * True when the runtime notification permission has been granted.
+     * On Android < 13 (API 32-) this always returns true because the
+     * permission is granted at install time, not at runtime.
+     */
+    private fun isNotificationGranted(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
     }
 
     /**
@@ -69,6 +99,86 @@ class MainActivity : FlutterActivity() {
                 // No settings activity is available; nothing else we can do.
             }
         }
+    }
+
+    /**
+     * True when the app is exempt from battery optimization restrictions.
+     * On Xiaomi/HyperOS this may still be insufficient without auto-start.
+     */
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    /**
+     * Opens the "Ignore battery optimization" system dialog for this app.
+     */
+    private fun requestIgnoreBatteryOptimizations() {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        } catch (_: Exception) {
+            openBatterySettings()
+        }
+    }
+
+    private fun openBatterySettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        } catch (_: Exception) {
+            openAppDetails()
+        }
+    }
+
+    /**
+     * Checks whether the device exposes an auto-start settings page.
+     * Xiaomi/HyperOS, Huawei, Oppo, Vivo are common examples that do.
+     */
+    private fun isAutoStartAvailable(): Boolean {
+        val intent = autoStartIntent() ?: return false
+        return packageManager.resolveActivity(intent, 0) != null
+    }
+
+    private fun openAutoStartSettings() {
+        val intent = autoStartIntent() ?: return openAppDetails()
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            openAppDetails()
+        }
+    }
+
+    /**
+     * Returns the OEM-specific auto-start settings intent, or null when the
+     * device does not expose one through a public action string.
+     */
+    private fun autoStartIntent(): Intent? {
+        // Xiaomi / HyperOS
+        try {
+            val xiaomi = Intent()
+            xiaomi.component = android.content.ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.permcenter.autostart.AutoStartManagementActivity",
+            )
+            if (packageManager.resolveActivity(xiaomi, 0) != null) return xiaomi
+        } catch (_: Exception) {}
+        // Fallback: generic application details
+        return null
+    }
+
+    private fun openAppDetails() {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        } catch (_: Exception) {}
     }
 
     companion object {

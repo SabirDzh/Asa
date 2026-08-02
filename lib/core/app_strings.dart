@@ -266,6 +266,18 @@ class AppStrings {
       'calendar_linked': 'Связана',
       'due_date': 'Дата',
       'calendar_not_linked': 'Не связана',
+      'setup_title': 'Быстрая настройка',
+      'setup_continue': 'Продолжить',
+      'setup_skip': 'Пропустить',
+      'setup_enable': 'Включить',
+      'setup_footer':
+          'Всё можно настроить позже в разделе «Уведомления и данные»',
+      'setup_battery': 'Отключить ограничение батареи',
+      'setup_battery_subtitle':
+          'Нужно чтобы напоминания приходили вовремя, даже когда приложение закрыто',
+      'setup_autostart': 'Автозапуск',
+      'setup_autostart_subtitle':
+          'Требуется на устройствах Xiaomi/HyperOS для получения уведомлений после перезагрузки',
     },
     'en': {
       'search': 'Search',
@@ -532,6 +544,18 @@ class AppStrings {
       'calendar_linked': 'Linked',
       'due_date': 'Due date',
       'calendar_not_linked': 'Not linked',
+      'setup_title': 'Quick Setup',
+      'setup_continue': 'Continue',
+      'setup_skip': 'Skip',
+      'setup_enable': 'Enable',
+      'setup_footer':
+          'Everything can be configured later in «Notifications & Data»',
+      'setup_battery': 'Disable battery optimization',
+      'setup_battery_subtitle':
+          'Required for reminders to arrive on time, even when the app is closed',
+      'setup_autostart': 'Auto-start',
+      'setup_autostart_subtitle':
+          'Required on Xiaomi/HyperOS to receive notifications after reboot',
     },
   };
 

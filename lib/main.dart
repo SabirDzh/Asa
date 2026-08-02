@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -13,9 +14,11 @@ import 'core/logger_service.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/tasks/providers/task_provider.dart';
 import 'features/tasks/screens/folder_detail_screen.dart';
+import 'features/tasks/screens/home_screen.dart';
 import 'features/tasks/widgets/task_editor_sheet.dart';
 import 'features/tasks/models/task_model.dart';
 import 'features/splash/splash_screen.dart';
+import 'features/splash/setup_screen.dart';
 
 import 'core/theme_switcher.dart';
 import 'core/home_widget_service.dart';
@@ -133,6 +136,12 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       // Sync the loaded task snapshot directly. The notification cache is
       // populated by this call, avoiding a startup race with TaskProvider.
       await NotificationService.syncTasks(tasks.allTasks);
+      // After a device reboot, reschedule notifications from the boot flag.
+      await _rescheduleAfterBootIfNeeded();
+      // On first launch, show the permissions setup screen.
+      if (mounted) {
+        await _maybeShowSetupScreen(settings);
+      }
     } on Object catch (error, stackTrace) {
       LoggerService.instance.w(
         'Optional startup services failed',
@@ -140,6 +149,38 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  /// Reschedules notifications after a device reboot by reading the boot flag
+  /// written by [BootReceiver]. The flag is cleared after a successful sync.
+  Future<void> _rescheduleAfterBootIfNeeded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bootCompleted = prefs.getBool('asa_boot_completed');
+      if (bootCompleted != true) return;
+      await prefs.remove('asa_boot_completed');
+      final tasks = context.read<TaskProvider>();
+      await tasks.ready;
+      if (!mounted) return;
+      await NotificationService.rescheduleCachedTasks();
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Boot reschedule failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Shows the first-launch setup screen if the user has not completed it yet.
+  Future<void> _maybeShowSetupScreen(SettingsProvider settings) async {
+    if (!await SetupScreen.shouldShow()) return;
+    if (!mounted) return;
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+    await navigator.push<void>(
+      MaterialPageRoute<void>(builder: (_) => const SetupScreen()),
+    );
   }
 
   Future<void> _consumePendingTimerAction(TaskProvider tasks) async {
@@ -259,6 +300,12 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       builder: (context, child) => _ScaledApp(scale: appScale, child: child!),
       navigatorKey: _navigatorKey,
       home: const SplashScreen(),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/home') {
+          return MaterialPageRoute<void>(builder: (_) => const HomeScreen());
+        }
+        return null;
+      },
     );
   }
 }

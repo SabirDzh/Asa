@@ -585,7 +585,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
       );
     }
 
-    if (!widget.enableDrag || widget.showReorderHandle) return swipeChild;
+    if (!widget.enableDrag) return swipeChild;
 
     return LongPressDraggable<TaskItem>(
       data: widget.task,

@@ -340,7 +340,7 @@ class _FolderRowState extends State<FolderRow> {
       );
     }
 
-    if (!widget.enableDrag || widget.showReorderHandle) {
+    if (!widget.enableDrag) {
       return swipeChild;
     }
 

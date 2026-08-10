@@ -78,10 +78,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
 
       UpdateInfo? newerRelease;
       for (final rel in list) {
-        if (SemanticVersion.isNewer(
-          rel.version,
-          VersionService.currentVersion,
-        )) {
+        if (VersionService.isUpdateAvailable(rel)) {
           newerRelease = rel;
           break;
         }
@@ -133,14 +130,10 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     List<UpdateInfo> releases,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
 
     UpdateInfo? newerRelease;
     for (final rel in releases) {
-      if (SemanticVersion.isNewer(
-        rel.version,
-        VersionService.currentVersion,
-      )) {
+      if (VersionService.isUpdateAvailable(rel)) {
         newerRelease = rel;
         break;
       }

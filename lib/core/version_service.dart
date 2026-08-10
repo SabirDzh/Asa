@@ -39,6 +39,17 @@ class VersionService {
   static bool isNewer(String latest, String current) =>
       SemanticVersion.isNewer(latest, current);
 
+  /// Returns true when [info] represents a newer version or a re-uploaded APK
+  /// for the current version.
+  static bool isUpdateAvailable(
+    UpdateInfo info, {
+    DateTime? installedAssetUpdatedAt,
+  }) => UpdateChecker.isUpdateAvailable(
+        info,
+        currentVersion,
+        installedAssetUpdatedAt: installedAssetUpdatedAt,
+      );
+
   @visibleForTesting
   static bool isSafeReleaseUrl(
     String value, {
@@ -119,8 +130,46 @@ class UpdateChecker {
   static const String _cachedPublishedAtKey = 'update_release_published_at';
   static const String _cachedAssetUrlKey = 'update_release_asset_url';
   static const String _cachedAssetNameKey = 'update_release_asset_name';
+  static const String _cachedAssetUpdatedAtKey =
+      'update_release_asset_updated_at';
+  static const String installedAssetTimeKey =
+      'update_installed_asset_updated_at';
   static const String _historyKey = 'update_release_history';
   static const int _maxNotesLength = 20 * 1024;
+
+  static const String _buildTimeRaw = String.fromEnvironment(
+    'BUILD_TIME',
+    defaultValue: '',
+  );
+  static final DateTime? buildTime =
+      _buildTimeRaw.isNotEmpty
+          ? DateTime.tryParse(_buildTimeRaw) ??
+              DateTime.fromMillisecondsSinceEpoch(
+                int.tryParse(_buildTimeRaw) ?? 0,
+              )
+          : null;
+
+  static bool isUpdateAvailable(
+    UpdateInfo info,
+    String currentVersion, {
+    DateTime? installedAssetUpdatedAt,
+  }) {
+    if (SemanticVersion.isNewer(info.version, currentVersion)) {
+      return true;
+    }
+    if (info.version.trim() == currentVersion.trim()) {
+      final remoteAssetTime = info.assetUpdatedAt ?? info.publishedAt;
+      if (remoteAssetTime != null) {
+        if (installedAssetUpdatedAt != null) {
+          return remoteAssetTime.isAfter(installedAssetUpdatedAt);
+        }
+        if (buildTime != null) {
+          return remoteAssetTime.isAfter(buildTime!);
+        }
+      }
+    }
+    return false;
+  }
 
   Future<_FetchResult>? _inFlight;
   bool _isPresenting = false;
@@ -175,8 +224,13 @@ class UpdateChecker {
     await prefs.setInt(_lastSuccessKey, _now().millisecondsSinceEpoch);
 
     final info = result.info;
+    final installedAssetTime = _readTime(prefs, installedAssetTimeKey);
     if (info == null ||
-        !SemanticVersion.isNewer(info.version, currentVersion)) {
+        !isUpdateAvailable(
+          info,
+          currentVersion,
+          installedAssetUpdatedAt: installedAssetTime,
+        )) {
       await prefs.setBool(_postponedKey, false);
       return;
     }
@@ -546,6 +600,15 @@ class UpdateChecker {
               final path = await downloadUpdate(info, onProgress: onProgress);
               if (path == null) return UpdateInstallOutcome.unavailable;
               final installed = await installUpdate(path);
+              if (installed) {
+                final installedTime = info.assetUpdatedAt ?? info.publishedAt;
+                if (installedTime != null) {
+                  await prefs.setInt(
+                    installedAssetTimeKey,
+                    installedTime.millisecondsSinceEpoch,
+                  );
+                }
+              }
               return installed
                   ? UpdateInstallOutcome.installed
                   : UpdateInstallOutcome.failed;
@@ -574,6 +637,7 @@ class UpdateInfo {
     this.publishedAt,
     this.assetUrl,
     this.assetName,
+    this.assetUpdatedAt,
   });
 
   final String version;
@@ -582,6 +646,7 @@ class UpdateInfo {
   final DateTime? publishedAt;
   final String? assetUrl;
   final String? assetName;
+  final DateTime? assetUpdatedAt;
 
   static UpdateInfo? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
@@ -610,6 +675,7 @@ class UpdateInfo {
       publishedAt: publishedAt,
       assetUrl: asset?.browserUrl,
       assetName: asset?.name,
+      assetUpdatedAt: asset?.updatedAt,
     );
   }
 
@@ -620,6 +686,7 @@ class UpdateInfo {
     'publishedAt': publishedAt?.toIso8601String(),
     'assetUrl': assetUrl,
     'assetName': assetName,
+    'assetUpdatedAt': assetUpdatedAt?.toIso8601String(),
   };
 
   static UpdateInfo? fromCacheJson(Object? value) {
@@ -629,6 +696,7 @@ class UpdateInfo {
     if (version is! String || url is! String) return null;
     if (SemanticVersion.tryParse(version) == null) return null;
     final publishedRaw = value['publishedAt'];
+    final assetUpdatedRaw = value['assetUpdatedAt'];
     return UpdateInfo(
       version: version,
       url: url,
@@ -639,20 +707,33 @@ class UpdateInfo {
           value['assetUrl'] is String ? value['assetUrl'] as String : null,
       assetName:
           value['assetName'] is String ? value['assetName'] as String : null,
+      assetUpdatedAt:
+          assetUpdatedRaw is String
+              ? DateTime.tryParse(assetUpdatedRaw)
+              : null,
     );
   }
 
   /// Picks the arm64-v8a APK when available, otherwise any `.apk` asset.
-  static ({String name, String browserUrl})? _pickApkAsset(Object? value) {
+  static ({String name, String browserUrl, DateTime? updatedAt})?
+  _pickApkAsset(Object? value) {
     if (value is! List) return null;
-    final candidates = <({String name, String browserUrl})>[];
+    final candidates =
+        <({String name, String browserUrl, DateTime? updatedAt})>[];
     for (final item in value) {
       if (item is! Map<String, dynamic>) continue;
       final name = item['name'];
       final browserUrl = item['browser_download_url'];
       if (name is! String || browserUrl is! String) continue;
       if (!name.toLowerCase().endsWith('.apk')) continue;
-      candidates.add((name: name, browserUrl: browserUrl));
+      final updatedRaw = item['updated_at'];
+      final updatedAt =
+          updatedRaw is String ? DateTime.tryParse(updatedRaw) : null;
+      candidates.add((
+        name: name,
+        browserUrl: browserUrl,
+        updatedAt: updatedAt,
+      ));
     }
     if (candidates.isEmpty) return null;
     for (final candidate in candidates) {

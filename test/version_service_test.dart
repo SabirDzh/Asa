@@ -504,6 +504,35 @@ void main() {
       expect(info!.notes.endsWith('\n…'), isTrue);
       expect(info.notes.runes.length, 20 * 1024 + 2);
     });
+
+    test('isUpdateAvailable detects re-uploaded APK when asset date is newer', () {
+      final oldAssetTime = DateTime.utc(2026, 8, 1, 12, 0);
+      final newAssetTime = DateTime.utc(2026, 8, 1, 14, 0);
+      final sameVersionRelease = UpdateInfo(
+        version: '1.1.3',
+        url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.3',
+        notes: 'Replaced APK',
+        assetUpdatedAt: newAssetTime,
+      );
+
+      expect(
+        UpdateChecker.isUpdateAvailable(
+          sameVersionRelease,
+          '1.1.3',
+          installedAssetUpdatedAt: oldAssetTime,
+        ),
+        isTrue,
+      );
+
+      expect(
+        UpdateChecker.isUpdateAvailable(
+          sameVersionRelease,
+          '1.1.3',
+          installedAssetUpdatedAt: newAssetTime,
+        ),
+        isFalse,
+      );
+    });
   });
 
   group('UpdateInfo assets', () {

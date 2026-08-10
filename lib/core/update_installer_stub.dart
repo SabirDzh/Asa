@@ -7,6 +7,7 @@ Future<String?> downloadUpdateFileImpl(
   http.Client? client,
   Future<String> Function()? directoryProvider,
   void Function(int received, int? total)? onProgress,
+  String? expectedSha256,
 }) async {
   return null;
 }

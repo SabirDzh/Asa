@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
@@ -13,11 +14,21 @@ Future<String> _defaultDirectory() async {
   return directory.path;
 }
 
+bool _isSafeRedirectHost(String host) {
+  final lower = host.toLowerCase();
+  return lower == 'github.com' ||
+      lower == 'objects.githubusercontent.com' ||
+      lower == 'release-assets.github.com' ||
+      lower.endsWith('.githubusercontent.com') ||
+      lower.endsWith('.github.com');
+}
+
 Future<String?> downloadUpdateFileImpl(
   String url, {
   http.Client? client,
   Future<String> Function()? directoryProvider,
   void Function(int received, int? total)? onProgress,
+  String? expectedSha256,
 }) async {
   try {
     final directoryPath = await (directoryProvider ?? _defaultDirectory)();
@@ -29,8 +40,13 @@ Future<String?> downloadUpdateFileImpl(
       var currentUrl = url;
       http.StreamedResponse? response;
       for (var redirectCount = 0; redirectCount < 5; redirectCount++) {
+        final currentUri = Uri.tryParse(currentUrl);
+        if (currentUri == null || !_isSafeRedirectHost(currentUri.host)) {
+          return null;
+        }
+
         final request =
-            http.Request('GET', Uri.parse(currentUrl))
+            http.Request('GET', currentUri)
               ..headers['User-Agent'] = 'ASA-UpdateChecker'
               ..followRedirects = false;
         final res = await sender
@@ -68,6 +84,17 @@ Future<String?> downloadUpdateFileImpl(
       // Reject empty or truncated downloads before the installer sees them.
       if (received == 0) return null;
       if (total != null && total > 0 && received != total) return null;
+
+      if (expectedSha256 != null && expectedSha256.isNotEmpty) {
+        final bytes = await file.readAsBytes();
+        final actualHash =
+            sha256.convert(bytes).toString().toLowerCase().trim();
+        if (actualHash != expectedSha256.toLowerCase().trim()) {
+          await file.delete();
+          return null;
+        }
+      }
+
       return file.path;
     } finally {
       if (client == null) sender.close();

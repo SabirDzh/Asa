@@ -272,6 +272,7 @@ class UpdateChecker {
       client: _client,
       onProgress: onProgress,
       directoryProvider: directoryProvider,
+      expectedSha256: info.sha256,
     );
   }
 
@@ -403,7 +404,8 @@ class UpdateChecker {
   Future<_FetchResult> _fetchLatest(SharedPreferences prefs) async {
     final uri = Uri.https(
       'api.github.com',
-      '/repos/$owner/$repo/releases/latest',
+      '/repos/$owner/$repo/releases',
+      {'per_page': '20'},
     );
     final headers = _releaseHeaders();
     final etag = prefs.getString(_etagKey);
@@ -416,9 +418,6 @@ class UpdateChecker {
 
       if (response.statusCode == 304) {
         final cached = _readCachedInfo(prefs);
-        // A stale ETag without a complete cache must not be interpreted as a
-        // successful "no update" response. Retry later without poisoning the
-        // cache or suppressing future checks.
         if (cached == null) {
           await prefs.remove(_etagKey);
           return const _FetchResult.failure();
@@ -427,18 +426,51 @@ class UpdateChecker {
       }
       if (response.statusCode != 200) return const _FetchResult.failure();
 
-      final info = UpdateInfo.fromJson(jsonDecode(response.body));
-      if (info == null ||
-          !isSafeReleaseUrl(info.url, owner: owner, repo: repo)) {
+      final decoded = jsonDecode(response.body);
+      final List rawList;
+      if (decoded is List) {
+        rawList = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        rawList = [decoded];
+      } else {
         return const _FetchResult.failure();
+      }
+
+      final currentSemVer = SemanticVersion.tryParse(currentVersion);
+      final allowPrerelease = currentSemVer?.preRelease.isNotEmpty ?? true;
+
+      final candidates = <UpdateInfo>[];
+      for (final item in rawList) {
+        final info = UpdateInfo.fromJson(item);
+        if (info == null ||
+            !isSafeReleaseUrl(info.url, owner: owner, repo: repo)) {
+          continue;
+        }
+        if (info.isPrerelease && !allowPrerelease) {
+          continue;
+        }
+        candidates.add(info);
+      }
+
+      if (candidates.isEmpty) return const _FetchResult.failure();
+
+      UpdateInfo best = candidates.first;
+      for (final candidate in candidates.skip(1)) {
+        if (isUpdateAvailable(
+          candidate,
+          best.version,
+          installedAssetUpdatedAt: best.assetUpdatedAt,
+        )) {
+          best = candidate;
+        }
       }
 
       final responseEtag = response.headers['etag'];
       if (responseEtag != null && responseEtag.isNotEmpty) {
         await prefs.setString(_etagKey, responseEtag);
       }
-      await _writeCachedInfo(prefs, info);
-      return _FetchResult.success(info);
+      await _writeCachedInfo(prefs, best);
+      return _FetchResult.success(best);
     } on Object {
       return const _FetchResult.failure();
     }
@@ -638,6 +670,8 @@ class UpdateInfo {
     this.assetUrl,
     this.assetName,
     this.assetUpdatedAt,
+    this.isPrerelease = false,
+    this.sha256,
   });
 
   final String version;
@@ -647,9 +681,12 @@ class UpdateInfo {
   final String? assetUrl;
   final String? assetName;
   final DateTime? assetUpdatedAt;
+  final bool isPrerelease;
+  final String? sha256;
 
   static UpdateInfo? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
+    if (value['draft'] == true) return null;
     final tag = value['tag_name'];
     final url = value['html_url'];
     if (tag is! String || url is! String) return null;
@@ -666,6 +703,7 @@ class UpdateInfo {
     final publishedRaw = value['published_at'];
     final publishedAt =
         publishedRaw is String ? DateTime.tryParse(publishedRaw) : null;
+    final isPrerelease = value['prerelease'] == true;
 
     final asset = _pickApkAsset(value['assets']);
     return UpdateInfo(
@@ -676,6 +714,8 @@ class UpdateInfo {
       assetUrl: asset?.browserUrl,
       assetName: asset?.name,
       assetUpdatedAt: asset?.updatedAt,
+      isPrerelease: isPrerelease,
+      sha256: asset?.sha256,
     );
   }
 
@@ -687,6 +727,8 @@ class UpdateInfo {
     'assetUrl': assetUrl,
     'assetName': assetName,
     'assetUpdatedAt': assetUpdatedAt?.toIso8601String(),
+    'isPrerelease': isPrerelease,
+    'sha256': sha256,
   };
 
   static UpdateInfo? fromCacheJson(Object? value) {
@@ -711,15 +753,17 @@ class UpdateInfo {
           assetUpdatedRaw is String
               ? DateTime.tryParse(assetUpdatedRaw)
               : null,
+      isPrerelease: value['isPrerelease'] == true,
+      sha256: value['sha256'] is String ? value['sha256'] as String : null,
     );
   }
 
   /// Picks the arm64-v8a APK when available, otherwise any `.apk` asset.
-  static ({String name, String browserUrl, DateTime? updatedAt})?
+  static ({String name, String browserUrl, DateTime? updatedAt, String? sha256})?
   _pickApkAsset(Object? value) {
     if (value is! List) return null;
     final candidates =
-        <({String name, String browserUrl, DateTime? updatedAt})>[];
+        <({String name, String browserUrl, DateTime? updatedAt, String? sha256})>[];
     for (final item in value) {
       if (item is! Map<String, dynamic>) continue;
       final name = item['name'];
@@ -729,10 +773,19 @@ class UpdateInfo {
       final updatedRaw = item['updated_at'];
       final updatedAt =
           updatedRaw is String ? DateTime.tryParse(updatedRaw) : null;
+      final rawDigest = item['digest'] ?? item['sha256'];
+      String? sha256;
+      if (rawDigest is String) {
+        sha256 =
+            rawDigest.startsWith('sha256:')
+                ? rawDigest.substring(7).trim().toLowerCase()
+                : rawDigest.trim().toLowerCase();
+      }
       candidates.add((
         name: name,
         browserUrl: browserUrl,
         updatedAt: updatedAt,
+        sha256: sha256,
       ));
     }
     if (candidates.isEmpty) return null;

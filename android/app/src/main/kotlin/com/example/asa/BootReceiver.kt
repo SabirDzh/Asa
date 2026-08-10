@@ -25,6 +25,6 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val KEY_BOOT_COMPLETED = "asa_boot_completed"
+        const val KEY_BOOT_COMPLETED = "flutter.asa_boot_completed"
     }
 }

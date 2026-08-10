@@ -15,12 +15,14 @@ Future<String?> downloadUpdateFile(
   http.Client? client,
   Future<String> Function()? directoryProvider,
   void Function(int received, int? total)? onProgress,
+  String? expectedSha256,
 }) {
   return downloadUpdateFileImpl(
     url,
     client: client,
     directoryProvider: directoryProvider,
     onProgress: onProgress,
+    expectedSha256: expectedSha256,
   );
 }
 

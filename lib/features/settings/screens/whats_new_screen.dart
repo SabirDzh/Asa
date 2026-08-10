@@ -138,6 +138,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
 
       button = SizedBox(
         width: double.infinity,
+        height: 56,
         child: ElevatedButton.icon(
           onPressed: () {
             VersionService.showUpdateDialog(context, settings, newerRelease!);
@@ -150,7 +151,6 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -161,6 +161,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     } else {
       button = SizedBox(
         width: double.infinity,
+        height: 56,
         child: OutlinedButton.icon(
           onPressed: _checking ? null : () => _manualCheck(settings),
           icon: _checking
@@ -180,7 +181,6 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
             ),
           ),
           style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -211,7 +211,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
         AppTheme.screenPad,
         12,
         AppTheme.screenPad,
-        (bottomPadding > 0 ? bottomPadding : 16),
+        (bottomPadding > 0 ? bottomPadding + 24 : 40),
       ),
       child: button,
     );

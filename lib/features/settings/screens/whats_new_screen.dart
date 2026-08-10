@@ -49,8 +49,14 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
       final msg = settings
           .tr('check_cooldown_message')
           .replaceAll('{seconds}', '$remaining');
+      final bottomMargin = MediaQuery.of(context).padding.bottom + 96;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+        SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(bottom: bottomMargin, left: 16, right: 16),
+          duration: const Duration(seconds: 2),
+        ),
       );
       return;
     }
@@ -87,9 +93,16 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
           final msg = settings
               .tr('up_to_date_message')
               .replaceAll('{version}', VersionService.currentVersion);
+          final bottomMargin = MediaQuery.of(context).padding.bottom + 96;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(msg),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.only(
+                bottom: bottomMargin,
+                left: 16,
+                right: 16,
+              ),
               duration: const Duration(seconds: 3),
             ),
           );

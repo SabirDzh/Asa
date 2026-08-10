@@ -321,11 +321,7 @@ class SettingsProvider with ChangeNotifier {
           );
         }
         if (!granted) {
-          // The system may auto-deny future requests (Android "don't ask
-          // again"). Remember that so the UI can redirect the user to the
-          // system settings instead of leaving a dead end.
-          _notificationsBlockedBySystem =
-              await NotificationService.isPermissionPermanentlyDenied();
+          _notificationsBlockedBySystem = true;
         } else {
           _notificationsBlockedBySystem = false;
         }

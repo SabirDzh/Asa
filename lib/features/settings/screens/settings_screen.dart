@@ -224,14 +224,20 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Iconsax.notification,
                   label: settings.tr('notifications'),
+                  onTap: () async {
+                    final newValue = !settings.notificationsEnabled;
+                    final enabled = await settings.toggleNotifications(newValue);
+                    if (!context.mounted) return;
+                    if (newValue && !enabled) {
+                      showOpenNotificationSettingsSheet(context, settings);
+                    }
+                  },
                   trailing: Switch(
                     value: settings.notificationsEnabled,
                     onChanged: (value) async {
                       final enabled = await settings.toggleNotifications(value);
                       if (!context.mounted) return;
-                      if (value &&
-                          !enabled &&
-                          settings.notificationsBlockedBySystem) {
+                      if (value && !enabled) {
                         showOpenNotificationSettingsSheet(context, settings);
                       }
                     },

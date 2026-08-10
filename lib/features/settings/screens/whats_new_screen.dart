@@ -196,17 +196,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     }
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
+    return Padding(
       padding: EdgeInsets.fromLTRB(
         AppTheme.screenPad,
         12,

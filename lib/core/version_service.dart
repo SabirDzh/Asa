@@ -57,6 +57,16 @@ class VersionService {
     String repo = VersionService.repo,
   }) => UpdateChecker.isSafeReleaseUrl(value, owner: owner, repo: repo);
 
+  static UpdateInfo? selectLatestCompatibleRelease(
+    List<UpdateInfo> releases, {
+    required String currentVersion,
+    bool? allowPrerelease,
+  }) => UpdateChecker.selectLatestCompatibleRelease(
+    releases,
+    currentVersion: currentVersion,
+    allowPrerelease: allowPrerelease,
+  );
+
   /// True when this platform can install an APK from a local file.
   static bool get canAutoInstall => canInstallApkLocally;
 
@@ -132,6 +142,8 @@ class UpdateChecker {
   static const String _cachedAssetNameKey = 'update_release_asset_name';
   static const String _cachedAssetUpdatedAtKey =
       'update_release_asset_updated_at';
+  static const String _cachedIsPrereleaseKey = 'update_release_is_prerelease';
+  static const String _cachedSha256Key = 'update_release_sha256';
   static const String installedAssetTimeKey =
       'update_installed_asset_updated_at';
   static const String _historyKey = 'update_release_history';
@@ -436,34 +448,21 @@ class UpdateChecker {
         return const _FetchResult.failure();
       }
 
-      final currentSemVer = SemanticVersion.tryParse(currentVersion);
-      final allowPrerelease = currentSemVer?.preRelease.isNotEmpty ?? true;
-
-      final candidates = <UpdateInfo>[];
+      final releases = <UpdateInfo>[];
       for (final item in rawList) {
         final info = UpdateInfo.fromJson(item);
         if (info == null ||
             !isSafeReleaseUrl(info.url, owner: owner, repo: repo)) {
           continue;
         }
-        if (info.isPrerelease && !allowPrerelease) {
-          continue;
-        }
-        candidates.add(info);
+        releases.add(info);
       }
 
-      if (candidates.isEmpty) return const _FetchResult.failure();
-
-      UpdateInfo best = candidates.first;
-      for (final candidate in candidates.skip(1)) {
-        if (isUpdateAvailable(
-          candidate,
-          best.version,
-          installedAssetUpdatedAt: best.assetUpdatedAt,
-        )) {
-          best = candidate;
-        }
-      }
+      final best = selectLatestCompatibleRelease(
+        releases,
+        currentVersion: currentVersion,
+      );
+      if (best == null) return const _FetchResult.failure();
 
       final responseEtag = response.headers['etag'];
       if (responseEtag != null && responseEtag.isNotEmpty) {
@@ -474,6 +473,38 @@ class UpdateChecker {
     } on Object {
       return const _FetchResult.failure();
     }
+  }
+
+  /// Selects the newest compatible release candidate from [releases] for
+  /// [currentVersion].
+  static UpdateInfo? selectLatestCompatibleRelease(
+    List<UpdateInfo> releases, {
+    required String currentVersion,
+    bool? allowPrerelease,
+  }) {
+    if (releases.isEmpty) return null;
+    final currentSemVer = SemanticVersion.tryParse(currentVersion);
+    final isPrereleaseAllowed =
+        allowPrerelease ?? (currentSemVer?.preRelease.isNotEmpty ?? true);
+
+    final candidates = <UpdateInfo>[];
+    for (final info in releases) {
+      if (info.isPrerelease && !isPrereleaseAllowed) continue;
+      candidates.add(info);
+    }
+    if (candidates.isEmpty) return null;
+
+    UpdateInfo best = candidates.first;
+    for (final candidate in candidates.skip(1)) {
+      if (isUpdateAvailable(
+        candidate,
+        best.version,
+        installedAssetUpdatedAt: best.assetUpdatedAt,
+      )) {
+        best = candidate;
+      }
+    }
+    return best;
   }
 
   static bool isSafeReleaseUrl(
@@ -547,12 +578,18 @@ class UpdateChecker {
     final publishedRaw = prefs.getString(_cachedPublishedAtKey);
     final assetUrl = prefs.getString(_cachedAssetUrlKey);
     final assetName = prefs.getString(_cachedAssetNameKey);
+    final assetUpdatedRaw = prefs.getString(_cachedAssetUpdatedAtKey);
+    final isPrerelease = prefs.getBool(_cachedIsPrereleaseKey) ?? false;
+    final sha256 = prefs.getString(_cachedSha256Key);
+
     final base = UpdateInfo(
       version: version,
       url: url,
       notes: prefs.getString(_cachedNotesKey) ?? '',
       publishedAt:
           publishedRaw == null ? null : DateTime.tryParse(publishedRaw),
+      isPrerelease: isPrerelease,
+      sha256: sha256,
     );
     if (assetUrl != null &&
         !isSafeAssetUrl(assetUrl, owner: owner, repo: repo)) {
@@ -565,6 +602,10 @@ class UpdateChecker {
       publishedAt: base.publishedAt,
       assetUrl: assetUrl,
       assetName: assetName,
+      assetUpdatedAt:
+          assetUpdatedRaw == null ? null : DateTime.tryParse(assetUpdatedRaw),
+      isPrerelease: isPrerelease,
+      sha256: sha256,
     );
   }
 
@@ -575,17 +616,37 @@ class UpdateChecker {
     await prefs.setString(_cachedVersionKey, info.version);
     await prefs.setString(_cachedUrlKey, info.url);
     await prefs.setString(_cachedNotesKey, info.notes);
+    await prefs.setBool(_cachedIsPrereleaseKey, info.isPrerelease);
     if (info.publishedAt != null) {
       await prefs.setString(
         _cachedPublishedAtKey,
         info.publishedAt!.toIso8601String(),
       );
+    } else {
+      await prefs.remove(_cachedPublishedAtKey);
     }
     if (info.assetUrl != null) {
       await prefs.setString(_cachedAssetUrlKey, info.assetUrl!);
+    } else {
+      await prefs.remove(_cachedAssetUrlKey);
     }
     if (info.assetName != null) {
       await prefs.setString(_cachedAssetNameKey, info.assetName!);
+    } else {
+      await prefs.remove(_cachedAssetNameKey);
+    }
+    if (info.assetUpdatedAt != null) {
+      await prefs.setString(
+        _cachedAssetUpdatedAtKey,
+        info.assetUpdatedAt!.toIso8601String(),
+      );
+    } else {
+      await prefs.remove(_cachedAssetUpdatedAtKey);
+    }
+    if (info.sha256 != null) {
+      await prefs.setString(_cachedSha256Key, info.sha256!);
+    } else {
+      await prefs.remove(_cachedSha256Key);
     }
   }
 

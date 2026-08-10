@@ -202,6 +202,12 @@ void main() {
         'app-arm64-v8a-release.apk',
       );
 
+      await prefs.setBool('update_release_is_prerelease', true);
+      await prefs.setString(
+        'update_release_sha256',
+        'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
+      );
+
       final checker = UpdateChecker(
         owner: 'SabirDzh',
         repo: 'Asa',
@@ -216,6 +222,11 @@ void main() {
       expect(info?.publishedAt, DateTime.utc(2026, 8, 1, 10));
       expect(info?.assetUrl, isNotNull);
       expect(info?.assetName, 'app-arm64-v8a-release.apk');
+      expect(info?.isPrerelease, isTrue);
+      expect(
+        info?.sha256,
+        'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
+      );
     });
 
     test('fetchReleaseHistory returns newest first and caches', () async {

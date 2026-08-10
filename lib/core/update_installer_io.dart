@@ -104,13 +104,13 @@ Future<String?> downloadUpdateFileImpl(
       if (expectedSha256 != null && expectedSha256.trim().isNotEmpty) {
         final expected = expectedSha256.trim().toLowerCase();
         if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(expected)) {
-          await file.delete();
+          if (await file.exists()) await file.delete();
           return null;
         }
         final bytes = await file.readAsBytes();
         final actualHash = sha256.convert(bytes).toString().toLowerCase();
         if (actualHash != expected) {
-          await file.delete();
+          if (await file.exists()) await file.delete();
           return null;
         }
       }

@@ -92,7 +92,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
         settings.tr('update_available'),
         style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
       ),
-      content: SingleChildScrollView(
+      content: SizedBox(
+        width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,10 +107,25 @@ class _UpdateDialogState extends State<UpdateDialog> {
               settings.tr('update_notes'),
               style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 4),
-            Text(
-              widget.info.notes.isEmpty ? '—' : widget.info.notes,
-              style: TextStyle(color: textColor),
+            const SizedBox(height: 6),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight:
+                    (MediaQuery.of(context).size.height * 0.25).clamp(
+                      120.0,
+                      150.0,
+                    ),
+              ),
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    widget.info.notes.isEmpty ? '—' : widget.info.notes,
+                    style: TextStyle(color: textColor, height: 1.35),
+                  ),
+                ),
+              ),
             ),
             if (widget.onViewHistory != null) ...[
               const SizedBox(height: 8),

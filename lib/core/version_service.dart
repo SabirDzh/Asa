@@ -550,11 +550,6 @@ class UpdateChecker {
                   ? UpdateInstallOutcome.installed
                   : UpdateInstallOutcome.failed;
             },
-            onViewHistory: () {
-              Navigator.of(ctx).push(
-                MaterialPageRoute<void>(builder: (_) => const WhatsNewScreen()),
-              );
-            },
           ),
     );
     await prefs.setInt(_lastPromptKey, _now().millisecondsSinceEpoch);

@@ -26,12 +26,33 @@ Future<String?> downloadUpdateFileImpl(
     final file = File('$directoryPath${Platform.pathSeparator}asa-update.apk');
     final sender = client ?? http.Client();
     try {
-      final request = http.Request('GET', Uri.parse(url))
-        ..headers['User-Agent'] = 'ASA-UpdateChecker';
-      final response = await sender
-          .send(request)
-          .timeout(const Duration(minutes: 3));
-      if (response.statusCode != 200) return null;
+      var currentUrl = url;
+      http.StreamedResponse? response;
+      for (var redirectCount = 0; redirectCount < 5; redirectCount++) {
+        final request =
+            http.Request('GET', Uri.parse(currentUrl))
+              ..headers['User-Agent'] = 'ASA-UpdateChecker'
+              ..followRedirects = false;
+        final res = await sender
+            .send(request)
+            .timeout(const Duration(minutes: 3));
+        if (res.statusCode == 301 ||
+            res.statusCode == 302 ||
+            res.statusCode == 307 ||
+            res.statusCode == 308) {
+          final location = res.headers['location'];
+          if (location == null || location.isEmpty) return null;
+          currentUrl = location;
+          continue;
+        }
+        if (res.statusCode == 200) {
+          response = res;
+          break;
+        }
+        return null;
+      }
+
+      if (response == null || response.statusCode != 200) return null;
       final total = response.contentLength;
       final sink = file.openWrite();
       var received = 0;

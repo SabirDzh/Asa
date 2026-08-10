@@ -22,14 +22,12 @@ class UpdateDialog extends StatefulWidget {
     required this.info,
     required this.onPostpone,
     required this.onInstall,
-    this.onViewHistory,
   });
 
   final SettingsProvider settings;
   final UpdateInfo info;
   final VoidCallback onPostpone;
   final UpdateInstallCallback onInstall;
-  final VoidCallback? onViewHistory;
 
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
@@ -85,6 +83,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
     final textSecondary =
         isDark ? const Color(0xFF8E8E93) : const Color(0xFF6B7280);
 
+    final percentText =
+        _progress != null ? '${(_progress! * 100).toInt()}%' : '';
+
     return AlertDialog(
       backgroundColor: bg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -127,21 +128,27 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ),
               ),
             ),
-            if (widget.onViewHistory != null) ...[
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: widget.onViewHistory,
-                icon: const Icon(Icons.history, size: 18),
-                label: Text(settings.tr('view_all_versions')),
-              ),
-            ],
             if (_downloading) ...[
               const SizedBox(height: 16),
               LinearProgressIndicator(value: _progress),
               const SizedBox(height: 8),
-              Text(
-                settings.tr('update_downloading'),
-                style: TextStyle(color: textSecondary, fontSize: 13),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    settings.tr('update_downloading'),
+                    style: TextStyle(color: textSecondary, fontSize: 13),
+                  ),
+                  if (percentText.isNotEmpty)
+                    Text(
+                      percentText,
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
               ),
             ],
             if (_failed) ...[

@@ -23,6 +23,8 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
   bool _checking = false;
   DateTime? _lastManualCheckTime;
   static const Duration _manualCheckCooldown = Duration(seconds: 15);
+  static const int _pageSize = 15;
+  int _visibleCount = _pageSize;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
 
   void _retry() {
     setState(() {
+      _visibleCount = _pageSize;
       _future = _fetch();
     });
   }
@@ -297,6 +300,10 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                       ),
                     );
                   }
+                  final hasMore = releases.length > _visibleCount;
+                  final displayCount =
+                      hasMore ? _visibleCount : releases.length;
+
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(
                       AppTheme.screenPad,
@@ -304,9 +311,55 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                       AppTheme.screenPad,
                       24,
                     ),
-                    itemCount: releases.length,
+                    itemCount: displayCount + (hasMore ? 1 : 0),
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
+                      if (hasMore && index == displayCount) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                            child: OutlinedButton.icon(
+                              key: const ValueKey('whats-new-load-more'),
+                              onPressed: () {
+                                setState(() {
+                                  _visibleCount += _pageSize;
+                                });
+                              },
+                              icon: const Icon(
+                                Icons.expand_more_rounded,
+                                size: 20,
+                              ),
+                              label: Text(
+                                settings.tr('load_more'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      isDark
+                                          ? AppColors.textDark
+                                          : AppColors.textLight,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                side: BorderSide(
+                                  color:
+                                      isDark
+                                          ? AppColors.textSecondaryDark
+                                              .withValues(alpha: 0.3)
+                                          : AppColors.textSecondaryLight
+                                              .withValues(alpha: 0.3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
                       final release = releases[index];
                       final date = _formatDate(release.publishedAt);
                       return Container(

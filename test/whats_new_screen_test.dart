@@ -127,4 +127,33 @@ void main() {
     expect(find.text('Recovered', findRichText: true), findsOneWidget);
     expect(find.text('Установить обновление (v1.2.0)'), findsOneWidget);
   });
+
+  testWidgets('paginates releases 15 at a time with load more button', (
+    tester,
+  ) async {
+    final releases = List.generate(
+      20,
+      (i) => UpdateInfo(
+        version: '1.0.$i',
+        url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.0.$i',
+        notes: 'Release notes $i',
+      ),
+    );
+
+    await _pumpAndInit(tester, _harness(() async => releases));
+
+    expect(find.text('v1.0.0'), findsOneWidget);
+
+    final scrollable = find.byType(Scrollable).first;
+    await tester.drag(scrollable, const Offset(0, -2000));
+    await tester.pumpAndSettle();
+
+    final loadMore = find.byKey(const ValueKey('whats-new-load-more'));
+    expect(loadMore, findsOneWidget);
+
+    await tester.tap(loadMore);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('whats-new-load-more')), findsNothing);
+  });
 }

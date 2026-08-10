@@ -178,7 +178,8 @@ class AppStrings {
       'up_to_date_message': 'У вас установлена последняя версия (v{version})',
       'checking_updates': 'Проверка…',
       'check_cooldown_message':
-          'Повторная проверка будет доступна через {seconds} сек.',
+          'Повторная проверка доступна через {seconds} сек.',
+      'load_more': 'Загрузить ещё',
       'view_all_versions': 'Все версии',
       'whats_new': 'Что нового',
       'releases_empty': 'Релизов пока нет',
@@ -464,6 +465,7 @@ class AppStrings {
       'checking_updates': 'Checking…',
       'check_cooldown_message':
           'Re-checking will be available in {seconds} sec.',
+      'load_more': 'Load more',
       'view_all_versions': 'All versions',
       'whats_new': "What's New",
       'releases_empty': 'No releases yet',

@@ -330,74 +330,10 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       _mentionTriggers[blockId] = trigger;
       _mentionSuggestions[blockId] = matches;
     });
-    _syncMentionOverlay(blockId);
-  }
-
-  void _syncMentionOverlay(String blockId) {
-    final matches = _mentionSuggestions[blockId] ?? const <TaskAttachment>[];
-    final existing = _mentionOverlayEntries[blockId];
-    if (matches.isEmpty || _mentionLayerLinks[blockId] == null) {
-      _dismissMentionOverlay(blockId);
-      return;
-    }
-
-    if (existing != null) {
-      existing.markNeedsBuild();
-      return;
-    }
-
-    final entry = OverlayEntry(
-      builder: (context) {
-        final current =
-            _mentionSuggestions[blockId] ?? const <TaskAttachment>[];
-        if (current.isEmpty) return const SizedBox.shrink();
-        final popupWidth =
-            (MediaQuery.sizeOf(context).width - 32)
-                .clamp(160.0, 320.0)
-                .toDouble();
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _dismissMentionOverlay(blockId),
-                child: const SizedBox.expand(),
-              ),
-            ),
-            CompositedTransformFollower(
-              link: _mentionLayerLinks[blockId]!,
-              showWhenUnlinked: false,
-              targetAnchor: Alignment.topLeft,
-              followerAnchor: Alignment.bottomLeft,
-              offset: const Offset(0, -4),
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: popupWidth,
-                  child: AttachmentMentionSuggestions(
-                    attachments: current,
-                    typeLinkLabel: _settings.tr('attachment_type_link'),
-                    typeImageLabel: _settings.tr('attachment_type_image'),
-                    typeFileLabel: _settings.tr('attachment_type_file'),
-                    onSelected:
-                        (attachment) => _selectMention(blockId, attachment),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    _mentionOverlayEntries[blockId] = entry;
-    Overlay.of(context).insert(entry);
   }
 
   void _dismissMentionOverlay(String blockId) {
-    final entry = _mentionOverlayEntries.remove(blockId);
-    entry?.remove();
+    _mentionOverlayEntries.remove(blockId)?.remove();
   }
 
   void _selectMention(String blockId, TaskAttachment attachment) {
@@ -409,7 +345,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       trigger,
       attachment,
     );
-    _dismissMentionOverlay(blockId);
     setState(() {
       _mentionTriggers.remove(blockId);
       _mentionSuggestions.remove(blockId);
@@ -1040,24 +975,32 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 ),
               ),
             ] else ...[
-              CompositedTransformTarget(
-                link: _mentionLayerLinks[block.id]!,
-                child: TextFormField(
-                  key: _fieldKey('description-text-input', block.id),
-                  controller: _descriptionControllers[block.id],
-                  focusNode: _descriptionFocusNodes[block.id],
-                  maxLength: kMaxTaskDescriptionLength,
-                  maxLines: 5,
-                  minLines: 3,
-                  inputFormatters: [
-                    textInputFormatter(maxLength: kMaxTaskDescriptionLength),
-                  ],
-                  decoration: InputDecoration(
-                    labelText: _settings.tr('description_text'),
-                    alignLabelWithHint: true,
-                  ),
+              TextFormField(
+                key: _fieldKey('description-text-input', block.id),
+                controller: _descriptionControllers[block.id],
+                focusNode: _descriptionFocusNodes[block.id],
+                maxLength: kMaxTaskDescriptionLength,
+                maxLines: 5,
+                minLines: 3,
+                inputFormatters: [
+                  textInputFormatter(maxLength: kMaxTaskDescriptionLength),
+                ],
+                decoration: InputDecoration(
+                  labelText: _settings.tr('description_text'),
+                  alignLabelWithHint: true,
                 ),
               ),
+              if (_mentionSuggestions[block.id]?.isNotEmpty == true) ...[
+                const SizedBox(height: 4),
+                AttachmentMentionSuggestions(
+                  attachments: _mentionSuggestions[block.id]!,
+                  typeLinkLabel: _settings.tr('attachment_type_link'),
+                  typeImageLabel: _settings.tr('attachment_type_image'),
+                  typeFileLabel: _settings.tr('attachment_type_file'),
+                  onSelected:
+                      (attachment) => _selectMention(block.id, attachment),
+                ),
+              ],
               const SizedBox(height: 8),
               AttachmentActionMenu(
                 selectedAction:

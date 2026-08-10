@@ -274,7 +274,7 @@ void main() {
       },
     );
 
-    test('permission denial marks blocked-by-system state for user settings prompt', () async {
+    test('temporary denial does not mark blocked-by-system state', () async {
       NotificationService.initializedOverride = true;
       NotificationService.requestPermissionOverride =
           ({required bool requestExactAlarms}) async => false;
@@ -284,7 +284,7 @@ void main() {
       await provider.toggleNotifications(true);
 
       expect(provider.notificationsEnabled, false);
-      expect(provider.notificationsBlockedBySystem, true);
+      expect(provider.notificationsBlockedBySystem, false);
     });
 
     test(

@@ -321,7 +321,8 @@ class SettingsProvider with ChangeNotifier {
           );
         }
         if (!granted) {
-          _notificationsBlockedBySystem = true;
+          _notificationsBlockedBySystem =
+              await NotificationService.isPermissionPermanentlyDenied();
         } else {
           _notificationsBlockedBySystem = false;
         }

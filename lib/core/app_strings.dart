@@ -173,6 +173,12 @@ class AppStrings {
       'update_download_failed': 'Не удалось загрузить обновление',
       'update_unavailable_platform':
           'Автоустановка недоступна на этой платформе',
+      'check_for_updates': 'Проверить обновления',
+      'install_update_version': 'Установить обновление (v{version})',
+      'up_to_date_message': 'У вас установлена последняя версия (v{version})',
+      'checking_updates': 'Проверка…',
+      'check_cooldown_message':
+          'Повторная проверка будет доступна через {seconds} сек.',
       'view_all_versions': 'Все версии',
       'whats_new': 'Что нового',
       'releases_empty': 'Релизов пока нет',
@@ -452,6 +458,12 @@ class AppStrings {
       'update_download_failed': 'Failed to download the update',
       'update_unavailable_platform':
           'In-app install is not available on this platform',
+      'check_for_updates': 'Check for updates',
+      'install_update_version': 'Install update (v{version})',
+      'up_to_date_message': 'You already have the latest version (v{version})',
+      'checking_updates': 'Checking…',
+      'check_cooldown_message':
+          'Re-checking will be available in {seconds} sec.',
       'view_all_versions': 'All versions',
       'whats_new': "What's New",
       'releases_empty': 'No releases yet',

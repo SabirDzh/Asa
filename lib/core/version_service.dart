@@ -69,6 +69,13 @@ class VersionService {
   /// Opens a downloaded APK with the system package installer.
   static Future<bool> installUpdate(String path) =>
       _defaultChecker.installUpdate(path);
+
+  /// Shows the update prompt dialog directly for [info].
+  static Future<void> showUpdateDialog(
+    BuildContext context,
+    SettingsProvider settings,
+    UpdateInfo info,
+  ) => _defaultChecker.showUpdateDialogDirect(context, settings, info);
 }
 
 /// Handles release fetching independently from the dialog UI.
@@ -499,6 +506,22 @@ class UpdateChecker {
   static DateTime? _readTime(SharedPreferences prefs, String key) {
     final value = prefs.getInt(key);
     return value == null ? null : DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  /// Presents the update dialog for [info] on demand.
+  Future<void> showUpdateDialogDirect(
+    BuildContext context,
+    SettingsProvider settings,
+    UpdateInfo info,
+  ) async {
+    final prefs = await _preferencesProvider();
+    if (!context.mounted || _isPresenting) return;
+    _isPresenting = true;
+    try {
+      await _showUpdateDialog(context, settings, info, prefs);
+    } finally {
+      _isPresenting = false;
+    }
   }
 
   Future<void> _showUpdateDialog(

@@ -7,7 +7,8 @@ import '../../../core/theme.dart';
 import '../../../core/version_service.dart';
 import '../providers/settings_provider.dart';
 
-/// Shows the release history (version, date, notes) fetched from GitHub.
+/// Shows the release history (version, date, notes) fetched from GitHub,
+/// with a button to check for updates or install an available update.
 class WhatsNewScreen extends StatefulWidget {
   final Future<List<UpdateInfo>> Function()? fetchHistory;
 
@@ -19,6 +20,7 @@ class WhatsNewScreen extends StatefulWidget {
 
 class _WhatsNewScreenState extends State<WhatsNewScreen> {
   late Future<List<UpdateInfo>> _future;
+  bool _checking = false;
 
   @override
   void initState() {
@@ -35,11 +37,164 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     });
   }
 
+  DateTime? _lastManualCheckTime;
+  static const Duration _manualCheckCooldown = Duration(seconds: 15);
+
+  Future<void> _manualCheck(SettingsProvider settings) async {
+    final now = DateTime.now();
+    if (_lastManualCheckTime != null &&
+        now.difference(_lastManualCheckTime!) < _manualCheckCooldown) {
+      final remaining =
+          _manualCheckCooldown.inSeconds -
+          now.difference(_lastManualCheckTime!).inSeconds;
+      final msg = settings
+          .tr('check_cooldown_message')
+          .replaceAll('{seconds}', '$remaining');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+      );
+      return;
+    }
+    _lastManualCheckTime = now;
+
+    setState(() {
+      _checking = true;
+    });
+    try {
+      final list = await _fetch();
+      if (!mounted) return;
+      setState(() {
+        _future = Future.value(list);
+        _checking = false;
+      });
+
+      UpdateInfo? newerRelease;
+      for (final rel in list) {
+        if (SemanticVersion.isNewer(
+          rel.version,
+          VersionService.currentVersion,
+        )) {
+          newerRelease = rel;
+          break;
+        }
+      }
+
+      if (newerRelease != null) {
+        if (mounted) {
+          VersionService.showUpdateDialog(context, settings, newerRelease);
+        }
+      } else {
+        if (mounted) {
+          final msg = settings
+              .tr('up_to_date_message')
+              .replaceAll('{version}', VersionService.currentVersion);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _checking = false;
+        });
+      }
+    }
+  }
+
   String _formatDate(DateTime? date) {
     if (date == null) return '';
     final d = date.toLocal();
     String two(int v) => v.toString().padLeft(2, '0');
     return '${two(d.day)}.${two(d.month)}.${d.year}';
+  }
+
+  Widget _buildTopAction(
+    BuildContext context,
+    SettingsProvider settings,
+    List<UpdateInfo> releases,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    UpdateInfo? newerRelease;
+    for (final rel in releases) {
+      if (SemanticVersion.isNewer(
+        rel.version,
+        VersionService.currentVersion,
+      )) {
+        newerRelease = rel;
+        break;
+      }
+    }
+
+    if (newerRelease != null) {
+      final label = settings
+          .tr('install_update_version')
+          .replaceAll('{version}', newerRelease.version);
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            VersionService.showUpdateDialog(context, settings, newerRelease!);
+          },
+          icon: const Icon(Icons.system_update_alt_rounded, size: 20),
+          label: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 2,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _checking ? null : () => _manualCheck(settings),
+        icon: _checking
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh_rounded, size: 20),
+        label: Text(
+          _checking
+              ? settings.tr('checking_updates')
+              : settings.tr('check_for_updates'),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppColors.textDark : AppColors.textLight,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          side: BorderSide(
+            color:
+                isDark
+                    ? AppColors.textSecondaryDark.withValues(alpha: 0.3)
+                    : AppColors.textSecondaryLight.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -63,7 +218,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                 AppTheme.screenPad,
                 AppTheme.screenPad,
                 AppTheme.screenPad,
-                AppTheme.screenPad * 2,
+                AppTheme.screenPad * 1.5,
               ),
               child: Row(
                 children: [
@@ -110,11 +265,23 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                   }
                   final releases = snapshot.data ?? const <UpdateInfo>[];
                   if (releases.isEmpty) {
-                    return _MessageState(
-                      icon: Icons.history,
-                      message: settings.tr('releases_empty'),
-                      onRetry: _retry,
-                      settings: settings,
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.screenPad,
+                        4,
+                        AppTheme.screenPad,
+                        80,
+                      ),
+                      children: [
+                        _buildTopAction(context, settings, releases),
+                        const SizedBox(height: 32),
+                        _MessageState(
+                          icon: Icons.history,
+                          message: settings.tr('releases_empty'),
+                          onRetry: _retry,
+                          settings: settings,
+                        ),
+                      ],
                     );
                   }
                   return ListView.separated(
@@ -124,10 +291,14 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                       AppTheme.screenPad,
                       80,
                     ),
-                    itemCount: releases.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemCount: releases.length + 1,
+                    separatorBuilder: (_, index) =>
+                        index == 0 ? const SizedBox.shrink() : const SizedBox(height: 10),
                     itemBuilder: (context, index) {
-                      final release = releases[index];
+                      if (index == 0) {
+                        return _buildTopAction(context, settings, releases);
+                      }
+                      final release = releases[index - 1];
                       final date = _formatDate(release.publishedAt);
                       return Container(
                         padding: const EdgeInsets.all(16),

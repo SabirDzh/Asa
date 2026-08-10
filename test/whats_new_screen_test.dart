@@ -52,7 +52,9 @@ void main() {
     NotificationService.permanentlyDeniedOverride = null;
   });
 
-  testWidgets('renders releases newest first with notes', (tester) async {
+  testWidgets('renders releases newest first with notes and install button', (
+    tester,
+  ) async {
     await _pumpAndInit(
       tester,
       _harness(
@@ -76,11 +78,30 @@ void main() {
     expect(find.text('v1.1.0'), findsOneWidget);
     expect(find.text('New bold feature', findRichText: true), findsOneWidget);
     expect(find.text('Older release', findRichText: true), findsOneWidget);
+    expect(find.text('Установить обновление (v1.2.0)'), findsOneWidget);
+  });
+
+  testWidgets('shows check for updates button when up to date', (tester) async {
+    await _pumpAndInit(
+      tester,
+      _harness(
+        () async => [
+          const UpdateInfo(
+            version: '1.1.1',
+            url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.1',
+            notes: 'Current version',
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('Проверить обновления'), findsOneWidget);
   });
 
   testWidgets('shows empty state', (tester) async {
     await _pumpAndInit(tester, _harness(() async => []));
     expect(find.text('Релизов пока нет'), findsOneWidget);
+    expect(find.text('Проверить обновления'), findsOneWidget);
   });
 
   testWidgets('shows error state and retries', (tester) async {
@@ -104,5 +125,6 @@ void main() {
     await tester.tap(find.text('Повторить'));
     await tester.pumpAndSettle();
     expect(find.text('Recovered', findRichText: true), findsOneWidget);
+    expect(find.text('Установить обновление (v1.2.0)'), findsOneWidget);
   });
 }

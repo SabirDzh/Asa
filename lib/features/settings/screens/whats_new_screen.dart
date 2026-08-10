@@ -8,7 +8,7 @@ import '../../../core/version_service.dart';
 import '../providers/settings_provider.dart';
 
 /// Shows the release history (version, date, notes) fetched from GitHub,
-/// with a button to check for updates or install an available update.
+/// with a pinned bottom button to check for updates or install an available update.
 class WhatsNewScreen extends StatefulWidget {
   final Future<List<UpdateInfo>> Function()? fetchHistory;
 
@@ -21,6 +21,8 @@ class WhatsNewScreen extends StatefulWidget {
 class _WhatsNewScreenState extends State<WhatsNewScreen> {
   late Future<List<UpdateInfo>> _future;
   bool _checking = false;
+  DateTime? _lastManualCheckTime;
+  static const Duration _manualCheckCooldown = Duration(seconds: 15);
 
   @override
   void initState() {
@@ -36,9 +38,6 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
       _future = _fetch();
     });
   }
-
-  DateTime? _lastManualCheckTime;
-  static const Duration _manualCheckCooldown = Duration(seconds: 15);
 
   Future<void> _manualCheck(SettingsProvider settings) async {
     final now = DateTime.now();
@@ -112,12 +111,13 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     return '${two(d.day)}.${two(d.month)}.${d.year}';
   }
 
-  Widget _buildTopAction(
+  Widget _buildBottomAction(
     BuildContext context,
     SettingsProvider settings,
     List<UpdateInfo> releases,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
 
     UpdateInfo? newerRelease;
     for (final rel in releases) {
@@ -130,13 +130,13 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
       }
     }
 
+    Widget button;
     if (newerRelease != null) {
       final label = settings
           .tr('install_update_version')
           .replaceAll('{version}', newerRelease.version);
 
-      return Container(
-        margin: const EdgeInsets.only(bottom: 16),
+      button = SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () {
@@ -158,42 +158,62 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
           ),
         ),
       );
+    } else {
+      button = SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _checking ? null : () => _manualCheck(settings),
+          icon: _checking
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded, size: 20),
+          label: Text(
+            _checking
+                ? settings.tr('checking_updates')
+                : settings.tr('check_for_updates'),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.textDark : AppColors.textLight,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            side: BorderSide(
+              color:
+                  isDark
+                      ? AppColors.textSecondaryDark.withValues(alpha: 0.3)
+                      : AppColors.textSecondaryLight.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+      );
     }
 
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: _checking ? null : () => _manualCheck(settings),
-        icon: _checking
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.refresh_rounded, size: 20),
-        label: Text(
-          _checking
-              ? settings.tr('checking_updates')
-              : settings.tr('check_for_updates'),
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: isDark ? AppColors.textDark : AppColors.textLight,
+      decoration: BoxDecoration(
+        color: bg,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
           ),
-        ),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          side: BorderSide(
-            color:
-                isDark
-                    ? AppColors.textSecondaryDark.withValues(alpha: 0.3)
-                    : AppColors.textSecondaryLight.withValues(alpha: 0.3),
-          ),
-        ),
+        ],
       ),
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.screenPad,
+        12,
+        AppTheme.screenPad,
+        (bottomPadding > 0 ? bottomPadding : 16),
+      ),
+      child: button,
     );
   }
 
@@ -265,23 +285,13 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                   }
                   final releases = snapshot.data ?? const <UpdateInfo>[];
                   if (releases.isEmpty) {
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppTheme.screenPad,
-                        4,
-                        AppTheme.screenPad,
-                        80,
+                    return Center(
+                      child: _MessageState(
+                        icon: Icons.history,
+                        message: settings.tr('releases_empty'),
+                        onRetry: _retry,
+                        settings: settings,
                       ),
-                      children: [
-                        _buildTopAction(context, settings, releases),
-                        const SizedBox(height: 32),
-                        _MessageState(
-                          icon: Icons.history,
-                          message: settings.tr('releases_empty'),
-                          onRetry: _retry,
-                          settings: settings,
-                        ),
-                      ],
                     );
                   }
                   return ListView.separated(
@@ -289,16 +299,12 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                       AppTheme.screenPad,
                       4,
                       AppTheme.screenPad,
-                      80,
+                      24,
                     ),
-                    itemCount: releases.length + 1,
-                    separatorBuilder: (_, index) =>
-                        index == 0 ? const SizedBox.shrink() : const SizedBox(height: 10),
+                    itemCount: releases.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return _buildTopAction(context, settings, releases);
-                      }
-                      final release = releases[index - 1];
+                      final release = releases[index];
                       final date = _formatDate(release.publishedAt);
                       return Container(
                         padding: const EdgeInsets.all(16),
@@ -370,6 +376,16 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                   );
                 },
               ),
+            ),
+            FutureBuilder<List<UpdateInfo>>(
+              future: _future,
+              builder: (context, snapshot) {
+                return _buildBottomAction(
+                  context,
+                  settings,
+                  snapshot.data ?? const [],
+                );
+              },
             ),
           ],
         ),

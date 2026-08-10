@@ -17,10 +17,9 @@ Future<String> _defaultDirectory() async {
 bool _isSafeRedirectHost(String host) {
   final lower = host.toLowerCase();
   return lower == 'github.com' ||
-      lower == 'objects.githubusercontent.com' ||
       lower == 'release-assets.github.com' ||
-      lower.endsWith('.githubusercontent.com') ||
-      lower.endsWith('.github.com');
+      lower == 'objects.githubusercontent.com' ||
+      lower.endsWith('.githubusercontent.com');
 }
 
 Future<String?> downloadUpdateFileImpl(
@@ -41,7 +40,11 @@ Future<String?> downloadUpdateFileImpl(
       http.StreamedResponse? response;
       for (var redirectCount = 0; redirectCount < 5; redirectCount++) {
         final currentUri = Uri.tryParse(currentUrl);
-        if (currentUri == null || !_isSafeRedirectHost(currentUri.host)) {
+        if (currentUri == null ||
+            currentUri.scheme.toLowerCase() != 'https' ||
+            !_isSafeRedirectHost(currentUri.host) ||
+            currentUri.hasPort ||
+            currentUri.userInfo.isNotEmpty) {
           return null;
         }
 
@@ -58,7 +61,14 @@ Future<String?> downloadUpdateFileImpl(
             res.statusCode == 308) {
           final location = res.headers['location'];
           if (location == null || location.isEmpty) return null;
-          currentUrl = location;
+          final resolved = currentUri.resolve(location);
+          if (!_isSafeRedirectHost(resolved.host) ||
+              resolved.scheme.toLowerCase() != 'https' ||
+              resolved.hasPort ||
+              resolved.userInfo.isNotEmpty) {
+            return null;
+          }
+          currentUrl = resolved.toString();
           continue;
         }
         if (res.statusCode == 200) {
@@ -82,14 +92,24 @@ Future<String?> downloadUpdateFileImpl(
         await sink.close();
       }
       // Reject empty or truncated downloads before the installer sees them.
-      if (received == 0) return null;
-      if (total != null && total > 0 && received != total) return null;
+      if (received == 0) {
+        if (await file.exists()) await file.delete();
+        return null;
+      }
+      if (total != null && total > 0 && received != total) {
+        if (await file.exists()) await file.delete();
+        return null;
+      }
 
-      if (expectedSha256 != null && expectedSha256.isNotEmpty) {
+      if (expectedSha256 != null && expectedSha256.trim().isNotEmpty) {
+        final expected = expectedSha256.trim().toLowerCase();
+        if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(expected)) {
+          await file.delete();
+          return null;
+        }
         final bytes = await file.readAsBytes();
-        final actualHash =
-            sha256.convert(bytes).toString().toLowerCase().trim();
-        if (actualHash != expectedSha256.toLowerCase().trim()) {
+        final actualHash = sha256.convert(bytes).toString().toLowerCase();
+        if (actualHash != expected) {
           await file.delete();
           return null;
         }

@@ -24,7 +24,9 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
   DateTime? _lastManualCheckTime;
   static const Duration _manualCheckCooldown = Duration(seconds: 15);
   static const int _pageSize = 15;
+  static const double _bottomButtonHeight = 100.0;
   int _visibleCount = _pageSize;
+
 
   @override
   void initState() {
@@ -130,6 +132,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     List<UpdateInfo> releases,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
 
     UpdateInfo? newerRelease;
     for (final rel in releases) {
@@ -205,14 +208,29 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
     }
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppTheme.screenPad,
-        12,
-        AppTheme.screenPad,
-        (bottomPadding > 0 ? bottomPadding + 24 : 40),
+    // Wrap in a gradient so the button stays readable over list content.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            bg.withValues(alpha: 0),
+            bg.withValues(alpha: 0.85),
+            bg,
+          ],
+          stops: const [0.0, 0.35, 0.65],
+        ),
       ),
-      child: button,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppTheme.screenPad,
+          20,
+          AppTheme.screenPad,
+          (bottomPadding > 0 ? bottomPadding + 24 : 40),
+        ),
+        child: button,
+      ),
     );
   }
 
@@ -229,212 +247,235 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
       backgroundColor: bg,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTheme.screenPad,
-                AppTheme.screenPad,
-                AppTheme.screenPad,
-                AppTheme.screenPad * 1.5,
-              ),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color:
-                            isDark
-                                ? AppColors.surfaceDark
-                                : AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.arrow_back, color: textColor, size: 22),
-                    ),
+            // ── Main scrollable content ───────────────────────────────────
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTheme.screenPad,
+                    AppTheme.screenPad,
+                    AppTheme.screenPad,
+                    AppTheme.screenPad * 1.5,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    settings.tr('whats_new'),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: FutureBuilder<List<UpdateInfo>>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return _MessageState(
-                      icon: Icons.error_outline,
-                      message: settings.tr('releases_error'),
-                      onRetry: _retry,
-                      settings: settings,
-                    );
-                  }
-                  final releases = snapshot.data ?? const <UpdateInfo>[];
-                  if (releases.isEmpty) {
-                    return Center(
-                      child: _MessageState(
-                        icon: Icons.history,
-                        message: settings.tr('releases_empty'),
-                        onRetry: _retry,
-                        settings: settings,
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                isDark
+                                    ? AppColors.surfaceDark
+                                    : AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: textColor,
+                            size: 22,
+                          ),
+                        ),
                       ),
-                    );
-                  }
-                  final hasMore = releases.length > _visibleCount;
-                  final displayCount =
-                      hasMore ? _visibleCount : releases.length;
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppTheme.screenPad,
-                      4,
-                      AppTheme.screenPad,
-                      24,
-                    ),
-                    itemCount: displayCount + (hasMore ? 1 : 0),
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      if (hasMore && index == displayCount) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Center(
-                            child: OutlinedButton.icon(
-                              key: const ValueKey('whats-new-load-more'),
-                              onPressed: () {
-                                setState(() {
-                                  _visibleCount += _pageSize;
-                                });
-                              },
-                              icon: const Icon(
-                                Icons.expand_more_rounded,
-                                size: 20,
-                              ),
-                              label: Text(
-                                settings.tr('load_more'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      isDark
-                                          ? AppColors.textDark
-                                          : AppColors.textLight,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                side: BorderSide(
-                                  color:
-                                      isDark
-                                          ? AppColors.textSecondaryDark
-                                              .withValues(alpha: 0.3)
-                                          : AppColors.textSecondaryLight
-                                              .withValues(alpha: 0.3),
-                                ),
-                              ),
-                            ),
+                      const SizedBox(width: 12),
+                      Text(
+                        settings.tr('whats_new'),
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: FutureBuilder<List<UpdateInfo>>(
+                    future: _future,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return _MessageState(
+                          icon: Icons.error_outline,
+                          message: settings.tr('releases_error'),
+                          onRetry: _retry,
+                          settings: settings,
+                        );
+                      }
+                      final releases = snapshot.data ?? const <UpdateInfo>[];
+                      if (releases.isEmpty) {
+                        return Center(
+                          child: _MessageState(
+                            icon: Icons.history,
+                            message: settings.tr('releases_empty'),
+                            onRetry: _retry,
+                            settings: settings,
                           ),
                         );
                       }
-                      final release = releases[index];
-                      final date = _formatDate(release.publishedAt);
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color:
-                              isDark
-                                  ? AppColors.surfaceDark
-                                  : AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(20),
+                      final hasMore = releases.length > _visibleCount;
+                      final displayCount =
+                          hasMore ? _visibleCount : releases.length;
+
+                      return ListView.separated(
+                        // Extra bottom padding so the last item isn't hidden
+                        // behind the floating action button.
+                        padding: EdgeInsets.fromLTRB(
+                          AppTheme.screenPad,
+                          4,
+                          AppTheme.screenPad,
+                          _bottomButtonHeight +
+                              MediaQuery.of(context).padding.bottom,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
+                        itemCount: displayCount + (hasMore ? 1 : 0),
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          if (hasMore && index == displayCount) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Center(
+                                child: OutlinedButton.icon(
+                                  key: const ValueKey('whats-new-load-more'),
+                                  onPressed: () {
+                                    setState(() {
+                                      _visibleCount += _pageSize;
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.expand_more_rounded,
+                                    size: 20,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.15,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    'v${release.version}',
+                                  label: Text(
+                                    settings.tr('load_more'),
                                     style: TextStyle(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          isDark
+                                              ? AppColors.textDark
+                                              : AppColors.textLight,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    side: BorderSide(
+                                      color:
+                                          isDark
+                                              ? AppColors.textSecondaryDark
+                                                  .withValues(alpha: 0.3)
+                                              : AppColors.textSecondaryLight
+                                                  .withValues(alpha: 0.3),
                                     ),
                                   ),
                                 ),
-                                const Spacer(),
-                                if (date.isNotEmpty)
-                                  Text(
-                                    '${settings.tr('published')} $date',
-                                    style: TextStyle(
-                                      color: textSecondary,
-                                      fontSize: 13,
+                              ),
+                            );
+                          }
+                          final release = releases[index];
+                          final date = _formatDate(release.publishedAt);
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color:
+                                  isDark
+                                      ? AppColors.surfaceDark
+                                      : AppColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'v${release.version}',
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                                     ),
+                                    const Spacer(),
+                                    if (date.isNotEmpty)
+                                      Text(
+                                        '${settings.tr('published')} $date',
+                                        style: TextStyle(
+                                          color: textSecondary,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                if (release.notes.isEmpty)
+                                  Text(
+                                    '—',
+                                    style: TextStyle(color: textSecondary),
+                                  )
+                                else
+                                  MarkdownBody(
+                                    data: release.notes,
+                                    selectable: true,
+                                    extensionSet:
+                                        md.ExtensionSet.gitHubFlavored,
+                                    styleSheet: MarkdownStyleSheet.fromTheme(
+                                      Theme.of(context),
+                                    ).copyWith(
+                                      p: TextStyle(color: textColor),
+                                      a: TextStyle(color: AppColors.primary),
+                                    ),
+                                    imageBuilder:
+                                        (uri, title, alt) => Text(
+                                          '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}]',
+                                        ),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            if (release.notes.isEmpty)
-                              Text('—', style: TextStyle(color: textSecondary))
-                            else
-                              MarkdownBody(
-                                data: release.notes,
-                                selectable: true,
-                                extensionSet: md.ExtensionSet.gitHubFlavored,
-                                styleSheet: MarkdownStyleSheet.fromTheme(
-                                  Theme.of(context),
-                                ).copyWith(
-                                  p: TextStyle(color: textColor),
-                                  a: TextStyle(color: AppColors.primary),
-                                ),
-                                imageBuilder:
-                                    (uri, title, alt) => Text(
-                                      '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}]',
-                                    ),
-                              ),
-                          ],
-                        ),
+                          );
+                        },
                       );
                     },
+                  ),
+                ),
+              ],
+            ),
+
+            // ── Floating action button (no solid background block) ────────
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: FutureBuilder<List<UpdateInfo>>(
+                future: _future,
+                builder: (context, snapshot) {
+                  return _buildBottomAction(
+                    context,
+                    settings,
+                    snapshot.data ?? const [],
                   );
                 },
               ),
-            ),
-            FutureBuilder<List<UpdateInfo>>(
-              future: _future,
-              builder: (context, snapshot) {
-                return _buildBottomAction(
-                  context,
-                  settings,
-                  snapshot.data ?? const [],
-                );
-              },
             ),
           ],
         ),

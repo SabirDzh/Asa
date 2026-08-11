@@ -88,7 +88,7 @@ class LoggerService {
   );
   static const String _appVersion = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.1.3',
+    defaultValue: '1.1.6',
   );
   static const String _installationIdKey = 'diagnostic_installation_id';
   static const int _maxBufferSize = 500;

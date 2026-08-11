@@ -1,7 +1,7 @@
 name: asa
 description: "ASA — modern task manager with folders and filtering."
 publish_to: 'none'
-version: 1.1.5+6
+version: 1.1.6+7
 
 environment:
   sdk: ^3.7.2

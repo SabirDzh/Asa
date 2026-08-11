@@ -17,7 +17,7 @@ class VersionService {
   // The build pipeline can provide the version with --dart-define=APP_VERSION.
   static const String currentVersion = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.1.5',
+    defaultValue: '1.1.6',
   );
 
   static final UpdateChecker _defaultChecker = UpdateChecker(

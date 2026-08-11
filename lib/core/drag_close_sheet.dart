@@ -59,11 +59,10 @@ class _DragToCloseSheetState extends State<DragToCloseSheet>
     duration: widget.springDuration,
   );
 
-  int? _activePointer;
-  double _downY = 0;
-  double _downScrollOffset = 0;
   double _scrollOffset = 0;
-  bool _pointerActive = false;
+  bool _verticalDragActive = false;
+  double _dragStartY = 0;
+  double _dragStartScrollOffset = 0;
 
   bool _scrollDragActive = false;
   double _overscrollAccum = 0;
@@ -85,6 +84,11 @@ class _DragToCloseSheetState extends State<DragToCloseSheet>
 
   bool _handleScroll(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+
+    // Notifications from nested scrollables (description previews, mention
+    // lists, and attachment lists) must never drive the parent sheet. The
+    // sheet only coordinates with its direct, primary scrollable.
+    if (notification.depth != 0) return false;
     _scrollOffset = notification.metrics.pixels;
     if (!widget.trackScrollableDrag) return false;
 
@@ -124,22 +128,23 @@ class _DragToCloseSheetState extends State<DragToCloseSheet>
     return false;
   }
 
-  void _onPointerDown(PointerDownEvent event) {
-    if (_activePointer != null || _scrollDragActive) return;
-    _activePointer = event.pointer;
-    _pointerActive = true;
-    _downY = event.position.dy;
-    _downScrollOffset = _scrollOffset;
+  /// Starts the fallback drag only after the gesture arena awards a vertical
+  /// drag to the sheet. A nested scrollable can therefore win the arena and
+  /// keep its own horizontal/vertical gesture completely independent.
+  void _onVerticalDragStart(DragStartDetails details) {
+    if (_scrollDragActive || _closing) return;
+    _verticalDragActive = true;
+    _dragStartY = details.localPosition.dy;
+    _dragStartScrollOffset = _scrollOffset;
     _controller.stop();
   }
 
-  void _onPointerMove(PointerMoveEvent event) {
-    if (event.pointer != _activePointer || !_pointerActive) return;
-    if (_scrollDragActive) return;
-    final netDy = event.position.dy - _downY;
-    // Movement the inner scrollable absorbed while scrolling toward its top
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (!_verticalDragActive || _scrollDragActive) return;
+    final netDy = details.localPosition.dy - _dragStartY;
+    // Movement the primary scrollable absorbed while returning to its top
     // must not translate the sheet; only the unconsumed remainder does.
-    final consumedByScroll = (_downScrollOffset - _scrollOffset).clamp(
+    final consumedByScroll = (_dragStartScrollOffset - _scrollOffset).clamp(
       0.0,
       double.infinity,
     );
@@ -147,19 +152,14 @@ class _DragToCloseSheetState extends State<DragToCloseSheet>
     _setPull(effective);
   }
 
-  void _onPointerUp(PointerUpEvent event) {
-    if (event.pointer != _activePointer) return;
-    if (_scrollDragActive) {
-      // A scrollable owns the drag; wait for its end notification.
-      return;
-    }
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (!_verticalDragActive || _scrollDragActive) return;
     _finishDrag();
   }
 
-  void _onPointerCancel(PointerCancelEvent event) {
-    if (event.pointer != _activePointer) return;
-    _activePointer = null;
-    _pointerActive = false;
+  void _onVerticalDragCancel() {
+    if (!_verticalDragActive) return;
+    _verticalDragActive = false;
     _controller.duration = widget.springDuration;
     _animateBack();
   }
@@ -176,8 +176,7 @@ class _DragToCloseSheetState extends State<DragToCloseSheet>
     if (_closing) {
       return;
     }
-    _activePointer = null;
-    _pointerActive = false;
+    _verticalDragActive = false;
     if (_pullPx >= widget.closeThreshold) {
       _closing = true;
       _controller.duration = widget.closeDuration;
@@ -219,12 +218,12 @@ class _DragToCloseSheetState extends State<DragToCloseSheet>
               Transform.translate(offset: Offset(0, _pullPx), child: child),
       child: NotificationListener<ScrollNotification>(
         onNotification: _handleScroll,
-        child: Listener(
+        child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onPointerDown: _onPointerDown,
-          onPointerMove: _onPointerMove,
-          onPointerUp: _onPointerUp,
-          onPointerCancel: _onPointerCancel,
+          onVerticalDragStart: _onVerticalDragStart,
+          onVerticalDragUpdate: _onVerticalDragUpdate,
+          onVerticalDragEnd: _onVerticalDragEnd,
+          onVerticalDragCancel: _onVerticalDragCancel,
           child: widget.child,
         ),
       ),

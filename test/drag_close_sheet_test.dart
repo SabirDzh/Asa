@@ -83,6 +83,27 @@ Widget shortContent() {
   );
 }
 
+Widget nestedScrollableContent() {
+  return Container(
+    height: 420,
+    color: Colors.white,
+    child: Column(
+      children: [
+        const Text('description block'),
+        Expanded(
+          child: ListView.builder(
+            key: const ValueKey('nested-description-scroll'),
+            itemCount: 40,
+            itemBuilder:
+                (context, index) =>
+                    SizedBox(height: 48, child: Text('attachment row $index')),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 void main() {
   testWidgets('slow drag down closes a tall scrollable sheet', (tester) async {
     await tester.pumpWidget(
@@ -151,6 +172,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('tall-scroll')), findsOneWidget);
+  });
+
+  testWidgets('nested description scrolling does not move or close the sheet', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildHarness(nestedScrollableContent()));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final list = find.byKey(const ValueKey('nested-description-scroll'));
+    expect(list, findsOneWidget);
+    final before = tester.getTopLeft(list).dy;
+    final scrollable = find.byType(Scrollable).last;
+
+    await tester.fling(list, const Offset(0, -500), 1200);
+    await tester.pumpAndSettle();
+
+    expect(list, findsOneWidget);
+    expect(tester.getTopLeft(list).dy, before);
+    expect(
+      tester.state<ScrollableState>(scrollable).position.pixels,
+      greaterThan(0),
+    );
   });
 
   testWidgets('small pull on a tall scrollable springs back without closing', (

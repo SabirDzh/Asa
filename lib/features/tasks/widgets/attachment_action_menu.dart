@@ -71,6 +71,9 @@ class AttachmentActionMenu extends StatelessWidget {
                       onTap:
                           enabled
                               ? () async {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                await _waitForKeyboardToClose(buttonContext);
+                                if (!buttonContext.mounted) return;
                                 final action = await showAnchoredPopupMenu<
                                   AttachmentAction
                                 >(
@@ -89,6 +92,7 @@ class AttachmentActionMenu extends StatelessWidget {
                                     ),
                                   ),
                                   gap: 6,
+                                  matchAnchorWidth: true,
                                   items: [
                                     for (final action
                                         in AttachmentAction.values)
@@ -97,22 +101,18 @@ class AttachmentActionMenu extends StatelessWidget {
                                           'attachment-action-option-${action.name}',
                                         ),
                                         value: action,
-                                        child: SizedBox(
-                                          width: 240,
-                                          child: Row(
-                                            children: [
-                                              Icon(_icon(action), size: 18),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  _label(action),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
+                                        child: Row(
+                                          children: [
+                                            Icon(_icon(action), size: 18),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                _label(action),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                   ],
@@ -167,5 +167,17 @@ class AttachmentActionMenu extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _waitForKeyboardToClose(BuildContext context) async {
+    final deadline = DateTime.now().add(const Duration(milliseconds: 500));
+    while (context.mounted &&
+        MediaQuery.viewInsetsOf(context).bottom > 0 &&
+        DateTime.now().isBefore(deadline)) {
+      await Future.any<void>([
+        WidgetsBinding.instance.endOfFrame,
+        Future<void>.delayed(const Duration(milliseconds: 16)),
+      ]);
+    }
   }
 }

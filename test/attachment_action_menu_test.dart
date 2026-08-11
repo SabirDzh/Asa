@@ -21,6 +21,7 @@ void main() {
     );
     expect(menuRect.top - anchorRect.bottom, closeTo(6, 0.01));
     expect(menuRect.right, closeTo(anchorRect.right, 0.01));
+    expect(menuRect.width, closeTo(anchorRect.width, 0.01));
   });
 
   testWidgets('opens above and right-aligns when below does not fit', (
@@ -42,6 +43,28 @@ void main() {
     );
     expect(anchorRect.top - menuRect.bottom, closeTo(6, 0.01));
     expect(menuRect.right, closeTo(anchorRect.right, 0.01));
+  });
+
+  testWidgets('opens with a live keyboard inset and keeps selector width', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    await tester.pumpWidget(
+      _TestApp(anchorKey: GlobalKey(), alignment: Alignment.topCenter),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('attachment-action-selector')));
+    await tester.pumpAndSettle();
+
+    final anchorRect = tester.getRect(
+      find.byKey(const ValueKey('attachment-action-selector')),
+    );
+    final menuRect = tester.getRect(
+      find.byKey(const ValueKey('attachment-action-dropdown')),
+    );
+    expect(menuRect.width, closeTo(anchorRect.width, 0.01));
+    expect(menuRect.top - anchorRect.bottom, closeTo(6, 0.01));
   });
 
   testWidgets('selecting an option updates the selected action', (

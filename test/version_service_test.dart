@@ -106,6 +106,8 @@ void main() {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      await prefs.remove('update_release_history');
     });
 
     test('parses, validates and caches a release with its ETag', () async {
@@ -271,8 +273,11 @@ void main() {
     });
 
     test(
-      'fetchReleaseHistory falls back to cache on network failure',
+      'throws on network failure without cache and falls back when cache exists',
       () async {
+        await prefs.remove('update_release_history');
+        expect(prefs.getString('update_release_history'), isNull);
+
         final checker = UpdateChecker(
           owner: 'SabirDzh',
           repo: 'Asa',
@@ -282,8 +287,10 @@ void main() {
           }),
         );
 
-        final releases = await checker.fetchReleaseHistory(preferences: prefs);
-        expect(releases, isEmpty);
+        await expectLater(
+          checker.fetchReleaseHistory(preferences: prefs),
+          throwsA(isA<StateError>()),
+        );
 
         await prefs.setString(
           'update_release_history',
@@ -303,6 +310,30 @@ void main() {
         expect(cached.first.notes, 'Cached');
       },
     );
+
+    test('throws when a non-empty response has no valid releases', () async {
+      final checker = UpdateChecker(
+        owner: 'SabirDzh',
+        repo: 'Asa',
+        currentVersion: '1.1.0',
+        client: _FakeClient((uri, headers) async {
+          return http.Response(
+            jsonEncode([
+              {
+                'tag_name': 'not-a-version',
+                'html_url': 'https://example.com/release',
+              },
+            ]),
+            200,
+          );
+        }),
+      );
+
+      expect(
+        checker.fetchReleaseHistory(preferences: prefs),
+        throwsA(isA<FormatException>()),
+      );
+    });
 
     test('drops an unsafe cached asset but keeps the release', () async {
       await prefs.setString('update_release_etag', '"cached-unsafe"');

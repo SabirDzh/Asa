@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,7 +34,8 @@ Future<void> _pumpAndInit(WidgetTester tester, Widget widget) async {
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    timeDilation = 1.0;
+    SharedPreferences.setMockInitialValues({'animationSpeed': 1.0});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
     installHomeWidgetChannelMock();
     NotificationService.initializedOverride = null;
@@ -42,6 +44,7 @@ void main() {
   });
 
   tearDown(() async {
+    timeDilation = 1.0;
     await HomeWidgetService.resetForTests();
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
@@ -202,6 +205,7 @@ void main() {
 
     // Simulate that the user already installed the APK from the old asset
     SharedPreferences.setMockInitialValues({
+      'animationSpeed': 1.0,
       UpdateChecker.installedAssetTimeKey: oldTime.millisecondsSinceEpoch,
     });
 

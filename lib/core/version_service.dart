@@ -345,9 +345,15 @@ class UpdateChecker {
       final response = await _client
           .get(uri, headers: _releaseHeaders())
           .timeout(requestTimeout);
-      if (response.statusCode != 200) return _readCachedHistory(prefs);
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Release history request failed with HTTP ${response.statusCode}',
+        );
+      }
       final decoded = jsonDecode(response.body);
-      if (decoded is! List) return _readCachedHistory(prefs);
+      if (decoded is! List) {
+        throw const FormatException('Release history response is not a list');
+      }
 
       final releases = <UpdateInfo>[];
       for (final item in decoded) {
@@ -362,6 +368,11 @@ class UpdateChecker {
         }
         releases.add(info);
       }
+      if (decoded.isNotEmpty && releases.isEmpty) {
+        throw const FormatException(
+          'Release history contained no valid releases',
+        );
+      }
       releases.sort((a, b) {
         final aTime = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bTime = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -370,7 +381,9 @@ class UpdateChecker {
       await _writeCachedHistory(prefs, releases);
       return releases;
     } on Object {
-      return _readCachedHistory(prefs);
+      final cached = _readCachedHistory(prefs);
+      if (cached.isNotEmpty) return cached;
+      rethrow;
     }
   }
 

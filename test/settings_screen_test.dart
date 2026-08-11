@@ -267,7 +267,7 @@ void main() {
 
     expect(find.text('Экспорт данных'), findsOneWidget);
     expect(find.text('Импорт данных'), findsOneWidget);
-    expect(find.text('Отправить логи разработчику'), findsOneWidget);
+    expect(find.text('Отправить отчёт разработчику'), findsOneWidget);
     expect(find.text('Очистить все задачи'), findsOneWidget);
     expect(find.text('Очистить все папки'), findsOneWidget);
     expect(find.text('Сбросить все данные'), findsOneWidget);

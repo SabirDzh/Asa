@@ -55,8 +55,8 @@ lib/
 │   ├── folder_icons.dart              # Built-in SVG folder icons
 │   ├── home_widget_service.dart       # Widget update debouncer
 │   ├── image_utils.dart               # Avatar compression helpers
-│   ├── input_utils.dart               # Text formatters and sanitizers
-│   ├── logger_service.dart            # Buffered logging + Telegram reporter
+│   ├── input_utils.dart               # Text formatters and sanitizers  │   ├── logger_service.dart            # Buffered logging + HTTPS diagnostic reporter
+
 │   ├── notification_service.dart      # Local notifications wrapper
 │   ├── responsive_center.dart         # Large-screen layout wrapper
 │   ├── scale_utils.dart               # Adaptive UI scale limits
@@ -308,11 +308,13 @@ Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, 
 
 [`lib/core/logger_service.dart`](../lib/core/logger_service.dart)
 
-Buffered logger. Configured at compile time with `--dart-define=TELEGRAM_BOT_TOKEN=... --dart-define=TELEGRAM_CHAT_ID=...`. If not configured, logs only go to the console and an in-memory buffer. Maximum buffer size is 500 entries.
+Buffered logger with a maximum of 500 entries. The app captures Flutter errors locally and sends diagnostics only after the user taps the report action and confirms the disclosure dialog. Release scripts read only the public HTTPS route from the ignored owner-only `config/private.env` file and automatically pass it to Flutter; no manual `--dart-define=DIAGNOSTICS_ENDPOINT` argument is required. Direct Flutter commands intentionally leave diagnostics disabled. Never put Neon, admin, session, Telegram credentials, or bearer tokens in the Flutter config or build defines.
 
-Sync secrets registered by `SettingsProvider`/`SyncService` are eagerly replaced with `[REDACTED]` before messages, exceptions, stack traces, console output, or Telegram payloads enter the buffer. Old registered values remain in the redaction set after rotation so delayed asynchronous errors cannot disclose a previous secret. Every non-empty registered value is redacted, including short secrets, so configured credentials are never intentionally left visible in diagnostics.
+Before buffering and before submission, registered sync secrets plus common tokens, passwords, email addresses, IP addresses, query-string URLs, and local paths are redacted. Reports include bounded technical logs and safe device metadata only; tasks, descriptions, attachments, backups, clipboard contents, and sync secrets are excluded by contract. A successful response is required before the local buffer is cleared.
 
-Unhandled Flutter errors are caught by `listenToFlutterErrors()` in `main.dart`.
+The Vercel implementation and deployment instructions live in [`diagnostics-dashboard/`](../diagnostics-dashboard). It uses Neon Postgres, signed httpOnly admin sessions, same-origin checks, bounded payload validation, hashed rate-limit identifiers, login throttling, report deletion, and retention cleanup.
+
+Unhandled Flutter errors are captured by `listenToFlutterErrors()` in `main.dart` and remain local until the user explicitly submits a report.
 
 ### 7.10 ThemeSwitcher & theme switching
 
@@ -461,15 +463,31 @@ those paths ignored in `android/.gitignore`. Without credentials, Gradle emits
 an explicit warning and produces an unsigned release artifact that is suitable
 only for local inspection, not distribution.
 
-### 12.3 Release APK (arm64-v8a only)
+### 12.3 Diagnostics build configuration
+
+Create the local owner-only config once:
 
 ```bash
-flutter build apk --target-platform android-arm64 --split-per-abi --release
+cp config/private.env.example config/private.env
+# Set the deployed public endpoint, then verify it is not group/world-readable:
+chmod 600 config/private.env
 ```
+
+The file may contain only `DIAGNOSTICS_ENDPOINT=https://.../api/reports`. It is ignored by Git and is not sourced as shell code; the loader reads that one key, validates HTTPS/no embedded credentials, and rejects missing or weak permissions. This endpoint is public client configuration, not a server secret. Keep Neon, admin passwords, `SESSION_SECRET`, `RATE_LIMIT_SALT`, and bearer tokens exclusively in Vercel environment variables.
+
+### 12.4 Release APK (arm64-v8a only)
+
+```bash
+./scripts/build.sh --split
+# or, for the release flow:
+./scripts/release.sh <version> <build> --no-push
+```
+
+Both scripts automatically load and validate `config/private.env`; no manual `--dart-define=DIAGNOSTICS_ENDPOINT` is needed. To intentionally build without diagnostics locally, use `./scripts/build.sh --without-diagnostics`. Direct `flutter build` commands keep diagnostics disabled.
 
 Output: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
 
-### 12.4 Release automation
+### 12.5 Release automation
 
 `./scripts/release.sh <version> <build> [--no-push] [--dry-run]` performs the full
 release flow:
@@ -487,7 +505,7 @@ In-app updates download the release's arm64 APK and open the system package
 installer (`open_filex`). The "What's New" screen shows release history from the
 GitHub `/releases` endpoint with a local cache fallback.
 
-### 12.5 Run tests
+### 12.6 Run tests
 
 ```bash
 flutter test

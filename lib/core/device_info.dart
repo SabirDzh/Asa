@@ -49,3 +49,45 @@ Future<String> getDefaultDeviceName() async {
   } catch (_) {}
   return 'ASA Device';
 }
+
+/// Returns only a non-user-assigned platform/model label for diagnostics.
+/// This intentionally avoids sending a personal device name from iOS.
+Future<String> getDiagnosticDeviceName() async {
+  try {
+    final deviceInfo = DeviceInfoPlugin();
+    if (kIsWeb) return 'Web';
+    if (Platform.isAndroid) {
+      final android = await deviceInfo.androidInfo;
+      final manufacturer = android.manufacturer.trim();
+      final model = android.model.trim();
+      final parts = <String>[
+        if (manufacturer.isNotEmpty) manufacturer,
+        if (model.isNotEmpty) model,
+      ];
+      return parts.join(' ').trim().isNotEmpty
+          ? parts.join(' ').trim()
+          : 'Android device';
+    }
+    if (Platform.isIOS) {
+      final ios = await deviceInfo.iosInfo;
+      return ios.model.trim().isNotEmpty ? ios.model.trim() : 'iOS device';
+    }
+    if (Platform.isMacOS) {
+      final mac = await deviceInfo.macOsInfo;
+      return mac.model.trim().isNotEmpty ? mac.model.trim() : 'Mac';
+    }
+    if (Platform.isWindows) {
+      final windows = await deviceInfo.windowsInfo;
+      return windows.productName.trim().isNotEmpty
+          ? windows.productName.trim()
+          : 'Windows device';
+    }
+    if (Platform.isLinux) {
+      final linux = await deviceInfo.linuxInfo;
+      return linux.prettyName.trim().isNotEmpty
+          ? linux.prettyName.trim()
+          : 'Linux device';
+    }
+  } catch (_) {}
+  return 'ASA device';
+}

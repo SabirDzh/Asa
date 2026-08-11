@@ -31,6 +31,12 @@ TAG="v${FULL}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Release APKs must be built with the owner-only local config. Only the public
+# API endpoint is read; server/database/admin secrets are never accepted here.
+# shellcheck source=scripts/load_diagnostics_config.sh
+source "$REPO_ROOT/scripts/load_diagnostics_config.sh"
+load_diagnostics_config "${DIAGNOSTICS_CONFIG:-$REPO_ROOT/config/private.env}" 1
+
 step() { echo "==> $*"; }
 
 # 1. Version bump (pubspec + APP_VERSION default).
@@ -50,13 +56,16 @@ step "Committing version bump"
 git add pubspec.yaml lib/core/version_service.dart
 git commit -m "chore: bump version to ${FULL}"
 
-# 3. Build the arm64 APK with the correct APP_VERSION.
+# 3. Build the arm64 APK with version, build time, and the configured endpoint.
 step "Building arm64 APK (APP_VERSION=${VERSION})"
+BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 flutter build apk \
   --target-platform android-arm64 \
   --split-per-abi \
   --release \
-  --dart-define="APP_VERSION=${VERSION}"
+  --dart-define="APP_VERSION=${VERSION}" \
+  --dart-define="BUILD_TIME=${BUILD_TIME}" \
+  --dart-define="DIAGNOSTICS_ENDPOINT=${DIAGNOSTICS_ENDPOINT}"
 
 APK="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
 ASSET="build/app/outputs/flutter-apk/Asa-${FULL}-arm64-v8a.apk"

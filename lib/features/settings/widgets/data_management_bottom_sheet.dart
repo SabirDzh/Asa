@@ -111,18 +111,38 @@ void showDataManagementSheet(BuildContext context) {
                   defaultColor: textColor,
                   onTap: () async {
                     Navigator.pop(ctx);
-                    final ok = await LoggerService.instance.sendToTelegram();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            ok
-                                ? settings.tr('logs_sent')
-                                : settings.tr('logs_failed'),
+                    if (!context.mounted) return;
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder:
+                          (dialogContext) => AlertDialog(
+                            title: Text(settings.tr('send_logs_title')),
+                            content: Text(settings.tr('send_logs_warning')),
+                            actions: [
+                              TextButton(
+                                onPressed:
+                                    () => Navigator.pop(dialogContext, false),
+                                child: Text(settings.tr('cancel')),
+                              ),
+                              FilledButton(
+                                onPressed:
+                                    () => Navigator.pop(dialogContext, true),
+                                child: Text(settings.tr('send_logs_confirm')),
+                              ),
+                            ],
                           ),
-                        ),
-                      );
-                    }
+                    );
+                    if (confirmed != true || !context.mounted) return;
+                    final result =
+                        await LoggerService.instance.sendDiagnosticReport();
+                    if (!context.mounted) return;
+                    final message =
+                        result.success
+                            ? '${settings.tr('logs_sent')}: ${result.reportId}'
+                            : settings.tr('logs_failed');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(message)));
                   },
                 ),
                 Divider(color: textColor.withAlpha(24), height: 16),

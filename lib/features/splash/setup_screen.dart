@@ -9,26 +9,25 @@ import '../../core/notification_service.dart';
 import '../../core/theme.dart';
 import '../settings/providers/settings_provider.dart';
 
-/// Shown once after the first app launch to guide the user through the
-/// permissions required for reliable background notifications.
-///
-/// Checks notification permission, battery optimization exemption, and
-/// (on Xiaomi/HyperOS) auto-start access. Each unmet requirement shows a
-/// button that opens the relevant system settings page.
-///
-/// The user can skip this screen at any time.
+/// Shown when background reliability requirements (notifications, exact alarms,
+/// battery optimization exemption, or OEM auto-start where supported) are missing.
 class SetupScreen extends StatefulWidget {
-  const SetupScreen({super.key});
+  final PermissionState? initialState;
+  final Future<void> Function()? onPermissionsResolved;
+
+  const SetupScreen({super.key, this.initialState, this.onPermissionsResolved});
 
   static const _prefsKey = 'asa_setup_completed';
 
   /// True if the setup screen has never been completed.
   static Future<bool> shouldShow() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_prefsKey) != true;
+    if (prefs.getBool(_prefsKey) == true) return false;
+    final state = await DevicePermissions.getPermissionState();
+    return !state.isComplete;
   }
 
-  /// Marks the setup as completed so it is not shown again.
+  /// Marks the setup as completed.
   static Future<void> markCompleted() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefsKey, true);
@@ -38,47 +37,69 @@ class SetupScreen extends StatefulWidget {
   State<SetupScreen> createState() => _SetupScreenState();
 }
 
-class _SetupScreenState extends State<SetupScreen> {
-  bool _notificationsGranted = true;
-  bool _batteryOptimized = true;
-  bool _autoStartAvailable = false;
+class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
+  late PermissionState _state;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _state =
+        widget.initialState ??
+        const PermissionState(
+          notificationsGranted: false,
+          exactAlarmGranted: false,
+          batteryOptimizationDisabled: false,
+          autoStartGranted: false,
+          autoStartSupported: false,
+        );
     unawaited(_checkPermissions());
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_checkPermissions());
+    }
+  }
+
   Future<void> _checkPermissions() async {
-    final results = await Future.wait([
-      DevicePermissions.areNotificationsGranted(),
-      DevicePermissions.isIgnoringBatteryOptimizations(),
-      DevicePermissions.isAutoStartAvailable(),
-    ]);
+    final newState = await DevicePermissions.getPermissionState();
     if (!mounted) return;
     setState(() {
-      _notificationsGranted = results[0];
-      _batteryOptimized = results[1];
-      _autoStartAvailable = results[2];
+      _state = newState;
     });
+    if (newState.isComplete) {
+      await widget.onPermissionsResolved?.call();
+    }
   }
 
   Future<void> _finish() async {
     await SetupScreen.markCompleted();
+    if (widget.onPermissionsResolved != null) {
+      await widget.onPermissionsResolved!();
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/home', (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.read<SettingsProvider>();
+    final settings = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.bgDark : AppColors.bgLight;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
     final secondary =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    final allResolved = _notificationsGranted && _batteryOptimized;
+    final isComplete = _state.isComplete;
 
     return Scaffold(
       backgroundColor: bg,
@@ -87,85 +108,104 @@ class _SetupScreenState extends State<SetupScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              const Spacer(flex: 1),
-              Text(
-                'ASA',
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 48,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 4,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                settings.tr('setup_title'),
-                style: TextStyle(color: secondary, fontSize: 16),
-              ),
-              const SizedBox(height: 40),
-              _permissionTile(
-                icon: Icons.notifications_outlined,
-                label: settings.tr('notifications'),
-                granted: _notificationsGranted,
-                onFix:
-                    _notificationsGranted
-                        ? null
-                        : () async {
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 24),
+                      Text(
+                        'ASA',
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        settings.tr('setup_title'),
+                        style: TextStyle(color: secondary, fontSize: 16),
+                      ),
+                      const SizedBox(height: 24),
+                      _permissionTile(
+                        icon: Icons.notifications_outlined,
+                        label: settings.tr('notifications'),
+                        granted: _state.notificationsGranted,
+                        onFix: () async {
                           await NotificationService.requestPermission(
                             requestExactAlarms: true,
                           );
+                          final permanentlyDenied =
+                              await NotificationService.isPermissionPermanentlyDenied();
+                          if (permanentlyDenied) {
+                            await DevicePermissions.openNotificationSettings();
+                          }
                           await _checkPermissions();
                         },
-              ),
-              const SizedBox(height: 12),
-              _permissionTile(
-                icon: Icons.battery_5_bar_outlined,
-                label: settings.tr('setup_battery'),
-                subtitle: settings.tr('setup_battery_subtitle'),
-                granted: _batteryOptimized,
-                onFix:
-                    _batteryOptimized
-                        ? null
-                        : () async {
+                      ),
+                      const SizedBox(height: 12),
+                      _permissionTile(
+                        icon: Icons.alarm_on_outlined,
+                        label: settings.tr('setup_exact_alarm'),
+                        subtitle: settings.tr('setup_exact_alarm_subtitle'),
+                        granted: _state.exactAlarmGranted,
+                        onFix: () async {
+                          await DevicePermissions.openExactAlarmSettings();
+                          await _checkPermissions();
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _permissionTile(
+                        icon: Icons.battery_5_bar_outlined,
+                        label: settings.tr('setup_battery'),
+                        subtitle: settings.tr('setup_battery_subtitle'),
+                        granted: _state.batteryOptimizationDisabled,
+                        onFix: () async {
                           await DevicePermissions.requestIgnoreBatteryOptimizations();
                           await _checkPermissions();
                         },
-              ),
-              if (_autoStartAvailable) ...[
-                const SizedBox(height: 12),
-                _permissionTile(
-                  icon: Icons.restart_alt_outlined,
-                  label: settings.tr('setup_autostart'),
-                  subtitle: settings.tr('setup_autostart_subtitle'),
-                  granted: true,
-                  trailing: TextButton(
-                    onPressed: () => DevicePermissions.openAutoStartSettings(),
-                    child: Text(
-                      settings.tr('open_settings'),
-                      style: const TextStyle(fontSize: 13),
-                    ),
+                      ),
+                      if (_state.autoStartSupported) ...[
+                        const SizedBox(height: 12),
+                        _permissionTile(
+                          icon: Icons.restart_alt_outlined,
+                          label: settings.tr('setup_autostart'),
+                          subtitle: settings.tr('setup_autostart_subtitle'),
+                          granted: _state.autoStartGranted,
+                          onFix: () async {
+                            await DevicePermissions.openAutoStartSettings();
+                            await _checkPermissions();
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                    ],
                   ),
                 ),
-              ],
-              const Spacer(flex: 2),
+              ),
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: _finish,
+                  onPressed: isComplete ? _finish : null,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor:
+                        isComplete
+                            ? AppColors.primary
+                            : secondary.withValues(alpha: 0.2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: Text(
-                    allResolved
+                    isComplete
                         ? settings.tr('setup_continue')
-                        : settings.tr('setup_skip'),
-                    style: const TextStyle(
-                      fontSize: 16,
+                        : settings.tr('setup_grant_all'),
+                    style: TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
+                      color: isComplete ? AppColors.textDark : secondary,
                     ),
                   ),
                 ),
@@ -190,7 +230,6 @@ class _SetupScreenState extends State<SetupScreen> {
     String? subtitle,
     required bool granted,
     VoidCallback? onFix,
-    Widget? trailing,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
@@ -238,9 +277,7 @@ class _SetupScreenState extends State<SetupScreen> {
               ],
             ),
           ),
-          if (trailing != null)
-            trailing
-          else if (!granted && onFix != null)
+          if (!granted && onFix != null)
             TextButton(
               onPressed: onFix,
               style: TextButton.styleFrom(
@@ -248,7 +285,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
               child: Text(
-                context.read<SettingsProvider>().tr('setup_enable'),
+                context.watch<SettingsProvider>().tr('setup_enable'),
                 style: const TextStyle(fontSize: 13),
               ),
             ),

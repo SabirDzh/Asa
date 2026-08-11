@@ -1,36 +1,70 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:asa/core/device_permissions.dart';
+import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/splash/setup_screen.dart';
 
 void main() {
-  group('SetupScreen', () {
-    setUp(() {
-      SharedPreferences.setMockInitialValues({});
-    });
+  setUp(() {
+    SharedPreferences.setMockInitialValues({'languageCode': 'ru'});
+  });
 
-    test('shouldShow returns true when not yet completed', () async {
-      expect(await SetupScreen.shouldShow(), isTrue);
-    });
+  tearDown(() {
+    DevicePermissions.permissionStateOverride = null;
+  });
 
-    test('shouldShow returns false after markCompleted', () async {
+  Widget createSetupScreenWidget() {
+    return ChangeNotifierProvider(
+      create: (_) => SettingsProvider(),
+      child: const MaterialApp(home: SetupScreen()),
+    );
+  }
+
+  group('SetupScreen State & UI', () {
+    test('markCompleted sets preference', () async {
       await SetupScreen.markCompleted();
-      expect(await SetupScreen.shouldShow(), isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('asa_setup_completed'), isTrue);
     });
 
-    test('markCompleted is idempotent — stays false on second call', () async {
-      await SetupScreen.markCompleted();
-      await SetupScreen.markCompleted();
-      expect(await SetupScreen.shouldShow(), isFalse);
+    testWidgets('renders all tiles when all permissions granted', (
+      tester,
+    ) async {
+      DevicePermissions.permissionStateOverride = const PermissionState(
+        notificationsGranted: true,
+        exactAlarmGranted: true,
+        batteryOptimizationDisabled: true,
+        autoStartGranted: true,
+        autoStartSupported: true,
+      );
+
+      await tester.pumpWidget(createSetupScreenWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SetupScreen), findsOneWidget);
+      expect(find.text('Продолжить'), findsOneWidget);
     });
 
-    test('shouldShow returns false when key is already set', () async {
-      SharedPreferences.setMockInitialValues({'asa_setup_completed': true});
-      expect(await SetupScreen.shouldShow(), isFalse);
-    });
+    testWidgets('shows disabled button label when permissions incomplete', (
+      tester,
+    ) async {
+      DevicePermissions.permissionStateOverride = const PermissionState(
+        notificationsGranted: false,
+        exactAlarmGranted: true,
+        batteryOptimizationDisabled: true,
+        autoStartGranted: false,
+        autoStartSupported: true,
+      );
 
-    test('shouldShow returns true when key is explicitly false', () async {
-      SharedPreferences.setMockInitialValues({'asa_setup_completed': false});
-      expect(await SetupScreen.shouldShow(), isTrue);
+      await tester.pumpWidget(createSetupScreenWidget());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Выдайте все разрешения для продолжения'),
+        findsOneWidget,
+      );
     });
   });
 }

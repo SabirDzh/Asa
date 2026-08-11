@@ -285,6 +285,10 @@ class AppStrings {
       'setup_autostart': 'Автозапуск',
       'setup_autostart_subtitle':
           'Требуется на устройствах Xiaomi/HyperOS для получения уведомлений после перезагрузки',
+      'setup_exact_alarm': 'Точные будильники и напоминания',
+      'setup_exact_alarm_subtitle':
+          'Разрешение на срабатывание уведомлений секунда в секунду (Android 12+)',
+      'setup_grant_all': 'Выдайте все разрешения для продолжения',
     },
     'en': {
       'search': 'Search',
@@ -570,6 +574,10 @@ class AppStrings {
       'setup_autostart': 'Auto-start',
       'setup_autostart_subtitle':
           'Required on Xiaomi/HyperOS to receive notifications after reboot',
+      'setup_exact_alarm': 'Exact alarms & reminders',
+      'setup_exact_alarm_subtitle':
+          'Permission for notifications to trigger down to the second (Android 12+)',
+      'setup_grant_all': 'Grant all permissions to continue',
     },
   };
 

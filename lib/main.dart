@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'core/permission_gate.dart';
 import 'core/theme.dart';
 import 'core/notification_service.dart';
 import 'core/scale_utils.dart';
@@ -18,7 +19,6 @@ import 'features/tasks/screens/home_screen.dart';
 import 'features/tasks/widgets/task_editor_sheet.dart';
 import 'features/tasks/models/task_model.dart';
 import 'features/splash/splash_screen.dart';
-import 'features/splash/setup_screen.dart';
 
 import 'core/theme_switcher.dart';
 import 'core/home_widget_service.dart';
@@ -138,10 +138,6 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       await NotificationService.syncTasks(tasks.allTasks);
       // After a device reboot, reschedule notifications from the boot flag.
       await _rescheduleAfterBootIfNeeded();
-      // On first launch, show the permissions setup screen.
-      if (mounted) {
-        await _maybeShowSetupScreen(settings);
-      }
     } on Object catch (error, stackTrace) {
       LoggerService.instance.w(
         'Optional startup services failed',
@@ -159,6 +155,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       final bootCompleted = prefs.getBool('asa_boot_completed');
       if (bootCompleted != true) return;
       await prefs.remove('asa_boot_completed');
+      if (!mounted) return;
       final tasks = context.read<TaskProvider>();
       await tasks.ready;
       if (!mounted) return;
@@ -170,17 +167,6 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
         stackTrace: stackTrace,
       );
     }
-  }
-
-  /// Shows the first-launch setup screen if the user has not completed it yet.
-  Future<void> _maybeShowSetupScreen(SettingsProvider settings) async {
-    if (!await SetupScreen.shouldShow()) return;
-    if (!mounted) return;
-    final navigator = _navigatorKey.currentState;
-    if (navigator == null) return;
-    await navigator.push<void>(
-      MaterialPageRoute<void>(builder: (_) => const SetupScreen()),
-    );
   }
 
   Future<void> _consumePendingTimerAction(TaskProvider tasks) async {
@@ -302,7 +288,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       home: const SplashScreen(),
       onGenerateRoute: (settings) {
         if (settings.name == '/home') {
-          return MaterialPageRoute<void>(builder: (_) => const HomeScreen());
+          return MaterialPageRoute<void>(
+            builder: (_) => const PermissionGate(child: HomeScreen()),
+          );
         }
         return null;
       },

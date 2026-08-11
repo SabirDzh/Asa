@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/permission_gate.dart';
 import '../../../core/sync_service.dart';
 import '../../../core/logger_service.dart';
 import '../../../core/theme.dart';
@@ -12,7 +13,7 @@ import '../tasks/providers/task_provider.dart';
 import '../tasks/screens/home_screen.dart';
 
 /// Initial loading screen.
-/// Waits for both providers to finish their async init, then fades into HomeScreen.
+/// Waits for both providers to finish their async init, then fades into PermissionGate(HomeScreen).
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -91,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen> {
           });
         }
 
-        return const HomeScreen();
+        return const PermissionGate(child: HomeScreen());
       },
     );
   }

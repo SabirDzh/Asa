@@ -1,6 +1,7 @@
 package com.example.asa
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -25,6 +26,12 @@ class MainActivity : FlutterActivity() {
                     result.success(isNotificationPermissionPermanentlyDenied())
                 "openNotificationSettings" -> {
                     openNotificationSettings()
+                    result.success(null)
+                }
+                "isExactAlarmGranted" ->
+                    result.success(isExactAlarmGranted())
+                "openExactAlarmSettings" -> {
+                    openExactAlarmSettings()
                     result.success(null)
                 }
                 "isIgnoringBatteryOptimizations" ->
@@ -97,6 +104,31 @@ class MainActivity : FlutterActivity() {
                 )
             } catch (_: Exception) {
                 // No settings activity is available; nothing else we can do.
+            }
+        }
+    }
+
+    /**
+     * True when exact alarm scheduling is granted.
+     * On Android < 12 (API 31-) this always returns true.
+     */
+    private fun isExactAlarmGranted(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        return alarmManager.canScheduleExactAlarms()
+    }
+
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        Uri.parse("package:$packageName"),
+                    ),
+                )
+            } catch (_: Exception) {
+                openAppDetails()
             }
         }
     }

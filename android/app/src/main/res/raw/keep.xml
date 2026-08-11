@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resources referenced only from Dart code are invisible to the Android resource shrinker.
+     Without this rule @drawable/ic_notification was stripped from release APKs
+     and flutter_local_notifications failed to initialize with invalid_icon. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notification" />

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/core/app_strings.dart';
@@ -13,6 +14,7 @@ void main() {
     late SettingsProvider provider;
 
     setUp(() {
+      timeDilation = 1.0;
       SharedPreferences.setMockInitialValues({});
       NotificationService.initializedOverride = null;
       NotificationService.notificationPermissionStateOverride = null;
@@ -23,6 +25,7 @@ void main() {
     });
 
     tearDown(() {
+      timeDilation = 1.0;
       NotificationService.initializedOverride = null;
       NotificationService.notificationPermissionStateOverride = null;
       NotificationService.requestPermissionOverride = null;
@@ -74,8 +77,14 @@ void main() {
       },
     );
 
-    test('uses normal animation speed by default', () {
-      expect(provider.animationSpeed, 1.0);
+    test('uses fast animation speed by default', () async {
+      await provider.ready;
+      expect(provider.animationSpeed, 0.5);
+    });
+
+    test('uses large interface scale by default', () async {
+      await provider.ready;
+      expect(provider.appScale, 1.2);
     });
 
     test('has no avatar by default', () {
@@ -420,7 +429,7 @@ void main() {
       await provider.removeCustomAnimationSpeed(1.5);
 
       expect(provider.customAnimationSpeeds, isNot(contains(1.5)));
-      expect(provider.animationSpeed, 1.0);
+      expect(provider.animationSpeed, 0.5);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getStringList('customAnimationSpeeds'), isEmpty);
     });

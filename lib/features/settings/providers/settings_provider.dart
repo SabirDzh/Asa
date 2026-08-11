@@ -16,6 +16,10 @@ import '../../../core/theme.dart';
 
 enum WidgetDisplayMode { activeTasks, lastFolder }
 
+/// Default UI preferences used when the user has not saved a preference yet.
+const double kDefaultAnimationSpeed = 0.5;
+const double kDefaultAppScale = 1.2;
+
 class SettingsProvider with ChangeNotifier {
   final Future<String> Function() _deviceNameProvider;
   final String Function() _systemLanguageCodeProvider;
@@ -28,8 +32,8 @@ class SettingsProvider with ChangeNotifier {
   bool _notificationsBlockedBySystem = false;
   int _notificationOperationCount = 0;
   String _languageCode = 'ru';
-  double _animationSpeed = 1.0;
-  double _appScale = 1.0;
+  double _animationSpeed = kDefaultAnimationSpeed;
+  double _appScale = kDefaultAppScale;
   List<double> _customAnimationSpeeds = [];
   List<double> _customAppScales = [];
   String? _avatarPath;
@@ -151,8 +155,9 @@ class SettingsProvider with ChangeNotifier {
               ? savedLanguageCode!
               : resolveSystemLanguageCode(_systemLanguageCodeProvider());
       NotificationService.setLanguage(_languageCode);
-      _animationSpeed = prefs.getDouble('animationSpeed') ?? 1.0;
-      _appScale = (prefs.getDouble('appScale') ?? 1.0).clamp(
+      _animationSpeed =
+          prefs.getDouble('animationSpeed') ?? kDefaultAnimationSpeed;
+      _appScale = (prefs.getDouble('appScale') ?? kDefaultAppScale).clamp(
         kAbsoluteMinAppScale,
         kAbsoluteMaxAppScale,
       );
@@ -408,7 +413,7 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setDouble('appScale', clamped);
   }
 
-  /// Removes a saved custom animation speed. If it is active, use the normal
+  /// Removes a saved custom animation speed. If it is active, use the default
   /// preset so the setting remains valid after deletion.
   Future<void> removeCustomAnimationSpeed(double speed) {
     return _enqueueCustomValuesOperation(() async {
@@ -421,8 +426,8 @@ class SettingsProvider with ChangeNotifier {
 
       _customAnimationSpeeds = updated;
       if ((_animationSpeed - speed).abs() < 0.01) {
-        _animationSpeed = 1.0;
-        timeDilation = 1.0;
+        _animationSpeed = kDefaultAnimationSpeed;
+        timeDilation = kDefaultAnimationSpeed;
       }
       notifyListeners();
       final prefs = await SharedPreferences.getInstance();
@@ -456,7 +461,7 @@ class SettingsProvider with ChangeNotifier {
     });
   }
 
-  /// Removes a saved custom app scale. If it is active, use the default
+  /// Removes a saved custom app scale. If it is active, use the large default
   /// preset so the setting remains valid after deletion.
   Future<void> removeCustomAppScale(double scale) {
     return _enqueueCustomValuesOperation(() async {
@@ -469,7 +474,7 @@ class SettingsProvider with ChangeNotifier {
 
       _customAppScales = updated;
       if ((_appScale - scale).abs() < 0.01) {
-        _appScale = 1.0;
+        _appScale = kDefaultAppScale;
       }
       notifyListeners();
       final prefs = await SharedPreferences.getInstance();

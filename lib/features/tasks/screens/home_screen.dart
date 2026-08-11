@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/fast_scroll.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
 import '../../../core/folder_icons.dart';
@@ -133,7 +134,9 @@ class _HomeScreenState extends State<HomeScreen>
         child: PageView(
           controller: _pageController,
           onPageChanged: (index) => setState(() => _navIndex = index),
-          physics: const BouncingScrollPhysics(),
+          physics: const PageScrollPhysics(
+            parent: FastScrollPhysics(parent: BouncingScrollPhysics()),
+          ),
           children: [
             _buildTasksBody(),
             const SettingsScreen(standalone: false),

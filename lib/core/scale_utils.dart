@@ -14,6 +14,30 @@ class AdaptiveAppScaleRange {
   const AdaptiveAppScaleRange({required this.min, required this.max});
 }
 
+/// Preserves the physical viewport size while the app is rendered on a
+/// scaled virtual canvas. Without this, opening the scale settings at 1.2x
+/// would measure the already-shrunk [MediaQuery] and hide valid presets.
+class AppScaleViewport extends InheritedWidget {
+  final Size physicalSize;
+
+  const AppScaleViewport({
+    super.key,
+    required this.physicalSize,
+    required super.child,
+  });
+
+  static Size? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<AppScaleViewport>()
+        ?.physicalSize;
+  }
+
+  @override
+  bool updateShouldNotify(AppScaleViewport oldWidget) {
+    return physicalSize != oldWidget.physicalSize;
+  }
+}
+
 /// Returns the adaptive min/max UI scale for the current screen.
 ///
 /// The range is based on the shortest logical side of the screen. Smaller
@@ -28,7 +52,9 @@ class AdaptiveAppScaleRange {
 ///
 /// The user's preferred scale is preserved; this is only a runtime cap.
 AdaptiveAppScaleRange getAdaptiveScaleRange(BuildContext context) {
-  final shortestSide = MediaQuery.sizeOf(context).shortestSide;
+  final shortestSide =
+      (AppScaleViewport.maybeOf(context) ?? MediaQuery.sizeOf(context))
+          .shortestSide;
   if (shortestSide < 360) {
     return const AdaptiveAppScaleRange(min: 0.95, max: 1.1);
   }

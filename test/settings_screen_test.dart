@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,7 +45,10 @@ Future<void> pumpAndInit(WidgetTester tester, Widget widget) async {
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    timeDilation = 1.0;
+    // Keep this widget suite independent from SettingsProvider's production
+    // fast-animation default and Flutter's global timeDilation guard.
+    SharedPreferences.setMockInitialValues({'animationSpeed': 1.0});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
     installHomeWidgetChannelMock();
     NotificationService.initializedOverride = null;
@@ -53,6 +57,7 @@ void main() {
   });
 
   tearDown(() async {
+    timeDilation = 1.0;
     await HomeWidgetService.resetForTests();
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,
@@ -225,7 +230,10 @@ void main() {
     (tester) async {
       // The switch starts off, matching the state after the system revoked
       // the permission behind the app's back.
-      SharedPreferences.setMockInitialValues({'notificationsEnabled': false});
+      SharedPreferences.setMockInitialValues({
+        'animationSpeed': 1.0,
+        'notificationsEnabled': false,
+      });
       NotificationService.initializedOverride = true;
       NotificationService.requestPermissionOverride =
           ({required bool requestExactAlarms}) async => false;
@@ -252,6 +260,30 @@ void main() {
       expect(find.text('Открыть настройки'), findsOneWidget);
     },
   );
+
+  testWidgets('keeps all scale presets available after selecting large', (
+    tester,
+  ) async {
+    await pumpAndInit(tester, createTestApp());
+
+    final scaleRow = find.text('Масштаб интерфейса: Крупный');
+    expect(scaleRow, findsOneWidget);
+    await tester.tap(scaleRow);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Мелкий'), findsOneWidget);
+    expect(find.text('Стандарт'), findsOneWidget);
+    expect(find.text('Крупный'), findsOneWidget);
+
+    await tester.tap(find.text('Крупный'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Масштаб интерфейса: Крупный'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Мелкий'), findsOneWidget);
+    expect(find.text('Стандарт'), findsOneWidget);
+    expect(find.text('Крупный'), findsOneWidget);
+  });
 
   testWidgets('shows data management sheet on tap', (tester) async {
     await pumpAndInit(tester, createTestApp());

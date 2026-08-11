@@ -64,33 +64,30 @@ void showAppScaleSheet(BuildContext context) {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (_kSmallPreset >= range.min &&
-                        _kSmallPreset <= range.max)
-                      _scaleTile(
-                        ctx,
-                        settings,
-                        value: _kSmallPreset,
-                        labelKey: 'scale_small',
-                        textColor: textColor,
-                      ),
-                    if (_kDefaultPreset >= range.min &&
-                        _kDefaultPreset <= range.max)
-                      _scaleTile(
-                        ctx,
-                        settings,
-                        value: _kDefaultPreset,
-                        labelKey: 'scale_default',
-                        textColor: textColor,
-                      ),
-                    if (_kLargePreset >= range.min &&
-                        _kLargePreset <= range.max)
-                      _scaleTile(
-                        ctx,
-                        settings,
-                        value: _kLargePreset,
-                        labelKey: 'scale_large',
-                        textColor: textColor,
-                      ),
+                    // Keep all built-in choices visible. The adaptive range
+                    // is a runtime safety cap, not a reason to make presets
+                    // disappear after the UI is scaled.
+                    _scaleTile(
+                      ctx,
+                      settings,
+                      value: _kSmallPreset,
+                      labelKey: 'scale_small',
+                      textColor: textColor,
+                    ),
+                    _scaleTile(
+                      ctx,
+                      settings,
+                      value: _kDefaultPreset,
+                      labelKey: 'scale_default',
+                      textColor: textColor,
+                    ),
+                    _scaleTile(
+                      ctx,
+                      settings,
+                      value: _kLargePreset,
+                      labelKey: 'scale_large',
+                      textColor: textColor,
+                    ),
                     if (settings.customAppScales.isNotEmpty) ...[
                       Divider(
                         color: textColor.withValues(alpha: 0.15),

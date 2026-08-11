@@ -39,6 +39,12 @@ void main() {
     expect(isAllowedTaskLink('https:///missing-host'), isFalse);
   });
 
+  test('HTTP links are valid but HTTPS is the only embedded scheme', () {
+    expect(isAllowedTaskLink('http://example.com/legacy'), isTrue);
+    expect(isAllowedTaskLink('https://example.com/secure'), isTrue);
+    expect(isAllowedTaskLink('ftp://example.com/file'), isFalse);
+  });
+
   test('favicon failure cache is bounded', () {
     for (var i = 0; i < 30; i++) {
       InAppBrowserScreen.rememberFaviconFailureForTesting(

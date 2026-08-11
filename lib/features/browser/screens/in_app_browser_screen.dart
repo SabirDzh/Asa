@@ -136,11 +136,21 @@ class _InAppBrowserScreenState extends State<InAppBrowserScreen> {
                 },
                 onNavigationRequest: (request) {
                   final uri = Uri.tryParse(request.url);
-                  return uri != null &&
-                          uri.scheme == 'https' &&
-                          isAllowedTaskLink(request.url)
-                      ? NavigationDecision.navigate
-                      : NavigationDecision.prevent;
+                  if (uri != null &&
+                      uri.scheme.toLowerCase() == 'https' &&
+                      isAllowedTaskLink(request.url)) {
+                    return NavigationDecision.navigate;
+                  }
+
+                  // Keep HTTP links valid, but do not downgrade the embedded
+                  // HTTPS page. Open them in the platform browser instead of
+                  // silently swallowing the tap.
+                  if (uri != null &&
+                      uri.scheme.toLowerCase() == 'http' &&
+                      isAllowedTaskLink(request.url)) {
+                    unawaited(_launchExternalNavigation(uri));
+                  }
+                  return NavigationDecision.prevent;
                 },
               ),
             )
@@ -184,15 +194,16 @@ class _InAppBrowserScreenState extends State<InAppBrowserScreen> {
     await _controller!.reload();
   }
 
-  Future<void> _openExternally() async {
-    final opened = await launchUrl(
-      _currentUrl ?? widget.url,
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> _launchExternalNavigation(Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!mounted || opened) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(_tr('browser_external_failed'))));
+  }
+
+  Future<void> _openExternally() async {
+    await _launchExternalNavigation(_currentUrl ?? widget.url);
   }
 
   @override

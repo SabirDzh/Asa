@@ -341,15 +341,27 @@ class NotificationService {
         now == null
             ? tz.TZDateTime.now(tz.local)
             : tz.TZDateTime.from(now, tz.local);
-    var scheduled = tz.TZDateTime.from(startTime, tz.local);
+
+    // Task periods are stored as a time of day. Project the stored hour and
+    // minute onto today's local date before deciding whether today's
+    // occurrence has already passed. Comparing the original persisted date
+    // would incorrectly move every legacy task to tomorrow.
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      current.year,
+      current.month,
+      current.day,
+      startTime.hour,
+      startTime.minute,
+    );
     if (!scheduled.isAfter(current)) {
       scheduled = tz.TZDateTime(
         tz.local,
         current.year,
         current.month,
         current.day + 1,
-        scheduled.hour,
-        scheduled.minute,
+        startTime.hour,
+        startTime.minute,
       );
     }
     return scheduled;
@@ -566,6 +578,10 @@ class NotificationService {
   /// Returns and clears a timer-start request stored by a background callback.
   static Future<String?> consumePendingTimerStart() async {
     final prefs = await SharedPreferences.getInstance();
+    // The notification action may have been written by a background isolate.
+    // SharedPreferences caches values per isolate, so refresh before reading
+    // to make the action visible when the app resumes.
+    await prefs.reload();
     final taskId = prefs.getString(_pendingTimerTaskKey);
     if (taskId != null) await prefs.remove(_pendingTimerTaskKey);
     return taskId;

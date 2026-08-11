@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -64,6 +65,23 @@ void main() {
       expect(scheduled.minute, 30);
     });
 
+    test(
+      'uses today when a legacy start date is stale but its time is future',
+      () {
+        final now = DateTime(2026, 7, 31, 9, 0);
+        final scheduled = NotificationService.nextScheduledStart(
+          DateTime(2024, 1, 1, 15, 30),
+          now: now,
+        );
+
+        expect(scheduled.year, 2026);
+        expect(scheduled.month, 7);
+        expect(scheduled.day, 31);
+        expect(scheduled.hour, 15);
+        expect(scheduled.minute, 30);
+      },
+    );
+
     test('exposes a stable timer action and task payload contract', () {
       expect(NotificationService.startTimerActionId, 'start_timer');
       expect(
@@ -71,6 +89,18 @@ void main() {
         'asa_task:task-42',
       );
     });
+
+    test(
+      'consumes a pending timer action once after refreshing preferences',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'pending_timer_task_id': 'task-42',
+        });
+
+        expect(await NotificationService.consumePendingTimerStart(), 'task-42');
+        expect(await NotificationService.consumePendingTimerStart(), isNull);
+      },
+    );
 
     test('rejects incomplete, zero-length, completed, and deleted periods', () {
       expect(

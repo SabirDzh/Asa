@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/device_permissions.dart';
+import '../../core/logger_service.dart';
 import '../../core/notification_service.dart';
 import '../../core/theme.dart';
 import '../settings/providers/settings_provider.dart';
@@ -39,6 +40,7 @@ class SetupScreen extends StatefulWidget {
 
 class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
   late PermissionState _state;
+  bool _notificationBusy = false;
 
   @override
   void initState() {
@@ -132,17 +134,8 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                         icon: Icons.notifications_outlined,
                         label: settings.tr('notifications'),
                         granted: _state.notificationsGranted,
-                        onFix: () async {
-                          await NotificationService.requestPermission(
-                            requestExactAlarms: true,
-                          );
-                          final permanentlyDenied =
-                              await NotificationService.isPermissionPermanentlyDenied();
-                          if (permanentlyDenied) {
-                            await DevicePermissions.openNotificationSettings();
-                          }
-                          await _checkPermissions();
-                        },
+                        busy: _notificationBusy,
+                        onFix: _requestNotificationPermission,
                       ),
                       const SizedBox(height: 12),
                       _permissionTile(
@@ -224,11 +217,67 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _requestNotificationPermission() async {
+    final settings = context.read<SettingsProvider>();
+    setState(() => _notificationBusy = true);
+    try {
+      var granted = false;
+      try {
+        granted = await NotificationService.requestPermission(
+          requestExactAlarms: true,
+        );
+      } on Object catch (error, stackTrace) {
+        // A platform/plugin failure must never look like a successful request
+        // or leave the screen without feedback.
+        LoggerService.instance.w(
+          'Notification permission request failed on setup screen',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+      if (granted) {
+        // Enabling the in-app flag also persists it and schedules reminders;
+        // without this the runtime permission alone left reminders disabled.
+        try {
+          await settings.toggleNotifications(true);
+        } on Object catch (error, stackTrace) {
+          // The runtime permission was already granted; the tile will reflect
+          // it. Do not claim the permission was denied.
+          LoggerService.instance.w(
+            'Failed to enable notifications after grant',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      } else {
+        final permanentlyDenied =
+            await NotificationService.isPermissionPermanentlyDenied();
+        if (permanentlyDenied) {
+          _showSnack(settings.tr('setup_notification_permanently_denied'));
+          await NotificationService.openNotificationSettings();
+        } else {
+          _showSnack(settings.tr('setup_notification_denied'));
+        }
+      }
+      await _checkPermissions();
+    } finally {
+      if (mounted) setState(() => _notificationBusy = false);
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Widget _permissionTile({
     required IconData icon,
     required String label,
     String? subtitle,
     required bool granted,
+    bool busy = false,
     VoidCallback? onFix,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -278,17 +327,26 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
             ),
           ),
           if (!granted && onFix != null)
-            TextButton(
-              onPressed: onFix,
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: Text(
-                context.watch<SettingsProvider>().tr('setup_enable'),
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
+            busy
+                ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+                : TextButton(
+                  onPressed: onFix,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: Text(
+                    context.watch<SettingsProvider>().tr('setup_enable'),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
         ],
       ),
     );

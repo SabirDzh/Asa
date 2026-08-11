@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,10 +10,16 @@ import 'package:asa/features/splash/setup_screen.dart';
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({'languageCode': 'ru'});
+    timeDilation = 1.0;
+    SharedPreferences.setMockInitialValues({
+      'languageCode': 'ru',
+      // Keep SettingsProvider from mutating the global timeDilation.
+      'animationSpeed': 1.0,
+    });
   });
 
   tearDown(() {
+    timeDilation = 1.0;
     DevicePermissions.permissionStateOverride = null;
     NotificationService.requestPermissionOverride = null;
     NotificationService.permanentlyDeniedOverride = null;
@@ -21,12 +28,28 @@ void main() {
     NotificationService.initializedOverride = null;
   });
 
-  Widget createSetupScreenWidget() {
+  Widget createSetupScreenWidget({SettingsProvider? settings}) {
     return ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+      create: (_) => settings ?? SettingsProvider(),
       child: const MaterialApp(home: SetupScreen()),
     );
   }
+
+  const incompleteState = PermissionState(
+    notificationsGranted: false,
+    exactAlarmGranted: true,
+    batteryOptimizationDisabled: true,
+    autoStartGranted: true,
+    autoStartSupported: false,
+  );
+
+  const completeState = PermissionState(
+    notificationsGranted: true,
+    exactAlarmGranted: true,
+    batteryOptimizationDisabled: true,
+    autoStartGranted: true,
+    autoStartSupported: true,
+  );
 
   group('SetupScreen State & UI', () {
     test('markCompleted sets preference', () async {
@@ -38,13 +61,7 @@ void main() {
     testWidgets('renders all tiles when all permissions granted', (
       tester,
     ) async {
-      DevicePermissions.permissionStateOverride = const PermissionState(
-        notificationsGranted: true,
-        exactAlarmGranted: true,
-        batteryOptimizationDisabled: true,
-        autoStartGranted: true,
-        autoStartSupported: true,
-      );
+      DevicePermissions.permissionStateOverride = completeState;
 
       await tester.pumpWidget(createSetupScreenWidget());
       await tester.pumpAndSettle();
@@ -62,13 +79,7 @@ void main() {
     testWidgets('shows disabled button label when permissions incomplete', (
       tester,
     ) async {
-      DevicePermissions.permissionStateOverride = const PermissionState(
-        notificationsGranted: false,
-        exactAlarmGranted: true,
-        batteryOptimizationDisabled: true,
-        autoStartGranted: false,
-        autoStartSupported: true,
-      );
+      DevicePermissions.permissionStateOverride = incompleteState;
 
       await tester.pumpWidget(createSetupScreenWidget());
       await tester.pumpAndSettle();
@@ -83,13 +94,7 @@ void main() {
       tester,
     ) async {
       var requestCalled = false;
-      DevicePermissions.permissionStateOverride = const PermissionState(
-        notificationsGranted: false,
-        exactAlarmGranted: true,
-        batteryOptimizationDisabled: true,
-        autoStartGranted: true,
-        autoStartSupported: false,
-      );
+      DevicePermissions.permissionStateOverride = incompleteState;
       NotificationService.requestPermissionOverride = ({
         required requestExactAlarms,
       }) async {
@@ -106,6 +111,66 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(requestCalled, isTrue);
+      expect(
+        find.text('Разрешение на уведомления не выдано — повторите попытку'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('granting permission enables the notifications setting', (
+      tester,
+    ) async {
+      // The startup sync turns the default-on toggle off while the runtime
+      // permission is still missing; granting from setup must turn it back on.
+      SharedPreferences.setMockInitialValues({
+        'languageCode': 'ru',
+        'animationSpeed': 1.0,
+        'notificationsEnabled': false,
+      });
+      final settings = SettingsProvider();
+      DevicePermissions.permissionStateOverride = incompleteState;
+      NotificationService.initializedOverride = true;
+      NotificationService.requestPermissionOverride =
+          ({required requestExactAlarms}) async => true;
+      NotificationService.permanentlyDeniedOverride = () async => false;
+
+      await tester.pumpWidget(createSetupScreenWidget(settings: settings));
+      await tester.pumpAndSettle();
+
+      expect(settings.notificationsEnabled, isFalse);
+      await tester.tap(find.text('Включить'));
+      await tester.pumpAndSettle();
+
+      expect(settings.notificationsEnabled, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('notificationsEnabled'), isTrue);
+    });
+
+    testWidgets('permanently denied opens settings and shows hint', (
+      tester,
+    ) async {
+      var settingsOpened = false;
+      DevicePermissions.permissionStateOverride = incompleteState;
+      NotificationService.requestPermissionOverride =
+          ({required requestExactAlarms}) async => false;
+      NotificationService.permanentlyDeniedOverride = () async => true;
+      NotificationService.openNotificationSettingsOverride = () async {
+        settingsOpened = true;
+      };
+
+      await tester.pumpWidget(createSetupScreenWidget());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Включить'));
+      await tester.pumpAndSettle();
+
+      expect(settingsOpened, isTrue);
+      expect(
+        find.text(
+          'Уведомления отключены в системе. Включите их в настройках приложения',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

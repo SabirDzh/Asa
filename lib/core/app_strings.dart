@@ -309,6 +309,10 @@ class AppStrings {
       'setup_exact_alarm_subtitle':
           'Разрешение на срабатывание уведомлений секунда в секунду (Android 12+)',
       'setup_grant_all': 'Выдайте все разрешения для продолжения',
+      'setup_notification_denied':
+          'Разрешение на уведомления не выдано — повторите попытку',
+      'setup_notification_permanently_denied':
+          'Уведомления отключены в системе. Включите их в настройках приложения',
     },
     'en': {
       'search': 'Search',
@@ -615,6 +619,10 @@ class AppStrings {
       'setup_exact_alarm_subtitle':
           'Permission for notifications to trigger down to the second (Android 12+)',
       'setup_grant_all': 'Grant all permissions to continue',
+      'setup_notification_denied':
+          'Notification permission was not granted — please try again',
+      'setup_notification_permanently_denied':
+          'Notifications are disabled in system settings. Enable them in the app settings',
     },
   };
 

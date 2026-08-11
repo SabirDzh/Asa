@@ -111,26 +111,14 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       if (initialWidgetUri != null) {
         unawaited(_handleWidgetUri(initialWidgetUri));
       }
-      if (settings.notificationsEnabled) {
-        // The default-enabled setting must still request Android runtime
-        // notification permission before reminders are scheduled. Exact-alarm
-        // access is requested later from the explicit notification setting,
-        // not on every app launch.
-        final granted = await NotificationService.requestPermission(
-          requestExactAlarms: false,
-        );
-        if (!granted && mounted) {
-          // Keep the setting honest when Android/iOS denies runtime access;
-          // otherwise reminders appear enabled but can never be delivered.
-          await settings.toggleNotifications(false);
-        }
-      }
-      // When the user revokes and later re-grants notification permission
-      // through system settings while the app is killed, the saved blocked
-      // flag must be cleared on the next launch so the toggle is interactive.
-      if (!settings.notificationsEnabled &&
-          settings.notificationsBlockedBySystem &&
-          mounted) {
+      // Do not request the runtime notification permission automatically at
+      // launch. On first run the setup screen is the single place that asks
+      // for it; auto-requesting here raced with the setup button (the plugin
+      // rejects a second request while one is in flight), so the button could
+      // silently do nothing. For already-onboarded users the permission is
+      // already granted, and when it was revoked behind the app's back the
+      // passive sync below keeps the toggle honest without a surprise dialog.
+      if (mounted) {
         await settings.syncNotificationPermission();
       }
       // Sync the loaded task snapshot directly. The notification cache is

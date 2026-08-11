@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">ASA — Задачи и список дел</string>
     <string name="widget_app_name">ASA</string>
     <string name="widget_description">Задачи и серия ASA</string>
     <string name="widget_streak_format">День %1$d</string>

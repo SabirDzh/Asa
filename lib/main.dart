@@ -275,7 +275,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
     );
 
     return MaterialApp(
-      title: 'ASA',
+      title: 'ASA — Задачи и список дел',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: AppTheme.lightThemeFor(appPalette),

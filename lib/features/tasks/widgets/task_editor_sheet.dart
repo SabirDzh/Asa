@@ -20,6 +20,7 @@ import '../models/task_model.dart';
 import '../screens/task_image_viewer_screen.dart';
 import '../screens/task_text_viewer_screen.dart';
 import '../screens/task_pdf_viewer_screen.dart';
+import '../screens/task_file_viewer_screen.dart';
 import '../providers/task_provider.dart';
 import 'attachment_action_menu.dart';
 import 'attachment_mention_overlay.dart';
@@ -672,7 +673,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             ? await openTaskTextViewer(context, attachment)
             : isTaskPdfAttachment(attachment)
             ? await openTaskPdfViewer(context, attachment)
-            : await openTaskAttachment(attachment);
+            : await openTaskFileFallback(context, attachment);
     if (!mounted || opened) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(_settings.tr('attachment_unavailable'))),

@@ -1,7 +1,8 @@
 import 'dart:io';
 
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
 Future<String?> storeTaskAttachmentBytes({
@@ -61,11 +62,31 @@ Future<List<int>?> readStoredTaskAttachmentBytesPlatform(
   }
 }
 
+Future<bool> shareStoredTaskAttachment(
+  String path, {
+  required String name,
+  String? mimeType,
+}) async {
+  try {
+    final file = await _resolveStoredTaskAttachmentFile(path);
+    if (file == null) return false;
+    final length = await file.length();
+    if (length <= 0 || length > 10 * 1024 * 1024) return false;
+    await Share.shareXFiles([
+      XFile(file.path, name: name, mimeType: mimeType),
+    ], subject: name);
+    return true;
+  } on Object {
+    return false;
+  }
+}
+
 Future<bool> openStoredTaskAttachment(String path) async {
   try {
     final file = await _resolveStoredTaskAttachmentFile(path);
     if (file == null) return false;
-    return launchUrl(Uri.file(file.path), mode: LaunchMode.externalApplication);
+    final result = await OpenFilex.open(file.path);
+    return result.type == ResultType.done;
   } on Object {
     return false;
   }

@@ -37,11 +37,15 @@ Future<bool> openTaskPdfViewer(
 class TaskPdfViewerScreen extends StatefulWidget {
   final TaskAttachment attachment;
   final Future<List<int>?> Function(String path)? bytesLoader;
+  final Future<bool> Function(TaskAttachment attachment)? openExternal;
+  final Future<bool> Function(TaskAttachment attachment)? shareFile;
 
   const TaskPdfViewerScreen({
     super.key,
     required this.attachment,
     this.bytesLoader,
+    this.openExternal,
+    this.shareFile,
   });
 
   @override
@@ -50,6 +54,7 @@ class TaskPdfViewerScreen extends StatefulWidget {
 
 class _TaskPdfViewerScreenState extends State<TaskPdfViewerScreen> {
   late final Future<PdfControllerPinch?> _controllerFuture;
+  bool _actionBusy = false;
   PdfControllerPinch? _controller;
   int _currentPage = 1;
   int _pageCount = 0;
@@ -90,6 +95,52 @@ class _TaskPdfViewerScreenState extends State<TaskPdfViewerScreen> {
     return controller;
   }
 
+  Future<void> _openExternally() async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    try {
+      final opened = await (widget.openExternal ?? openTaskAttachment)(
+        widget.attachment,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_tr('viewer_external_open_failed'))),
+        );
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_tr('viewer_external_open_failed'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _share() async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    try {
+      final shared = await (widget.shareFile ?? shareTaskAttachment)(
+        widget.attachment,
+      );
+      if (!shared && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_tr('viewer_share_failed'))));
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_tr('viewer_share_failed'))));
+      }
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
   bool _hasPdfSignature(List<int> bytes) {
     return bytes.length >= 5 &&
         bytes[0] == 0x25 &&
@@ -124,6 +175,18 @@ class _TaskPdfViewerScreenState extends State<TaskPdfViewerScreen> {
         ),
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            key: const ValueKey('open-task-pdf-external'),
+            tooltip: _tr('viewer_open_external'),
+            onPressed: _actionBusy ? null : _openExternally,
+            icon: const Icon(Icons.open_in_new),
+          ),
+          IconButton(
+            key: const ValueKey('share-task-pdf'),
+            tooltip: _tr('viewer_share'),
+            onPressed: _actionBusy ? null : _share,
+            icon: const Icon(Icons.share_outlined),
+          ),
           if (_pageCount > 0)
             Center(
               child: Padding(

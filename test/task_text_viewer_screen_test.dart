@@ -79,6 +79,29 @@ void main() {
     expect(find.text('Скопировано'), findsOneWidget);
   });
 
+  testWidgets('reports a failed external action', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ru'),
+        supportedLocales: const [Locale('ru'), Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: TaskTextViewerScreen(
+          attachment: attachment,
+          bytesLoader: (_) async => 'Hello ASA'.codeUnits,
+          openExternal: (_) async => false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-task-text-external')));
+    await tester.pump();
+
+    expect(
+      find.text('Не удалось открыть файл во внешнем приложении'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('pretty prints valid JSON', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

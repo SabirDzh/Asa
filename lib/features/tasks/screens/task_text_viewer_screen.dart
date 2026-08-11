@@ -42,11 +42,15 @@ Future<bool> openTaskTextViewer(
 class TaskTextViewerScreen extends StatefulWidget {
   final TaskAttachment attachment;
   final Future<List<int>?> Function(String path)? bytesLoader;
+  final Future<bool> Function(TaskAttachment attachment)? openExternal;
+  final Future<bool> Function(TaskAttachment attachment)? shareFile;
 
   const TaskTextViewerScreen({
     super.key,
     required this.attachment,
     this.bytesLoader,
+    this.openExternal,
+    this.shareFile,
   });
 
   @override
@@ -55,6 +59,10 @@ class TaskTextViewerScreen extends StatefulWidget {
 
 class _TaskTextViewerScreenState extends State<TaskTextViewerScreen> {
   late final Future<_LoadedText?> _contentFuture;
+  bool _actionBusy = false;
+
+  String _tr(String key) =>
+      AppStrings.get(key, Localizations.localeOf(context).languageCode);
 
   @override
   void initState() {
@@ -88,6 +96,52 @@ class _TaskTextViewerScreenState extends State<TaskTextViewerScreen> {
     }
   }
 
+  Future<void> _openExternally() async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    try {
+      final opened = await (widget.openExternal ?? openTaskAttachment)(
+        widget.attachment,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_tr('viewer_external_open_failed'))),
+        );
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_tr('viewer_external_open_failed'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _share() async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    try {
+      final shared = await (widget.shareFile ?? shareTaskAttachment)(
+        widget.attachment,
+      );
+      if (!shared && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_tr('viewer_share_failed'))));
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_tr('viewer_share_failed'))));
+      }
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
   String _prettyJson(String value) {
     try {
       final decoded = jsonDecode(value);
@@ -104,9 +158,6 @@ class _TaskTextViewerScreenState extends State<TaskTextViewerScreen> {
     final title = attachment_validation.attachmentDisplayName(
       widget.attachment.name,
     );
-    String tr(String key) =>
-        AppStrings.get(key, Localizations.localeOf(context).languageCode);
-
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
@@ -118,13 +169,25 @@ class _TaskTextViewerScreenState extends State<TaskTextViewerScreen> {
         ),
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            key: const ValueKey('open-task-text-external'),
+            tooltip: _tr('viewer_open_external'),
+            onPressed: _actionBusy ? null : _openExternally,
+            icon: const Icon(Icons.open_in_new),
+          ),
+          IconButton(
+            key: const ValueKey('share-task-text'),
+            tooltip: _tr('viewer_share'),
+            onPressed: _actionBusy ? null : _share,
+            icon: const Icon(Icons.share_outlined),
+          ),
           FutureBuilder<_LoadedText?>(
             future: _contentFuture,
             builder: (context, snapshot) {
               if (snapshot.data == null) return const SizedBox.shrink();
               return IconButton(
                 key: const ValueKey('copy-task-text'),
-                tooltip: tr('viewer_copy'),
+                tooltip: _tr('viewer_copy'),
                 onPressed: () async {
                   await Clipboard.setData(
                     ClipboardData(text: snapshot.data!.text),
@@ -132,7 +195,7 @@ class _TaskTextViewerScreenState extends State<TaskTextViewerScreen> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(
                     context,
-                  ).showSnackBar(SnackBar(content: Text(tr('viewer_copied'))));
+                  ).showSnackBar(SnackBar(content: Text(_tr('viewer_copied'))));
                 },
                 icon: const Icon(Icons.copy_outlined),
               );

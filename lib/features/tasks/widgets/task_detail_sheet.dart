@@ -11,6 +11,7 @@ import '../../browser/screens/in_app_browser_screen.dart';
 import '../screens/task_image_viewer_screen.dart';
 import '../screens/task_text_viewer_screen.dart';
 import '../screens/task_pdf_viewer_screen.dart';
+import '../screens/task_file_viewer_screen.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
@@ -501,7 +502,7 @@ class _TaskDetailSheet extends StatelessWidget {
             ? await openTaskTextViewer(context, attachment)
             : isTaskPdfAttachment(attachment)
             ? await openTaskPdfViewer(context, attachment)
-            : await openTaskAttachment(attachment);
+            : await openTaskFileFallback(context, attachment);
     if (!context.mounted || opened) return;
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(

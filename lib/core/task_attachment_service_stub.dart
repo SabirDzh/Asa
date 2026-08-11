@@ -12,6 +12,14 @@ Future<List<int>?> readStoredTaskAttachmentBytesPlatform(
   return null;
 }
 
+Future<bool> shareStoredTaskAttachment(
+  String path, {
+  required String name,
+  String? mimeType,
+}) async {
+  return false;
+}
+
 Future<bool> openStoredTaskAttachment(String path) async {
   return false;
 }

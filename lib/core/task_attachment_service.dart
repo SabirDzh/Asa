@@ -118,6 +118,15 @@ Future<List<int>?> readStoredTaskAttachmentBytes(
   return readStoredTaskAttachmentBytesPlatform(path, maxBytes: maxBytes);
 }
 
+Future<bool> shareTaskAttachment(TaskAttachment attachment) async {
+  if (attachment.type != TaskAttachmentType.file) return false;
+  return shareStoredTaskAttachment(
+    attachment.value,
+    name: attachment.name,
+    mimeType: attachment.mimeType,
+  );
+}
+
 Future<bool> openTaskAttachment(TaskAttachment attachment) async {
   if (attachment.type == TaskAttachmentType.link) {
     final normalized = validation.normalizeTaskAttachmentLink(attachment.value);

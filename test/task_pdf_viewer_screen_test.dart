@@ -30,6 +30,26 @@ void main() {
     );
   });
 
+  testWidgets('reports a failed PDF share action', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ru'),
+        supportedLocales: const [Locale('ru'), Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: TaskPdfViewerScreen(
+          attachment: pdf,
+          bytesLoader: (_) async => const [1, 2, 3],
+          shareFile: (_) async => false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-task-pdf')));
+    await tester.pump();
+
+    expect(find.text('Не удалось поделиться файлом'), findsOneWidget);
+  });
+
   testWidgets('shows a safe state for missing or invalid PDF data', (
     tester,
   ) async {

@@ -5,7 +5,10 @@ Future<String?> storeTaskAttachmentBytes({
   return null;
 }
 
-Future<List<int>?> readStoredTaskAttachmentBytesPlatform(String path) async {
+Future<List<int>?> readStoredTaskAttachmentBytesPlatform(
+  String path, {
+  int maxBytes = 10 * 1024 * 1024,
+}) async {
   return null;
 }
 

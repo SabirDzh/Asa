@@ -45,12 +45,16 @@ Future<File?> _resolveStoredTaskAttachmentFile(String path) async {
   return File(filePath);
 }
 
-Future<List<int>?> readStoredTaskAttachmentBytesPlatform(String path) async {
+Future<List<int>?> readStoredTaskAttachmentBytesPlatform(
+  String path, {
+  int maxBytes = 10 * 1024 * 1024,
+}) async {
   try {
+    if (maxBytes <= 0) return null;
     final file = await _resolveStoredTaskAttachmentFile(path);
     if (file == null) return null;
     final length = await file.length();
-    if (length <= 0 || length > 10 * 1024 * 1024) return null;
+    if (length <= 0 || length > maxBytes) return null;
     return await file.readAsBytes();
   } on Object {
     return null;

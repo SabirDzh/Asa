@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -55,7 +56,11 @@ Widget _harness(UpdateInstallCallback onInstall) {
 }
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    timeDilation = 1.0;
+    // Keep SettingsProvider from mutating the global timeDilation.
+    SharedPreferences.setMockInitialValues({'animationSpeed': 1.0});
+  });
 
   testWidgets('install flow shows progress then closes on success', (
     tester,

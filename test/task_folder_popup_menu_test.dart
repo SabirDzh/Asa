@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
@@ -17,12 +18,15 @@ import 'package:asa/features/tasks/widgets/task_card.dart';
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    timeDilation = 1.0;
+    // Keep SettingsProvider from mutating the global timeDilation.
+    SharedPreferences.setMockInitialValues({'animationSpeed': 1.0});
     HomeWidgetService.instance.debounceDelay = Duration.zero;
     installHomeWidgetChannelMock();
   });
 
   tearDown(() async {
+    timeDilation = 1.0;
     await HomeWidgetService.resetForTests();
     HomeWidgetService.instance.debounceDelay = const Duration(
       milliseconds: 300,

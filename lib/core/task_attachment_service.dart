@@ -109,6 +109,12 @@ Future<TaskAttachment?> storeTaskAttachment({
   );
 }
 
+/// Reads a stored image after enforcing the same attachment-directory boundary
+/// used when opening files. Returns null for missing or unsafe paths.
+Future<List<int>?> readStoredTaskAttachmentBytes(String path) async {
+  return readStoredTaskAttachmentBytesPlatform(path);
+}
+
 Future<bool> openTaskAttachment(TaskAttachment attachment) async {
   if (attachment.type == TaskAttachmentType.link) {
     final normalized = validation.normalizeTaskAttachmentLink(attachment.value);

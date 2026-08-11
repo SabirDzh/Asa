@@ -8,6 +8,7 @@ import '../../../core/drag_close_sheet.dart';
 import '../../../core/task_attachment_service.dart';
 import '../../../core/theme.dart';
 import '../../browser/screens/in_app_browser_screen.dart';
+import '../screens/task_image_viewer_screen.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
@@ -492,6 +493,8 @@ class _TaskDetailSheet extends StatelessWidget {
               attachment.value,
               title: attachment.name,
             )
+            : attachment.type == TaskAttachmentType.image
+            ? await openTaskImageViewer(context, attachment)
             : await openTaskAttachment(attachment);
     if (!context.mounted || opened) return;
     final settings = Provider.of<SettingsProvider>(context, listen: false);

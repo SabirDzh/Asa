@@ -5,6 +5,10 @@ Future<String?> storeTaskAttachmentBytes({
   return null;
 }
 
+Future<List<int>?> readStoredTaskAttachmentBytesPlatform(String path) async {
+  return null;
+}
+
 Future<bool> openStoredTaskAttachment(String path) async {
   return false;
 }

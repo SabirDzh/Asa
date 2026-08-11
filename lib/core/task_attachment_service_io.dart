@@ -27,24 +27,41 @@ Future<String?> storeTaskAttachmentBytes({
   }
 }
 
+Future<File?> _resolveStoredTaskAttachmentFile(String path) async {
+  final directory = await getApplicationDocumentsDirectory();
+  final attachmentsDirectory = Directory(
+    '${directory.path}${Platform.pathSeparator}task_attachments',
+  );
+  if (!await attachmentsDirectory.exists()) return null;
+
+  final rootPath = await attachmentsDirectory.resolveSymbolicLinks();
+  final file = File(path);
+  if (!await file.exists()) return null;
+  final filePath = await file.resolveSymbolicLinks();
+  final separator = Platform.pathSeparator;
+  if (filePath == rootPath || !filePath.startsWith('$rootPath$separator')) {
+    return null;
+  }
+  return File(filePath);
+}
+
+Future<List<int>?> readStoredTaskAttachmentBytesPlatform(String path) async {
+  try {
+    final file = await _resolveStoredTaskAttachmentFile(path);
+    if (file == null) return null;
+    final length = await file.length();
+    if (length <= 0 || length > 10 * 1024 * 1024) return null;
+    return await file.readAsBytes();
+  } on Object {
+    return null;
+  }
+}
+
 Future<bool> openStoredTaskAttachment(String path) async {
   try {
-    final directory = await getApplicationDocumentsDirectory();
-    final attachmentsDirectory = Directory(
-      '${directory.path}${Platform.pathSeparator}task_attachments',
-    );
-    if (!await attachmentsDirectory.exists()) return false;
-
-    final rootPath = await attachmentsDirectory.resolveSymbolicLinks();
-    final file = File(path);
-    if (!await file.exists()) return false;
-    final filePath = await file.resolveSymbolicLinks();
-    final separator = Platform.pathSeparator;
-    if (filePath != rootPath && !filePath.startsWith('$rootPath$separator')) {
-      return false;
-    }
-
-    return launchUrl(Uri.file(filePath), mode: LaunchMode.externalApplication);
+    final file = await _resolveStoredTaskAttachmentFile(path);
+    if (file == null) return false;
+    return launchUrl(Uri.file(file.path), mode: LaunchMode.externalApplication);
   } on Object {
     return false;
   }

@@ -176,6 +176,44 @@ void main() {
     });
   });
 
+  group('NotificationService fallback zone ID', () {
+    test('formats a positive whole-hour offset', () {
+      expect(
+        NotificationService.zoneIdForOffset(const Duration(hours: 3)),
+        'UTC+03:00',
+      );
+    });
+
+    test('formats a negative offset', () {
+      expect(
+        NotificationService.zoneIdForOffset(const Duration(hours: -5)),
+        'UTC-05:00',
+      );
+    });
+
+    test('formats an offset with minutes', () {
+      expect(
+        NotificationService.zoneIdForOffset(
+          const Duration(hours: 5, minutes: 30),
+        ),
+        'UTC+05:30',
+      );
+    });
+
+    test('formats a negative offset with minutes', () {
+      expect(
+        NotificationService.zoneIdForOffset(
+          const Duration(hours: -3, minutes: -30),
+        ),
+        'UTC-03:30',
+      );
+    });
+
+    test('formats a zero offset', () {
+      expect(NotificationService.zoneIdForOffset(Duration.zero), 'UTC+00:00');
+    });
+  });
+
   group('NotificationService due-date helpers', () {
     test('due-date notification ID does not collide with start-time ID', () {
       final startId = NotificationService.notificationIdForTask('task-1');

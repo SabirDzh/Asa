@@ -418,6 +418,21 @@ class NotificationService {
     }
   }
 
+  /// Returns a valid IANA-style zone ID for a fixed UTC [offset], for example
+  /// `UTC+03:00`. The native plugin resolves the scheduled notification's
+  /// zone on the Java side with `ZoneId.of(zoneId)`, so the ID must be a
+  /// parseable offset-based zone ID rather than an arbitrary label.
+  ///
+  /// Used as the fallback location name when the platform reports a time-zone
+  /// abbreviation instead of an IANA identifier.
+  static String zoneIdForOffset(Duration offset) {
+    final sign = offset.isNegative ? '-' : '+';
+    final abs = offset.abs();
+    final hours = (abs.inHours).toString().padLeft(2, '0');
+    final minutes = (abs.inMinutes % 60).toString().padLeft(2, '0');
+    return 'UTC$sign$hours:$minutes';
+  }
+
   /// Returns the next local occurrence of a task start time.
   ///
   /// The task editor stores a time of day rather than a calendar date, so the

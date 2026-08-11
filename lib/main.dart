@@ -84,15 +84,23 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       } catch (_) {
         // Some platforms expose only an abbreviation (for example, "MSK"),
         // which is not an IANA identifier. Keep the device's actual offset
-        // instead of silently shifting reminders to UTC.
-        final offset = DateTime.now().timeZoneOffset.inMilliseconds;
+        // instead of silently shifting reminders to UTC. The location name
+        // must be a valid offset-based zone ID (for example, "UTC+03:00"):
+        // the native notification plugin resolves it on the Java side with
+        // ZoneId.of(), which rejects arbitrary labels such as "device-offset"
+        // with "Unknown time-zone ID".
+        final offset = DateTime.now().timeZoneOffset;
         tz.setLocalLocation(
           tz.Location(
-            'device-offset',
+            NotificationService.zoneIdForOffset(offset),
             const <int>[],
             const <int>[],
             <tz.TimeZone>[
-              tz.TimeZone(offset, isDst: false, abbreviation: 'LOCAL'),
+              tz.TimeZone(
+                offset.inMilliseconds,
+                isDst: false,
+                abbreviation: 'LOCAL',
+              ),
             ],
           ),
         );

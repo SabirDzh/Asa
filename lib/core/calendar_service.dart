@@ -1,5 +1,6 @@
 import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 /// Wraps the native Android Calendar Provider (and iOS EventKit) via the
@@ -11,6 +12,17 @@ class CalendarService {
   /// user grants access for the first time. Tests can set this to zero.
   @visibleForTesting
   static Duration calendarRetryDelay = const Duration(milliseconds: 250);
+
+  /// Prevents repeated creation attempts when a ROM hides newly created
+  /// calendars from the provider. Tests can reset this between cases.
+  @visibleForTesting
+  static bool calendarFallbackAttempted = false;
+
+  @visibleForTesting
+  static bool? calendarPlatformAndroidOverride;
+
+  static Future<void>? _fallbackCreationFuture;
+  static const _fallbackCalendarIdKey = 'asa_calendar_fallback_id';
 
   /// Requests calendar read/write permissions. Returns true if granted.
   static Future<bool> requestPermission() async {
@@ -26,9 +38,64 @@ class CalendarService {
   /// On the first access, Android/iOS can briefly return an empty collection
   /// while the native calendar store is being initialized. Retry a few times
   /// so granting permission does not immediately look like a missing calendar.
+  ///
+  /// Some Android ROMs, including HyperOS, can grant calendar permissions while
+  /// exposing no writable account calendar to third-party apps. In that case,
+  /// create a private local calendar owned by ASA and read the provider again.
+  /// The fallback is deliberately performed only after the normal lookup fails;
+  /// existing user calendars are never modified.
   static Future<List<Calendar>> getCalendars() async {
     if (!await requestPermission()) return [];
 
+    final calendars = await _retrieveWritableCalendars();
+    final isAndroid =
+        calendarPlatformAndroidOverride ??
+        (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
+    if (calendars.isNotEmpty || !isAndroid) return calendars;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (calendarFallbackAttempted ||
+        (prefs.getString(_fallbackCalendarIdKey)?.isNotEmpty ?? false)) {
+      return calendars;
+    }
+
+    final inFlight = _fallbackCreationFuture;
+    if (inFlight != null) {
+      await inFlight;
+      return _retrieveWritableCalendars();
+    }
+
+    final creation = _createFallbackCalendar(prefs);
+    _fallbackCreationFuture = creation;
+    try {
+      await creation;
+    } finally {
+      if (identical(_fallbackCreationFuture, creation)) {
+        _fallbackCreationFuture = null;
+      }
+    }
+
+    return _retrieveWritableCalendars();
+  }
+
+  static Future<void> _createFallbackCalendar(SharedPreferences prefs) async {
+    try {
+      final created = await _plugin.createCalendar(
+        'ASA',
+        localAccountName: 'ASA',
+      );
+      final calendarId = created.data;
+      if (!created.isSuccess || calendarId == null || calendarId.isEmpty)
+        return;
+      calendarFallbackAttempted = true;
+      await prefs.setString(_fallbackCalendarIdKey, calendarId);
+    } on Object {
+      // A ROM may forbid local calendar creation even when permissions are
+      // granted. Keep the caller's existing empty-calendar error in that case.
+    }
+  }
+
+  static Future<List<Calendar>> _retrieveWritableCalendars() async {
     const maxAttempts = 3;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       final result = await _plugin.retrieveCalendars();

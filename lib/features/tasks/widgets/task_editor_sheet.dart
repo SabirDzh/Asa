@@ -19,6 +19,7 @@ import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import '../screens/task_image_viewer_screen.dart';
 import '../screens/task_text_viewer_screen.dart';
+import '../screens/task_pdf_viewer_screen.dart';
 import '../providers/task_provider.dart';
 import 'attachment_action_menu.dart';
 import 'attachment_mention_overlay.dart';
@@ -669,6 +670,8 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             ? await openTaskImageViewer(context, attachment)
             : isTaskTextAttachment(attachment)
             ? await openTaskTextViewer(context, attachment)
+            : isTaskPdfAttachment(attachment)
+            ? await openTaskPdfViewer(context, attachment)
             : await openTaskAttachment(attachment);
     if (!mounted || opened) return;
     ScaffoldMessenger.of(context).showSnackBar(

@@ -51,6 +51,12 @@ void main() {
 
       expect(find.byType(SetupScreen), findsOneWidget);
       expect(find.text('Продолжить'), findsOneWidget);
+      expect(
+        find.text(
+          'После завершения настройки разрешения можно изменить в разделе «Уведомления и данные»',
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('shows disabled button label when permissions incomplete', (

@@ -298,7 +298,7 @@ class AppStrings {
       'setup_skip': 'Пропустить',
       'setup_enable': 'Включить',
       'setup_footer':
-          'Всё можно настроить позже в разделе «Уведомления и данные»',
+          'После завершения настройки разрешения можно изменить в разделе «Уведомления и данные»',
       'setup_battery': 'Отключить ограничение батареи',
       'setup_battery_subtitle':
           'Нужно чтобы напоминания приходили вовремя, даже когда приложение закрыто',
@@ -604,7 +604,7 @@ class AppStrings {
       'setup_skip': 'Skip',
       'setup_enable': 'Enable',
       'setup_footer':
-          'Everything can be configured later in «Notifications & Data»',
+          'After setup, you can change permissions in «Notifications & Data»',
       'setup_battery': 'Disable battery optimization',
       'setup_battery_subtitle':
           'Required for reminders to arrive on time, even when the app is closed',

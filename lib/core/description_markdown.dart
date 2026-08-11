@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -39,9 +41,44 @@ AttachmentMention? extractAttachmentMention(String href, String label) {
   if (uri == null || uri.scheme.toLowerCase() != kAttachmentMentionScheme) {
     return null;
   }
-  final id = uri.host.isNotEmpty ? uri.host : uri.path;
-  if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(id)) return null;
+  final encodedId =
+      uri.host.isNotEmpty
+          ? uri.host
+          : uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.first
+          : '';
+  if (encodedId.length > 2048 ||
+      RegExp(r'[\x00-\x1F\x7F]').hasMatch(encodedId)) {
+    return null;
+  }
+
+  final id =
+      encodedId.startsWith('b64_')
+          ? _decodeAttachmentMentionId(encodedId.substring(4))
+          : RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(encodedId)
+          ? encodedId
+          : null;
+  if (id == null || id.isEmpty || id.length > 2048) return null;
   return AttachmentMention(id: id, label: label.trim());
+}
+
+String _attachmentMentionId(TaskAttachment attachment) {
+  final id = attachment.id;
+  if (RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(id)) return id;
+  return 'b64_${base64Url.encode(utf8.encode(id)).replaceAll('=', '')}';
+}
+
+String? _decodeAttachmentMentionId(String encoded) {
+  try {
+    final padded = '$encoded${'=' * ((4 - encoded.length % 4) % 4)}';
+    final decoded = utf8.decode(
+      base64Url.decode(padded),
+      allowMalformed: false,
+    );
+    return decoded.length <= 2048 ? decoded : null;
+  } on Object {
+    return null;
+  }
 }
 
 String _escapeMentionLabel(String value) {
@@ -53,8 +90,152 @@ String _escapeMentionLabel(String value) {
 }
 
 String attachmentMentionMarkdown(TaskAttachment attachment) {
-  final label = _escapeMentionLabel(attachment.name);
-  return '[@$label]($kAttachmentMentionScheme://${Uri.encodeComponent(attachment.id)})';
+  // Keep the attachment id only in the internal href. The visible label must
+  // never expose a stored path or other implementation detail.
+  final label = _escapeMentionLabel(attachmentDisplayName(attachment.name));
+  final mentionId = _attachmentMentionId(attachment);
+  final href =
+      mentionId.startsWith('b64_')
+          ? '$kAttachmentMentionScheme:///$mentionId'
+          : '$kAttachmentMentionScheme://$mentionId';
+  return '[$label]($href)';
+}
+
+/// Converts the editor-friendly `@file.name` form into a clickable Markdown
+/// link immediately before rendering. The editor therefore never exposes
+/// internal IDs, paths, or Markdown syntax, while older saved Markdown links
+/// remain supported by [DescriptionLinkBuilder].
+String expandAttachmentMentions(String text, List<TaskAttachment> attachments) {
+  final sorted = [...attachments]..sort(
+    (a, b) => attachmentDisplayName(
+      b.name,
+    ).length.compareTo(attachmentDisplayName(a.name).length),
+  );
+  final result = StringBuffer();
+  String? fencedChar;
+  var fencedLength = 0;
+  var inlineCodeDelimiter = '';
+  var squareBracketDepth = 0;
+  var lineStart = true;
+  var index = 0;
+
+  while (index < text.length) {
+    if (lineStart) {
+      final lineEnd = text.indexOf('\n', index);
+      final end = lineEnd == -1 ? text.length : lineEnd;
+      final line = text.substring(index, end);
+      final fence = RegExp(r'^\s*(`{3,}|~{3,})').firstMatch(line);
+      if (fencedChar != null) {
+        result.write(line);
+        if (fence != null &&
+            fence.group(1)!.startsWith(fencedChar) &&
+            fence.group(1)!.length >= fencedLength) {
+          fencedChar = null;
+          fencedLength = 0;
+        }
+        if (lineEnd != -1) result.write('\n');
+        index = lineEnd == -1 ? text.length : lineEnd + 1;
+        lineStart = true;
+        continue;
+      }
+      if (fence != null) {
+        fencedChar = fence.group(1)![0];
+        fencedLength = fence.group(1)!.length;
+        result.write(line);
+        if (lineEnd != -1) result.write('\n');
+        index = lineEnd == -1 ? text.length : lineEnd + 1;
+        lineStart = true;
+        continue;
+      }
+    }
+
+    final character = text[index];
+    if (character == '\n') {
+      result.write(character);
+      index++;
+      lineStart = true;
+      continue;
+    }
+
+    if (character == '`' && (index == 0 || text[index - 1] != '\\')) {
+      var runLength = 1;
+      while (index + runLength < text.length &&
+          text[index + runLength] == '`') {
+        runLength++;
+      }
+      final delimiter = '`' * runLength;
+      result.write(delimiter);
+      if (inlineCodeDelimiter.isEmpty) {
+        inlineCodeDelimiter = delimiter;
+      } else if (inlineCodeDelimiter == delimiter) {
+        inlineCodeDelimiter = '';
+      }
+      index += runLength;
+      lineStart = false;
+      continue;
+    }
+
+    if (inlineCodeDelimiter.isNotEmpty) {
+      result.write(character);
+      index++;
+      lineStart = false;
+      continue;
+    }
+    if (character == '[' && (index == 0 || text[index - 1] != '\\')) {
+      squareBracketDepth++;
+      result.write(character);
+      index++;
+      lineStart = false;
+      continue;
+    }
+    if (character == ']' && squareBracketDepth > 0) {
+      squareBracketDepth--;
+      result.write(character);
+      index++;
+      lineStart = false;
+      continue;
+    }
+    if (squareBracketDepth > 0 || character != '@') {
+      result.write(character);
+      index++;
+      lineStart = false;
+      continue;
+    }
+
+    TaskAttachment? match;
+    String? matchedName;
+    for (final attachment in sorted) {
+      final name = attachmentDisplayName(attachment.name);
+      final token = '@$name';
+      final tokenEnd = index + token.length;
+      final hasBoundaryBefore =
+          index == 0 || RegExp(r'\s').hasMatch(text[index - 1]);
+      final hasBoundaryAfter =
+          tokenEnd == text.length ||
+          (tokenEnd < text.length &&
+              RegExp(r'[\s.,!?;:)\]]').hasMatch(text[tokenEnd]));
+      if (name.isNotEmpty &&
+          tokenEnd <= text.length &&
+          text.startsWith(token, index) &&
+          hasBoundaryBefore &&
+          hasBoundaryAfter) {
+        match = attachment;
+        matchedName = name;
+        break;
+      }
+    }
+
+    if (match == null || matchedName == null) {
+      result.write(character);
+      index++;
+      lineStart = false;
+      continue;
+    }
+    result.write(attachmentMentionMarkdown(match));
+    index += matchedName.length + 1;
+    lineStart = false;
+  }
+  return result.toString();
 }
 
 class MentionTrigger {
@@ -96,7 +277,7 @@ TextEditingValue replaceMentionTrigger(
   MentionTrigger trigger,
   TaskAttachment attachment,
 ) {
-  final token = '${attachmentMentionMarkdown(attachment)} ';
+  final token = '@${attachmentDisplayName(attachment.name)} ';
   final nextText = value.text.replaceRange(trigger.start, trigger.end, token);
   final nextOffset = trigger.start + token.length;
   return TextEditingValue(
@@ -144,7 +325,7 @@ class DescriptionLinkBuilder extends MarkdownElementBuilder {
       }
       if (attachment == null) {
         return Text(
-          '@${mention.label}',
+          attachmentDisplayName(mention.label),
           style: (preferredStyle ?? parentStyle)?.copyWith(
             color: (preferredStyle ?? parentStyle)?.color?.withValues(
               alpha: 0.5,
@@ -152,6 +333,7 @@ class DescriptionLinkBuilder extends MarkdownElementBuilder {
           ),
         );
       }
+      final displayName = attachmentDisplayName(attachment.name);
       final attachmentIcon = switch (attachment.type) {
         TaskAttachmentType.link => Icons.link,
         TaskAttachmentType.image => Icons.image_outlined,
@@ -159,7 +341,7 @@ class DescriptionLinkBuilder extends MarkdownElementBuilder {
       };
       return Semantics(
         button: true,
-        label: '@${attachment.name}',
+        label: displayName,
         child: InkWell(
           key: ValueKey('markdown-attachment-${attachment.id}'),
           borderRadius: BorderRadius.circular(8),
@@ -176,7 +358,7 @@ class DescriptionLinkBuilder extends MarkdownElementBuilder {
                 Icon(attachmentIcon, size: 14, color: accentColor),
                 const SizedBox(width: 4),
                 Text(
-                  '@${attachment.name}',
+                  displayName,
                   style:
                       (preferredStyle ?? parentStyle)?.copyWith(
                         color: accentColor,
@@ -248,7 +430,7 @@ class DescriptionBody extends StatelessWidget {
     }
 
     return MarkdownBody(
-      data: text,
+      data: expandAttachmentMentions(text, attachments),
       selectable: selectable,
       extensionSet: md.ExtensionSet.gitHubFlavored,
       styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(

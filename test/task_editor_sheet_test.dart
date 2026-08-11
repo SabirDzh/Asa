@@ -299,7 +299,7 @@ void main() {
     await tester.pump();
     expect(
       tester.widget<TextFormField>(description).controller!.text,
-      '[@contract.pdf](attachment://contract) ',
+      '@contract.pdf ',
     );
   });
 

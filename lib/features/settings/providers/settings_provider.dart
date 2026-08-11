@@ -26,6 +26,7 @@ class SettingsProvider with ChangeNotifier {
   bool _hasCustomPalette = false;
   bool _notificationsEnabled = true;
   bool _notificationsBlockedBySystem = false;
+  int _notificationOperationCount = 0;
   String _languageCode = 'ru';
   double _animationSpeed = 1.0;
   double _appScale = 1.0;
@@ -71,6 +72,7 @@ class SettingsProvider with ChangeNotifier {
   /// back (e.g. the user disabled it in the system settings). While set, the
   /// switch can be restored automatically once the permission is granted again.
   bool get notificationsBlockedBySystem => _notificationsBlockedBySystem;
+  bool get notificationOperationPending => _notificationOperationCount > 0;
   String get languageCode => _languageCode;
   double get animationSpeed => _animationSpeed;
   double get appScale => _appScale;
@@ -255,11 +257,16 @@ class SettingsProvider with ChangeNotifier {
     Future<T> Function() operation,
   ) {
     final result = Completer<T>();
+    _notificationOperationCount++;
+    notifyListeners();
     final next = _notificationPermissionOperation.then((_) async {
       try {
         result.complete(await operation());
       } on Object catch (error, stackTrace) {
         result.completeError(error, stackTrace);
+      } finally {
+        _notificationOperationCount--;
+        notifyListeners();
       }
     });
     _notificationPermissionOperation = next.catchError((_) {});

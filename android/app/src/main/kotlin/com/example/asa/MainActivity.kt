@@ -81,7 +81,12 @@ class MainActivity : FlutterActivity() {
         // Before the first request the rationale also reports false, but the
         // Dart side only asks after a request attempt has already failed, so a
         // denial here always means "the dialog will not be shown again".
-        return !shouldShowRequestPermissionRationale(
+        val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+        val requested = prefs.getBoolean(
+            "flutter.notification_permission_requested",
+            false,
+        )
+        return requested && !shouldShowRequestPermissionRationale(
             Manifest.permission.POST_NOTIFICATIONS,
         )
     }

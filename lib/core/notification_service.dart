@@ -43,6 +43,8 @@ class NotificationService {
   static const _startTimerActionId = 'start_timer';
   static const _taskPayloadPrefix = 'asa_task:';
   static const _pendingTimerTaskKey = 'pending_timer_task_id';
+  static const _notificationPermissionRequestedKey =
+      'notification_permission_requested';
   static const _platformChannel = MethodChannel('asa/notifications');
   static const _dueDateHour = 9;
 
@@ -59,6 +61,9 @@ class NotificationService {
 
   @visibleForTesting
   static Future<bool> Function()? permanentlyDeniedOverride;
+
+  @visibleForTesting
+  static Future<void> Function()? openNotificationSettingsOverride;
 
   @visibleForTesting
   static bool? initializedOverride;
@@ -202,20 +207,41 @@ class NotificationService {
 
     var granted = false;
     if (Platform.isAndroid) {
+      final prefs = await SharedPreferences.getInstance();
+      // Android cannot distinguish a first request from permanent denial using
+      // shouldShowRequestPermissionRationale alone. Persist this marker only
+      // after the native permission API has actually been attempted.
       final android =
           _plugin
               .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin
               >();
+      if (android == null) {
+        // A missing platform implementation is a configuration failure, not
+        // a completed permission request. Do not persist the request marker.
+        return false;
+      }
       final notificationPermission =
-          await android?.requestNotificationsPermission();
+          await android.requestNotificationsPermission();
+      // Reaching this line means the native permission API completed. Do not
+      // mark the permission as requested when the platform call throws, since
+      // that would turn a plugin failure into a false permanent-denial state.
+      try {
+        await prefs.setBool(_notificationPermissionRequestedKey, true);
+      } on Object catch (error, stackTrace) {
+        LoggerService.instance.w(
+          'Failed to persist notification permission request marker',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
       // Android versions before API 33 return null because no runtime
       // notification permission is required. Exact alarm access is separate
       // and is intentionally best-effort: scheduling falls back to inexact
       // alarms when the user declines it.
       if (requestExactAlarms && notificationPermission != false) {
         try {
-          await android?.requestExactAlarmsPermission();
+          await android.requestExactAlarmsPermission();
         } on Object catch (error, stackTrace) {
           LoggerService.instance.w(
             'Exact alarm permission request failed',
@@ -250,7 +276,13 @@ class NotificationService {
   static Future<bool> isPermissionPermanentlyDenied() async {
     final override = permanentlyDeniedOverride;
     if (override != null) return override();
-    if (kIsWeb || !Platform.isAndroid) return false;
+    if (kIsWeb) return false;
+    if (Platform.isIOS) {
+      // iOS does not show the authorization prompt again after a denial;
+      // recovery must go through the app's Settings page.
+      return await notificationPermissionState() == false;
+    }
+    if (!Platform.isAndroid) return false;
     try {
       final denied = await _platformChannel.invokeMethod<bool>(
         'notificationsPermanentlyDenied',
@@ -269,9 +301,15 @@ class NotificationService {
     }
   }
 
-  /// Opens the system notification settings for this app on Android.
+  /// Opens the system notification settings for this app.
+  /// Android and iOS provide native handlers; other platforms are no-ops.
   static Future<void> openNotificationSettings() async {
-    if (kIsWeb || !Platform.isAndroid) return;
+    final override = openNotificationSettingsOverride;
+    if (override != null) {
+      await override();
+      return;
+    }
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
     try {
       await _platformChannel.invokeMethod<void>('openNotificationSettings');
     } on MissingPluginException {
@@ -301,7 +339,7 @@ class NotificationService {
     await _plugin.show(
       0,
       'ASA',
-      'Уведомления включены',
+      _tr('Уведомления включены', 'Notifications enabled'),
       const NotificationDetails(android: androidDetails, iOS: iOSDetails),
     );
   }

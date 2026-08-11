@@ -18,6 +18,7 @@ void main() {
       NotificationService.notificationPermissionStateOverride = null;
       NotificationService.requestPermissionOverride = null;
       NotificationService.permanentlyDeniedOverride = null;
+      NotificationService.openNotificationSettingsOverride = null;
       provider = SettingsProvider(systemLanguageCodeProvider: () => 'ru');
     });
 
@@ -26,6 +27,7 @@ void main() {
       NotificationService.notificationPermissionStateOverride = null;
       NotificationService.requestPermissionOverride = null;
       NotificationService.permanentlyDeniedOverride = null;
+      NotificationService.openNotificationSettingsOverride = null;
     });
 
     test('uses system theme by default', () {
@@ -201,6 +203,25 @@ void main() {
     });
 
     test(
+      'reports a pending state while notification permission is resolving',
+      () async {
+        NotificationService.initializedOverride = true;
+        final permission = Completer<bool>();
+        NotificationService.requestPermissionOverride =
+            ({required bool requestExactAlarms}) => permission.future;
+        await provider.ready;
+
+        final operation = provider.toggleNotifications(true);
+        expect(provider.notificationOperationPending, isTrue);
+        permission.complete(true);
+        await operation;
+
+        expect(provider.notificationOperationPending, isFalse);
+        expect(provider.notificationsEnabled, isTrue);
+      },
+    );
+
+    test(
       'toggleNotifications updates value when notifications are available',
       () async {
         NotificationService.initializedOverride = true;
@@ -219,6 +240,20 @@ void main() {
         await provider.toggleNotifications(true);
         expect(provider.notificationsEnabled, true);
         expect(requestedExactAlarms, false);
+      },
+    );
+
+    test(
+      'opens notification settings through the injected platform hook',
+      () async {
+        var opened = false;
+        NotificationService.openNotificationSettingsOverride = () async {
+          opened = true;
+        };
+
+        await NotificationService.openNotificationSettings();
+
+        expect(opened, isTrue);
       },
     );
 

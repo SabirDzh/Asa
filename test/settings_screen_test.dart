@@ -61,6 +61,7 @@ void main() {
     NotificationService.initializedOverride = null;
     NotificationService.requestPermissionOverride = null;
     NotificationService.permanentlyDeniedOverride = null;
+    NotificationService.openNotificationSettingsOverride = null;
   });
 
   testWidgets('renders all setting groups', (tester) async {
@@ -229,6 +230,7 @@ void main() {
       NotificationService.requestPermissionOverride =
           ({required bool requestExactAlarms}) async => false;
       NotificationService.permanentlyDeniedOverride = () async => true;
+      NotificationService.openNotificationSettingsOverride = () async {};
       await pumpAndInit(tester, createTestApp());
 
       final notificationsRow = find.text('Уведомления');

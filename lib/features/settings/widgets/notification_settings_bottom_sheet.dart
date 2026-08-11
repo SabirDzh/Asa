@@ -5,8 +5,8 @@ import '../../../core/theme.dart';
 import '../providers/settings_provider.dart';
 
 /// Explains that the notification permission is disabled at the system level
-/// and offers to open the system settings, because the permission dialog will
-/// never be shown again (Android "don't ask again").
+/// and offers to open the app's notification settings. On iOS and Android,
+/// the system dialog may no longer be shown after a denial.
 void showOpenNotificationSettingsSheet(
   BuildContext context,
   SettingsProvider settings,

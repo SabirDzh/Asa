@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
@@ -32,9 +34,38 @@ IconData _themeModeIcon(ThemeMode mode) {
   }
 }
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   final bool standalone;
   const SettingsScreen({super.key, this.standalone = true});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.standalone) {
+      WidgetsBinding.instance.addObserver(this);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.standalone) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.standalone && state == AppLifecycleState.resumed && mounted) {
+      unawaited(context.read<SettingsProvider>().syncNotificationPermission());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -226,15 +257,22 @@ class SettingsScreen extends StatelessWidget {
                   label: settings.tr('notifications'),
                   trailing: Switch(
                     value: settings.notificationsEnabled,
-                    onChanged: (value) async {
-                      final enabled = await settings.toggleNotifications(value);
-                      if (!context.mounted) return;
-                      if (value &&
-                          !enabled &&
-                          settings.notificationsBlockedBySystem) {
-                        showOpenNotificationSettingsSheet(context, settings);
-                      }
-                    },
+                    onChanged:
+                        settings.notificationOperationPending
+                            ? null
+                            : (value) async {
+                              final enabled = await settings
+                                  .toggleNotifications(value);
+                              if (!context.mounted) return;
+                              if (value &&
+                                  !enabled &&
+                                  settings.notificationsBlockedBySystem) {
+                                showOpenNotificationSettingsSheet(
+                                  context,
+                                  settings,
+                                );
+                              }
+                            },
                     activeThumbColor: AppColors.primary,
                     trackOutlineColor: WidgetStateProperty.all(
                       Colors.transparent,

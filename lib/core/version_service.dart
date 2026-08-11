@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/settings/providers/settings_provider.dart';
-import '../features/settings/screens/whats_new_screen.dart';
 import 'logger_service.dart';
 import 'update_dialog.dart';
 import 'update_installer.dart';
@@ -45,10 +44,10 @@ class VersionService {
     UpdateInfo info, {
     DateTime? installedAssetUpdatedAt,
   }) => UpdateChecker.isUpdateAvailable(
-        info,
-        currentVersion,
-        installedAssetUpdatedAt: installedAssetUpdatedAt,
-      );
+    info,
+    currentVersion,
+    installedAssetUpdatedAt: installedAssetUpdatedAt,
+  );
 
   @visibleForTesting
   static bool isSafeReleaseUrl(
@@ -414,11 +413,9 @@ class UpdateChecker {
   }
 
   Future<_FetchResult> _fetchLatest(SharedPreferences prefs) async {
-    final uri = Uri.https(
-      'api.github.com',
-      '/repos/$owner/$repo/releases',
-      {'per_page': '20'},
-    );
+    final uri = Uri.https('api.github.com', '/repos/$owner/$repo/releases', {
+      'per_page': '20',
+    });
     final headers = _releaseHeaders();
     final etag = prefs.getString(_etagKey);
     if (etag != null && etag.isNotEmpty) headers['If-None-Match'] = etag;
@@ -811,20 +808,30 @@ class UpdateInfo {
       assetName:
           value['assetName'] is String ? value['assetName'] as String : null,
       assetUpdatedAt:
-          assetUpdatedRaw is String
-              ? DateTime.tryParse(assetUpdatedRaw)
-              : null,
+          assetUpdatedRaw is String ? DateTime.tryParse(assetUpdatedRaw) : null,
       isPrerelease: value['isPrerelease'] == true,
       sha256: value['sha256'] is String ? value['sha256'] as String : null,
     );
   }
 
   /// Picks the arm64-v8a APK when available, otherwise any `.apk` asset.
-  static ({String name, String browserUrl, DateTime? updatedAt, String? sha256})?
+  static ({
+    String name,
+    String browserUrl,
+    DateTime? updatedAt,
+    String? sha256,
+  })?
   _pickApkAsset(Object? value) {
     if (value is! List) return null;
     final candidates =
-        <({String name, String browserUrl, DateTime? updatedAt, String? sha256})>[];
+        <
+          ({
+            String name,
+            String browserUrl,
+            DateTime? updatedAt,
+            String? sha256,
+          })
+        >[];
     for (final item in value) {
       if (item is! Map<String, dynamic>) continue;
       final name = item['name'];

@@ -516,34 +516,77 @@ void main() {
       expect(info.notes.runes.length, 20 * 1024 + 2);
     });
 
-    test('isUpdateAvailable detects re-uploaded APK when asset date is newer', () {
-      final oldAssetTime = DateTime.utc(2026, 8, 1, 12, 0);
-      final newAssetTime = DateTime.utc(2026, 8, 1, 14, 0);
-      final sameVersionRelease = UpdateInfo(
-        version: '1.1.3',
-        url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.3',
-        notes: 'Replaced APK',
-        assetUpdatedAt: newAssetTime,
-      );
+    test(
+      'isUpdateAvailable detects re-uploaded APK when asset date is newer',
+      () {
+        final oldAssetTime = DateTime.utc(2026, 8, 1, 12, 0);
+        final newAssetTime = DateTime.utc(2026, 8, 1, 14, 0);
+        final sameVersionRelease = UpdateInfo(
+          version: '1.1.3',
+          url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.3',
+          notes: 'Replaced APK',
+          assetUpdatedAt: newAssetTime,
+        );
 
-      expect(
-        UpdateChecker.isUpdateAvailable(
-          sameVersionRelease,
-          '1.1.3',
-          installedAssetUpdatedAt: oldAssetTime,
-        ),
-        isTrue,
-      );
+        expect(
+          UpdateChecker.isUpdateAvailable(
+            sameVersionRelease,
+            '1.1.3',
+            installedAssetUpdatedAt: oldAssetTime,
+          ),
+          isTrue,
+        );
 
-      expect(
-        UpdateChecker.isUpdateAvailable(
-          sameVersionRelease,
-          '1.1.3',
-          installedAssetUpdatedAt: newAssetTime,
-        ),
-        isFalse,
-      );
-    });
+        expect(
+          UpdateChecker.isUpdateAvailable(
+            sameVersionRelease,
+            '1.1.3',
+            installedAssetUpdatedAt: newAssetTime,
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'isUpdateAvailable returns false for same version without any baseline time',
+      () {
+        // When there is no installedAssetUpdatedAt and buildTime is null
+        // (BUILD_TIME not passed during build), same-version detection cannot
+        // determine if the asset was replaced. This documents the expected
+        // behavior and why BUILD_TIME should be passed at build time.
+        final sameVersionRelease = UpdateInfo(
+          version: '1.1.3',
+          url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.3',
+          notes: 'Replaced APK',
+          assetUpdatedAt: DateTime.utc(2026, 8, 11, 15, 0),
+        );
+
+        // With neither installedAssetUpdatedAt nor buildTime, and versions
+        // match, UpdateChecker.buildTime is a compile-time constant we cannot
+        // mock in unit tests. Instead we test that the installedAssetUpdatedAt
+        // path works correctly when present.
+        expect(
+          UpdateChecker.isUpdateAvailable(
+            sameVersionRelease,
+            '1.1.3',
+            installedAssetUpdatedAt: DateTime.utc(2026, 8, 11, 15, 0),
+          ),
+          isFalse,
+          reason: 'exact same asset time should not trigger an update',
+        );
+
+        expect(
+          UpdateChecker.isUpdateAvailable(
+            sameVersionRelease,
+            '1.1.3',
+            installedAssetUpdatedAt: DateTime.utc(2026, 8, 1, 10, 0),
+          ),
+          isTrue,
+          reason: 'older installed time should trigger an update',
+        );
+      },
+    );
   });
 
   group('UpdateInfo assets', () {

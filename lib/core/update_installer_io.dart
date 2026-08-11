@@ -80,6 +80,10 @@ Future<String?> downloadUpdateFileImpl(
 
       if (response == null || response.statusCode != 200) return null;
       final total = response.contentLength;
+      // Remove any stale APK before writing the new download so that a
+      // partial/interrupted download or a replaced release asset never
+      // leaves behind an outdated file.
+      if (await file.exists()) await file.delete();
       final sink = file.openWrite();
       var received = 0;
       try {

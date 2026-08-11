@@ -40,6 +40,7 @@ Future<T?> showAnchoredPopupMenu<T>({
   required ShapeBorder shape,
   Key? menuKey,
   double gap = 6.0,
+  bool matchAnchorWidth = false,
 }) {
   final navigator = Navigator.of(anchorContext);
   final overlay = navigator.overlay;
@@ -64,32 +65,58 @@ Future<T?> showAnchoredPopupMenu<T>({
   return navigator.push<T>(
     _AnchoredPopupMenuRoute<T>(
       anchorRect: anchorRect,
+      anchorContext: anchorContext,
       items: items,
       color: color,
       shape: shape,
+      overlayBox: overlayBox,
       menuKey: menuKey,
       gap: gap,
+      matchAnchorWidth: matchAnchorWidth,
       barrierText: localizations.modalBarrierDismissLabel,
     ),
   );
 }
 
+class _AnchorGeometryNotifier extends ChangeNotifier
+    with WidgetsBindingObserver {
+  _AnchorGeometryNotifier() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeMetrics() => notifyListeners();
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+}
+
 class _AnchoredPopupMenuRoute<T> extends PopupRoute<T> {
   final Rect anchorRect;
+  final BuildContext anchorContext;
+  final RenderBox overlayBox;
   final List<AnchoredPopupMenuItem<T>> items;
   final Color color;
   final ShapeBorder shape;
   final Key? menuKey;
   final double gap;
+  final bool matchAnchorWidth;
   final String barrierText;
+  final _AnchorGeometryNotifier _anchorGeometry = _AnchorGeometryNotifier();
 
   _AnchoredPopupMenuRoute({
     required this.anchorRect,
+    required this.anchorContext,
+    required this.overlayBox,
     required this.items,
     required this.color,
     required this.shape,
     required this.menuKey,
     required this.gap,
+    required this.matchAnchorWidth,
     required this.barrierText,
   });
 
@@ -111,30 +138,71 @@ class _AnchoredPopupMenuRoute<T> extends PopupRoute<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    final mediaQuery = MediaQuery.of(context);
-    return CustomSingleChildLayout(
-      delegate: _AnchoredPopupMenuLayout(
-        anchorRect: anchorRect,
-        gap: gap,
-        viewPadding: mediaQuery.padding,
-      ),
-      child: Material(
-        key: menuKey,
-        color: color,
-        elevation: 8,
-        shape: shape,
-        clipBehavior: Clip.antiAlias,
-        child: IntrinsicWidth(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 112, maxWidth: 280),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: ListBody(children: items),
+    return AnimatedBuilder(
+      animation: _anchorGeometry,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        final anchor =
+            anchorContext.mounted
+                ? anchorContext.findRenderObject() as RenderBox?
+                : null;
+        var currentAnchorRect = anchorRect;
+        if (anchorContext.mounted &&
+            overlayBox.attached &&
+            anchor != null &&
+            anchor.attached &&
+            anchor.hasSize) {
+          final topLeft = anchor.localToGlobal(
+            Offset.zero,
+            ancestor: overlayBox,
+          );
+          final bottomRight = anchor.localToGlobal(
+            anchor.size.bottomRight(Offset.zero),
+            ancestor: overlayBox,
+          );
+          currentAnchorRect = Rect.fromPoints(topLeft, bottomRight);
+        }
+
+        final menu = Material(
+          key: menuKey,
+          color: color,
+          elevation: 8,
+          shape: shape,
+          clipBehavior: Clip.antiAlias,
+          child: IntrinsicWidth(
+            child: ConstrainedBox(
+              constraints:
+                  matchAnchorWidth
+                      ? BoxConstraints(
+                        minWidth: currentAnchorRect.width,
+                        maxWidth: currentAnchorRect.width,
+                      )
+                      : const BoxConstraints(minWidth: 112, maxWidth: 280),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ListBody(children: items),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+
+        return CustomSingleChildLayout(
+          delegate: _AnchoredPopupMenuLayout(
+            anchorRect: currentAnchorRect,
+            gap: gap,
+            viewPadding: mediaQuery.padding,
+            viewInsets: mediaQuery.viewInsets,
+          ),
+          child: menu,
+        );
+      },
     );
+  }
+
+  @override
+  void dispose() {
+    _anchorGeometry.dispose();
+    super.dispose();
   }
 
   @override
@@ -163,11 +231,13 @@ class _AnchoredPopupMenuLayout extends SingleChildLayoutDelegate {
   final Rect anchorRect;
   final double gap;
   final EdgeInsets viewPadding;
+  final EdgeInsets viewInsets;
 
   const _AnchoredPopupMenuLayout({
     required this.anchorRect,
     required this.gap,
     required this.viewPadding,
+    required this.viewInsets,
   });
 
   static const double _screenPadding = 8.0;
@@ -189,7 +259,8 @@ class _AnchoredPopupMenuLayout extends SingleChildLayoutDelegate {
     final screenLeft = _screenPadding + viewPadding.left;
     final screenTop = _screenPadding + viewPadding.top;
     final screenRight = size.width - _screenPadding - viewPadding.right;
-    final screenBottom = size.height - _screenPadding - viewPadding.bottom;
+    final screenBottom =
+        size.height - _screenPadding - viewPadding.bottom - viewInsets.bottom;
 
     final below = anchorRect.bottom + gap;
     final above = anchorRect.top - gap - childSize.height;
@@ -232,6 +303,7 @@ class _AnchoredPopupMenuLayout extends SingleChildLayoutDelegate {
   bool shouldRelayout(covariant _AnchoredPopupMenuLayout oldDelegate) {
     return anchorRect != oldDelegate.anchorRect ||
         gap != oldDelegate.gap ||
-        viewPadding != oldDelegate.viewPadding;
+        viewPadding != oldDelegate.viewPadding ||
+        viewInsets != oldDelegate.viewInsets;
   }
 }

@@ -39,21 +39,23 @@ load_diagnostics_config "${DIAGNOSTICS_CONFIG:-$REPO_ROOT/config/private.env}" 1
 
 step() { echo "==> $*"; }
 
-# 1. Version bump (pubspec + APP_VERSION default).
+# 1. Version bump. pubspec.yaml is the source of truth; lib/core/app_version.dart
+# is the single Dart-side default and must stay in sync (build scripts pass
+# APP_VERSION via --dart-define anyway).
 step "Bumping pubspec.yaml to ${FULL}"
 perl -pi -e "s/^version: .*/version: ${FULL}/" pubspec.yaml
-step "Updating APP_VERSION default to ${VERSION}"
-perl -pi -e "s/(defaultValue: ')[0-9]+\.[0-9]+\.[0-9]+(')/\${1}${VERSION}\${2}/" lib/core/version_service.dart
+step "Updating app_version.dart default to ${VERSION}"
+perl -pi -e "s/(defaultValue: ')[0-9]+\.[0-9]+\.[0-9]+(')/\${1}${VERSION}\${2}/" lib/core/app_version.dart
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "Dry run — skipping build, commit, tag, and release."
-  git diff --stat pubspec.yaml lib/core/version_service.dart
+  git diff --stat pubspec.yaml lib/core/app_version.dart
   exit 0
 fi
 
 # 2. Commit the bump.
 step "Committing version bump"
-git add pubspec.yaml lib/core/version_service.dart
+git add pubspec.yaml lib/core/app_version.dart
 git commit -m "chore: bump version to ${FULL}"
 
 # 3. Build the arm64 APK with version, build time, and the configured endpoint.

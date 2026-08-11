@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/settings/providers/settings_provider.dart';
+import 'app_version.dart';
 import 'logger_service.dart';
 import 'update_dialog.dart';
 import 'update_installer.dart';
@@ -14,11 +15,9 @@ import 'update_installer.dart';
 class VersionService {
   static const String owner = 'SabirDzh';
   static const String repo = 'Asa';
-  // The build pipeline can provide the version with --dart-define=APP_VERSION.
-  static const String currentVersion = String.fromEnvironment(
-    'APP_VERSION',
-    defaultValue: '1.1.6',
-  );
+
+  /// Current app version. The single source of truth is [appVersion].
+  static const String currentVersion = appVersion;
 
   static final UpdateChecker _defaultChecker = UpdateChecker(
     owner: owner,

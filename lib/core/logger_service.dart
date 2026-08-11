@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_version.dart';
 import 'device_info.dart';
 
 /// Severity level for log entries.
@@ -85,10 +86,6 @@ class LoggerService {
   static const String _diagnosticsEndpoint = String.fromEnvironment(
     'DIAGNOSTICS_ENDPOINT',
     defaultValue: '',
-  );
-  static const String _appVersion = String.fromEnvironment(
-    'APP_VERSION',
-    defaultValue: '1.1.6',
   );
   static const String _installationIdKey = 'diagnostic_installation_id';
   static const int _maxBufferSize = 500;
@@ -278,7 +275,7 @@ class LoggerService {
           .toList(growable: false);
       final payload = <String, Object?>{
         'installationId': installationId,
-        'appVersion': _appVersion,
+        'appVersion': appVersion,
         'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
         'deviceName': _sanitizeDiagnosticText(deviceName),
         'sentAt': DateTime.now().toUtc().toIso8601String(),

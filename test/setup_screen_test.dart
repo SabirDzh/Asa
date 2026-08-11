@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/core/device_permissions.dart';
+import 'package:asa/core/notification_service.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/splash/setup_screen.dart';
 
@@ -13,6 +14,11 @@ void main() {
 
   tearDown(() {
     DevicePermissions.permissionStateOverride = null;
+    NotificationService.requestPermissionOverride = null;
+    NotificationService.permanentlyDeniedOverride = null;
+    NotificationService.openNotificationSettingsOverride = null;
+    NotificationService.notificationPermissionStateOverride = null;
+    NotificationService.initializedOverride = null;
   });
 
   Widget createSetupScreenWidget() {
@@ -65,6 +71,35 @@ void main() {
         find.text('Выдайте все разрешения для продолжения'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('notification enable action requests permission', (
+      tester,
+    ) async {
+      var requestCalled = false;
+      DevicePermissions.permissionStateOverride = const PermissionState(
+        notificationsGranted: false,
+        exactAlarmGranted: true,
+        batteryOptimizationDisabled: true,
+        autoStartGranted: true,
+        autoStartSupported: false,
+      );
+      NotificationService.requestPermissionOverride = ({
+        required requestExactAlarms,
+      }) async {
+        requestCalled = true;
+        expect(requestExactAlarms, isTrue);
+        return false;
+      };
+      NotificationService.permanentlyDeniedOverride = () async => false;
+
+      await tester.pumpWidget(createSetupScreenWidget());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Включить'));
+      await tester.pumpAndSettle();
+
+      expect(requestCalled, isTrue);
     });
   });
 }

@@ -33,6 +33,7 @@ import 'logger_service.dart';
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static Future<void>? _initializationFuture;
   static String _languageCode = 'ru';
   static final Map<int, String> _scheduledFingerprints = <int, String>{};
   static final Map<int, String> _dueDateFingerprints = <int, String>{};
@@ -159,10 +160,29 @@ class NotificationService {
     return !task.dueDate!.isBefore(todayStart);
   }
 
-  /// Initializes the plugin. Must be called before any other method.
+  /// Initializes the plugin. Safe to call more than once and from concurrent
+  /// callers (for example, startup and the setup screen button).
   static Future<void> init() async {
-    if (kIsWeb) return;
+    if (kIsWeb || _initialized) return;
 
+    final inFlight = _initializationFuture;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final initialization = _initializePlugin();
+    _initializationFuture = initialization;
+    try {
+      await initialization;
+    } finally {
+      if (identical(_initializationFuture, initialization)) {
+        _initializationFuture = null;
+      }
+    }
+  }
+
+  static Future<void> _initializePlugin() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');
     final iOS = DarwinInitializationSettings(
       notificationCategories: [
@@ -203,7 +223,20 @@ class NotificationService {
     if (override != null) {
       return override(requestExactAlarms: requestExactAlarms);
     }
-    if (kIsWeb || !isInitialized) return false;
+    if (kIsWeb) return false;
+    if (!isInitialized) {
+      try {
+        await init();
+      } on Object catch (error, stackTrace) {
+        LoggerService.instance.w(
+          'Notification service initialization failed while requesting permission',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        return false;
+      }
+      if (!isInitialized) return false;
+    }
 
     var granted = false;
     if (Platform.isAndroid) {
@@ -221,8 +254,24 @@ class NotificationService {
         // a completed permission request. Do not persist the request marker.
         return false;
       }
-      final notificationPermission =
-          await android.requestNotificationsPermission();
+      bool? notificationPermission;
+      try {
+        notificationPermission = await android.requestNotificationsPermission();
+      } on Object catch (error, stackTrace) {
+        // Some OEM builds or an unavailable plugin channel can reject the
+        // request. Keep the setup callback alive so it can fall back to the
+        // system settings check instead of appearing to do nothing.
+        LoggerService.instance.w(
+          'Notification permission request failed',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        // If the OEM/plugin cannot present its runtime dialog, provide a
+        // deterministic recovery path instead of leaving the setup screen
+        // with no visible result.
+        await openNotificationSettings();
+        return false;
+      }
       // Reaching this line means the native permission API completed. Do not
       // mark the permission as requested when the platform call throws, since
       // that would turn a plugin failure into a false permanent-denial state.

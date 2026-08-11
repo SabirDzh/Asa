@@ -96,6 +96,43 @@ void main() {
     );
 
     expect(find.text('Проверить обновления'), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
+  });
+
+  testWidgets('removes the page snackbar when navigating away', (tester) async {
+    await _pumpAndInit(
+      tester,
+      _harness(
+        () async => [
+          const UpdateInfo(
+            version: '1.1.1',
+            url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.1',
+            notes: 'Current version',
+          ),
+        ],
+      ),
+    );
+
+    await tester.tap(find.text('Проверить обновления'));
+    await tester.pump();
+    await tester.tap(find.text('Проверить обновления'));
+    await tester.pump();
+    expect(find.byType(SnackBar), findsOneWidget);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create:
+            (_) => SettingsProvider(
+              deviceNameProvider: () async => 'Test Device',
+              systemLanguageCodeProvider: () => 'ru',
+            ),
+        child: const MaterialApp(home: Scaffold(body: Text('Next page'))),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('Next page'), findsOneWidget);
   });
 
   testWidgets('shows empty state', (tester) async {
@@ -155,5 +192,41 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('whats-new-load-more')), findsNothing);
+  });
+
+  testWidgets('shows install button for replaced APK with newer assetUpdatedAt', (
+    tester,
+  ) async {
+    final oldTime = DateTime.utc(2026, 8, 1, 10, 0);
+    final newTime = DateTime.utc(2026, 8, 11, 15, 0);
+
+    // Simulate that the user already installed the APK from the old asset
+    SharedPreferences.setMockInitialValues({
+      UpdateChecker.installedAssetTimeKey: oldTime.millisecondsSinceEpoch,
+    });
+
+    await _pumpAndInit(
+      tester,
+      _harness(
+        () async => [
+          UpdateInfo(
+            version: VersionService.currentVersion,
+            url:
+                'https://github.com/SabirDzh/Asa/releases/tag/v${VersionService.currentVersion}',
+            notes: 'Replaced APK with permission gate fix',
+            assetUpdatedAt: newTime,
+            assetUrl:
+                'https://github.com/SabirDzh/Asa/releases/download/v${VersionService.currentVersion}/Asa-arm64-v8a.apk',
+          ),
+        ],
+      ),
+    );
+
+    // Should show the install button since the asset was updated after the
+    // installed version's asset timestamp.
+    expect(
+      find.text('Установить обновление (v${VersionService.currentVersion})'),
+      findsOneWidget,
+    );
   });
 }

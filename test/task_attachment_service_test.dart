@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:asa/core/task_attachment_service.dart';
@@ -6,6 +9,36 @@ import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'task_attachment_service_test_platform.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory documentsDirectory;
+
+  setUp(() async {
+    documentsDirectory = await Directory.systemTemp.createTemp(
+      'asa-attachment-service-test-',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (call) async {
+            if (call.method == 'getApplicationDocumentsDirectory') {
+              return documentsDirectory.path;
+            }
+            return null;
+          },
+        );
+  });
+
+  tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          null,
+        );
+    if (await documentsDirectory.exists()) {
+      await documentsDirectory.delete(recursive: true);
+    }
+  });
+
   test('normalizes safe http and https links and rejects unsafe URLs', () {
     expect(
       normalizeTaskAttachmentLink('  HTTPS://EXAMPLE.COM/book  '),
@@ -131,6 +164,83 @@ void main() {
       existingAttachmentCount: kMaxTaskAttachmentsPerTask,
     );
     expect(result, isNull);
+  });
+
+  test(
+    'deletes an app-owned attachment and tolerates a missing file',
+    () async {
+      final attachment = await storeTaskAttachment(
+        type: TaskAttachmentType.file,
+        name: 'delete-me.pdf',
+        bytes: const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31],
+        mimeType: 'application/pdf',
+      );
+
+      expect(attachment, isNotNull);
+      final storedAttachment = attachment!;
+      try {
+        expect(
+          await readStoredTaskAttachmentBytes(storedAttachment.value),
+          isNotNull,
+        );
+        expect(
+          await deleteStoredTaskAttachment(storedAttachment.value),
+          isTrue,
+        );
+        expect(
+          await readStoredTaskAttachmentBytes(storedAttachment.value),
+          isNull,
+        );
+        expect(
+          await deleteStoredTaskAttachment(storedAttachment.value),
+          isFalse,
+        );
+      } finally {
+        await deleteStoredTaskAttachment(storedAttachment.value);
+      }
+    },
+  );
+
+  test('rejects deleting an external path', () async {
+    final outside = File(
+      '${documentsDirectory.parent.path}${Platform.pathSeparator}outside.pdf',
+    );
+    await outside.writeAsBytes(const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31]);
+    try {
+      expect(await deleteStoredTaskAttachment(outside.path), isFalse);
+      expect(await outside.exists(), isTrue);
+    } finally {
+      if (await outside.exists()) await outside.delete();
+    }
+  });
+
+  test('sweeps orphan files without following external symlinks', () async {
+    final attachmentsDirectory = Directory(
+      '${documentsDirectory.path}${Platform.pathSeparator}task_attachments',
+    );
+    await attachmentsDirectory.create(recursive: true);
+    final orphan = File(
+      '${attachmentsDirectory.path}${Platform.pathSeparator}orphan.pdf',
+    );
+    await orphan.writeAsBytes(const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31]);
+    final outside = File(
+      '${documentsDirectory.parent.path}${Platform.pathSeparator}outside-orphan.pdf',
+    );
+    await outside.writeAsBytes(const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31]);
+    final link = Link(
+      '${attachmentsDirectory.path}${Platform.pathSeparator}outside-link.pdf',
+    );
+    await link.create(outside.path);
+
+    try {
+      expect(await deleteAllStoredTaskAttachments(), 1);
+      expect(await orphan.exists(), isFalse);
+      expect(await link.exists(), isTrue);
+      expect(await outside.exists(), isTrue);
+    } finally {
+      if (await link.exists()) await link.delete();
+      if (await outside.exists()) await outside.delete();
+    }
   });
 
   test('opening a missing local attachment returns false', () async {

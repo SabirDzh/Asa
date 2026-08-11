@@ -46,6 +46,46 @@ Future<File?> _resolveStoredTaskAttachmentFile(String path) async {
   return File(filePath);
 }
 
+Future<bool> deleteStoredTaskAttachmentPlatform(String path) async {
+  try {
+    final file = await _resolveStoredTaskAttachmentFile(path);
+    if (file == null) return false;
+    await file.delete();
+    return true;
+  } on Object {
+    return false;
+  }
+}
+
+Future<int> deleteAllStoredTaskAttachmentsPlatform() async {
+  try {
+    final directory = await getApplicationDocumentsDirectory();
+    final attachmentsDirectory = Directory(
+      '${directory.path}${Platform.pathSeparator}task_attachments',
+    );
+    if (!await attachmentsDirectory.exists()) return 0;
+
+    var deleted = 0;
+    await for (final entity in attachmentsDirectory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entity is! File || await Link(entity.path).exists()) continue;
+      final resolved = await _resolveStoredTaskAttachmentFile(entity.path);
+      if (resolved == null) continue;
+      try {
+        await resolved.delete();
+        deleted++;
+      } on Object {
+        // A single inaccessible orphan must not block the rest of the reset.
+      }
+    }
+    return deleted;
+  } on Object {
+    return 0;
+  }
+}
+
 Future<List<int>?> readStoredTaskAttachmentBytesPlatform(
   String path, {
   int maxBytes = 10 * 1024 * 1024,

@@ -118,6 +118,18 @@ Future<List<int>?> readStoredTaskAttachmentBytes(
   return readStoredTaskAttachmentBytesPlatform(path, maxBytes: maxBytes);
 }
 
+/// Deletes a local attachment only when it resolves inside the app-owned
+/// attachment directory. Missing or unsafe paths are harmless.
+Future<bool> deleteStoredTaskAttachment(String path) async {
+  return deleteStoredTaskAttachmentPlatform(path);
+}
+
+/// Deletes orphaned regular files from the app-owned attachment directory.
+/// Symlinks, directories, missing files, and external targets are skipped.
+Future<int> deleteAllStoredTaskAttachments() async {
+  return deleteAllStoredTaskAttachmentsPlatform();
+}
+
 Future<bool> shareTaskAttachment(TaskAttachment attachment) async {
   if (attachment.type != TaskAttachmentType.file) return false;
   return shareStoredTaskAttachment(

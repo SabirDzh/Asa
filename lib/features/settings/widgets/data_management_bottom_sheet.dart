@@ -152,9 +152,13 @@ void showDataManagementSheet(BuildContext context) {
                   defaultColor: textColor,
                   onTap: () {
                     Navigator.pop(ctx);
-                    _confirmAction(context, settings.tr('clear_tasks'), () {
-                      taskProvider.clearAllTasks();
-                    });
+                    _confirmAction(
+                      context,
+                      settings.tr('clear_tasks'),
+                      () async {
+                        await taskProvider.clearAllTasks();
+                      },
+                    );
                   },
                 ),
                 _buildTile(
@@ -163,9 +167,13 @@ void showDataManagementSheet(BuildContext context) {
                   defaultColor: textColor,
                   onTap: () {
                     Navigator.pop(ctx);
-                    _confirmAction(context, settings.tr('clear_folders'), () {
-                      taskProvider.clearAllFolders();
-                    });
+                    _confirmAction(
+                      context,
+                      settings.tr('clear_folders'),
+                      () async {
+                        await taskProvider.clearAllFolders();
+                      },
+                    );
                   },
                 ),
                 _buildTile(
@@ -175,8 +183,8 @@ void showDataManagementSheet(BuildContext context) {
                   titleColor: Colors.redAccent,
                   onTap: () {
                     Navigator.pop(ctx);
-                    _confirmAction(context, settings.tr('clear_all'), () {
-                      taskProvider.clearAllData();
+                    _confirmAction(context, settings.tr('clear_all'), () async {
+                      await taskProvider.clearAllData();
                     });
                   },
                 ),
@@ -234,7 +242,7 @@ Widget _buildTile({
 void _confirmAction(
   BuildContext context,
   String title,
-  VoidCallback onConfirm,
+  Future<void> Function() onConfirm,
 ) {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   showDialog(
@@ -256,9 +264,9 @@ void _confirmAction(
             ),
           ),
           TextButton(
-            onPressed: () {
-              onConfirm();
-              Navigator.pop(ctx);
+            onPressed: () async {
+              await onConfirm();
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(
               settings.tr('delete'),

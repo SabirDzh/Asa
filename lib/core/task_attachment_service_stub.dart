@@ -5,6 +5,14 @@ Future<String?> storeTaskAttachmentBytes({
   return null;
 }
 
+Future<bool> deleteStoredTaskAttachmentPlatform(String path) async {
+  return false;
+}
+
+Future<int> deleteAllStoredTaskAttachmentsPlatform() async {
+  return 0;
+}
+
 Future<List<int>?> readStoredTaskAttachmentBytesPlatform(
   String path, {
   int maxBytes = 10 * 1024 * 1024,

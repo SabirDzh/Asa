@@ -10,6 +10,7 @@ import '../../../core/calendar_service.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/logger_service.dart';
 import '../../../core/notification_service.dart';
+import '../../../core/task_attachment_service.dart';
 
 enum TaskFilter { all, active, completed, foldersOnly }
 
@@ -1237,7 +1238,25 @@ class TaskProvider with ChangeNotifier {
     return changed;
   }
 
-  void clearAllTasks() {
+  Future<void> _deleteAttachmentsForTasks(Iterable<TaskItem> tasks) async {
+    final paths = <String>{};
+    for (final task in tasks) {
+      for (final block in task.infoBlocks) {
+        for (final attachment in block.attachments) {
+          if (attachment.type != TaskAttachmentType.link) {
+            paths.add(attachment.value);
+          }
+        }
+      }
+    }
+
+    await Future.wait(paths.map((path) => deleteStoredTaskAttachment(path)));
+  }
+
+  Future<void> clearAllTasks() async {
+    final tasksToClear = List<TaskItem>.of(_tasks);
+    await _deleteAttachmentsForTasks(tasksToClear);
+
     final now = DateTime.now();
     for (var i = 0; i < _tasks.length; i++) {
       _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);
@@ -1246,7 +1265,10 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
-  void clearAllFolders() {
+  Future<void> clearAllFolders() async {
+    final tasksToClear = _tasks.where((task) => task.folderId != null);
+    await _deleteAttachmentsForTasks(tasksToClear);
+
     final now = DateTime.now();
     for (var i = 0; i < _folders.length; i++) {
       if (!_folders[i].isSystemStreak && !_folders[i].isDeleted) {
@@ -1264,7 +1286,11 @@ class TaskProvider with ChangeNotifier {
     _saveToPrefs();
   }
 
-  void clearAllData() {
+  Future<void> clearAllData() async {
+    final tasksToClear = List<TaskItem>.of(_tasks);
+    await _deleteAttachmentsForTasks(tasksToClear);
+    await deleteAllStoredTaskAttachments();
+
     final now = DateTime.now();
     for (var i = 0; i < _tasks.length; i++) {
       _tasks[i] = _tasks[i].copyWith(isDeleted: true, updatedAt: now);

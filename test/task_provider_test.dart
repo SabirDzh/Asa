@@ -1,18 +1,48 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
+import 'package:asa/core/task_attachment_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('TaskProvider', () {
+    late Directory documentsDirectory;
+
     late TaskProvider provider;
 
-    setUp(() {
+    setUp(() async {
       SharedPreferences.setMockInitialValues({});
+      documentsDirectory = await Directory.systemTemp.createTemp(
+        'asa-task-provider-test-',
+      );
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (call) async {
+              if (call.method == 'getApplicationDocumentsDirectory') {
+                return documentsDirectory.path;
+              }
+              return null;
+            },
+          );
       provider = TaskProvider();
+    });
+
+    tearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            null,
+          );
+      if (await documentsDirectory.exists()) {
+        await documentsDirectory.delete(recursive: true);
+      }
     });
 
     String addTaskForTest(String title, {String? folderId}) {
@@ -429,20 +459,138 @@ void main() {
       expect(provider.allTasks.every((t) => t.isDeleted), true);
     });
 
-    test('clearAllTasks removes all tasks', () {
-      addTaskForTest('Task 1');
-      addTaskForTest('Task 2');
-      provider.clearAllTasks();
+    test('clearAllTasks removes all local task attachments', () async {
+      await provider.ready;
+      final attachment = await storeTaskAttachment(
+        type: TaskAttachmentType.file,
+        name: 'task.pdf',
+        bytes: const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31],
+        mimeType: 'application/pdf',
+      );
+      expect(attachment, isNotNull);
+      final storedAttachment = attachment!;
+      provider.addTask(
+        'Task with attachment',
+        infoBlocks: [
+          TaskInfoBlock.description(
+            attachments: [storedAttachment],
+            id: 'notes',
+          ),
+        ],
+      );
+
+      await provider.clearAllTasks();
+
       expect(provider.tasks, isEmpty);
+      expect(
+        await readStoredTaskAttachmentBytes(storedAttachment.value),
+        isNull,
+      );
     });
 
-    test('clearAllData removes everything', () {
+    test('clearAllFolders removes attachments from folder tasks', () async {
+      await provider.ready;
       provider.addFolder('Work');
-      addTaskForTest('Task');
-      provider.clearAllData();
-      expect(provider.filteredFolders, isEmpty);
+      final folderId =
+          provider.filteredFolders.firstWhere((f) => !f.isSystemStreak).id;
+      final attachment = await storeTaskAttachment(
+        type: TaskAttachmentType.file,
+        name: 'folder-task.pdf',
+        bytes: const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31],
+        mimeType: 'application/pdf',
+      );
+      expect(attachment, isNotNull);
+      final storedAttachment = attachment!;
+      provider.addTask(
+        'Folder task',
+        folderId: folderId,
+        infoBlocks: [
+          TaskInfoBlock.description(
+            attachments: [storedAttachment],
+            id: 'notes',
+          ),
+        ],
+      );
+
+      await provider.clearAllFolders();
+
       expect(provider.tasks, isEmpty);
+      expect(
+        await readStoredTaskAttachmentBytes(storedAttachment.value),
+        isNull,
+      );
     });
+
+    test(
+      'clearAllData removes local files, preserves links, and tolerates missing paths',
+      () async {
+        await provider.ready;
+        final localAttachment = await storeTaskAttachment(
+          type: TaskAttachmentType.file,
+          name: 'private.pdf',
+          bytes: const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31],
+          mimeType: 'application/pdf',
+        );
+        expect(localAttachment, isNotNull);
+        final storedAttachment = localAttachment!;
+        final orphan = File(
+          '${documentsDirectory.path}${Platform.pathSeparator}task_attachments${Platform.pathSeparator}orphan.pdf',
+        );
+        await orphan.parent.create(recursive: true);
+        await orphan.writeAsBytes(const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31]);
+        const link = TaskAttachment(
+          id: 'link',
+          type: TaskAttachmentType.link,
+          name: 'ASA',
+          value: 'https://example.com',
+        );
+        const missingFile = TaskAttachment(
+          id: 'missing',
+          type: TaskAttachmentType.file,
+          name: 'missing.pdf',
+          value: '/app/task_attachments/missing.pdf',
+        );
+        provider.addTask(
+          'Task',
+          infoBlocks: [
+            TaskInfoBlock.description(
+              id: 'notes',
+              attachments: [storedAttachment, link, missingFile],
+            ),
+          ],
+        );
+
+        await provider.clearAllData();
+
+        expect(
+          provider.filteredFolders.where((folder) => !folder.isSystemStreak),
+          isEmpty,
+        );
+        expect(
+          provider.filteredFolders.where((folder) => folder.isSystemStreak),
+          hasLength(1),
+        );
+        expect(provider.tasks, isEmpty);
+        expect(
+          await readStoredTaskAttachmentBytes(storedAttachment.value),
+          isNull,
+        );
+        expect(await orphan.exists(), isFalse);
+        final deletedTask = provider.allTasks.single;
+        expect(
+          deletedTask.infoBlocks.single.attachments.map((item) => item.type),
+          [
+            TaskAttachmentType.file,
+            TaskAttachmentType.link,
+            TaskAttachmentType.file,
+          ],
+        );
+        expect(
+          deletedTask.infoBlocks.single.attachments[1].value,
+          'https://example.com',
+        );
+      },
+    );
 
     test('setTaskTime calculates duration from the selected period', () {
       final taskId = addTaskForTest('Time task');
@@ -1020,12 +1168,12 @@ void main() {
       },
     );
 
-    test('clearAllFolders soft-deletes folders and their tasks', () {
+    test('clearAllFolders soft-deletes folders and their tasks', () async {
       provider.addFolder('Work');
       final folderId = provider.filteredFolders.first.id;
       final taskId = addTaskForTest('Task', folderId: folderId);
 
-      provider.clearAllFolders();
+      await provider.clearAllFolders();
 
       expect(provider.folders, isEmpty);
       expect(provider.tasks, isEmpty);

@@ -42,6 +42,8 @@ app.*.map.json
 # Local build configuration and secrets
 /config/private.env
 /config/*.local
+/.env
+/.env.*
 
 # Android Studio will place build artifacts here
 /android/app/debug

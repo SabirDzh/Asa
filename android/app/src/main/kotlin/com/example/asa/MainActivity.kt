@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import java.util.TimeZone
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -28,6 +29,8 @@ class MainActivity : FlutterActivity() {
                     openNotificationSettings()
                     result.success(null)
                 }
+                "getTimeZoneId" ->
+                    result.success(TimeZone.getDefault().id)
                 "isExactAlarmGranted" ->
                     result.success(isExactAlarmGranted())
                 "openExactAlarmSettings" -> {

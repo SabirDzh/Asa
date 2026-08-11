@@ -214,6 +214,55 @@ void main() {
     });
   });
 
+  group('NotificationService local zone resolution', () {
+    test('keeps a valid IANA name from Dart', () async {
+      final location = await NotificationService.resolveLocalLocation(
+        timeZoneName: 'Europe/Moscow',
+      );
+      expect(location.name, 'Europe/Moscow');
+    });
+
+    test('asks the OS when Dart reports only an abbreviation', () async {
+      final location = await NotificationService.resolveLocalLocation(
+        timeZoneName: 'MSK',
+        timeZoneIdProvider: () async => 'Europe/Moscow',
+      );
+      expect(location.name, 'Europe/Moscow');
+    });
+
+    test('falls back to a fixed offset when both lookups fail', () async {
+      final location = await NotificationService.resolveLocalLocation(
+        timeZoneName: 'NOT_A_ZONE',
+        timeZoneIdProvider: () async => null,
+        fallbackOffset: const Duration(hours: 5, minutes: 30),
+      );
+      expect(location.name, 'UTC+05:30');
+    });
+
+    test('falls back to a fixed offset when the OS ID is unknown', () async {
+      final location = await NotificationService.resolveLocalLocation(
+        timeZoneName: 'NOT_A_ZONE',
+        timeZoneIdProvider: () async => 'NOT_A_ZONE_EITHER',
+        fallbackOffset: const Duration(hours: -3),
+      );
+      expect(location.name, 'UTC-03:00');
+    });
+  });
+
+  group('NotificationService device time zone', () {
+    test('deviceTimeZoneId uses the override provider', () async {
+      NotificationService.deviceTimeZoneIdOverride =
+          () async => 'Europe/Moscow';
+      addTearDown(() => NotificationService.deviceTimeZoneIdOverride = null);
+      expect(await NotificationService.deviceTimeZoneId(), 'Europe/Moscow');
+    });
+
+    test('deviceTimeZoneId returns null without a host handler', () async {
+      // No override and no platform channel in tests -> MissingPluginException.
+      expect(await NotificationService.deviceTimeZoneId(), isNull);
+    });
+  });
+
   group('NotificationService due-date helpers', () {
     test('due-date notification ID does not collide with start-time ID', () {
       final startId = NotificationService.notificationIdForTask('task-1');

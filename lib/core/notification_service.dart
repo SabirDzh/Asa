@@ -64,6 +64,9 @@ class NotificationService {
   static Future<bool> Function()? permanentlyDeniedOverride;
 
   @visibleForTesting
+  static Future<String?> Function()? deviceTimeZoneIdOverride;
+
+  @visibleForTesting
   static Future<void> Function()? openNotificationSettingsOverride;
 
   @visibleForTesting
@@ -431,6 +434,79 @@ class NotificationService {
     final hours = (abs.inHours).toString().padLeft(2, '0');
     final minutes = (abs.inMinutes % 60).toString().padLeft(2, '0');
     return 'UTC$sign$hours:$minutes';
+  }
+
+  /// Returns the device's IANA time-zone identifier (for example,
+  /// `Europe/Moscow`) as reported by the operating system, or null when the
+  /// platform does not expose one.
+  ///
+  /// Dart's [DateTime.timeZoneName] can return a bare abbreviation (for
+  /// example, `MSK`) on some Android devices, which is not an IANA
+  /// identifier. The native side always has the real zone, so this method
+  /// asks it directly. The identifier is then resolved against the bundled
+  /// tz database, which keeps DST transitions correct in the fallback path.
+  static Future<String?> deviceTimeZoneId() async {
+    final override = deviceTimeZoneIdOverride;
+    if (override != null) return override();
+    if (kIsWeb) return null;
+    try {
+      final id = await _platformChannel.invokeMethod<String>('getTimeZoneId');
+      return (id == null || id.isEmpty) ? null : id;
+    } on MissingPluginException {
+      // No host implementation (tests, unsupported hosts): nothing to query.
+      return null;
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Device time-zone lookup failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  /// Resolves the local location used for scheduling notifications.
+  ///
+  /// Resolution order:
+  /// 1. [DateTime.timeZoneName] when it is a valid IANA identifier;
+  /// 2. the OS-provided IANA identifier via [deviceTimeZoneId] (covers
+  ///    Android devices that report only an abbreviation, keeping DST rules);
+  /// 3. a fixed-offset location named with a parseable offset-based zone ID
+  ///    as the last resort.
+  ///
+  /// [timeZoneName] and [timeZoneIdProvider] are overridable for tests;
+  /// [fallbackOffset] pins the last-resort offset in deterministic tests.
+  static Future<tz.Location> resolveLocalLocation({
+    String? timeZoneName,
+    Future<String?> Function()? timeZoneIdProvider,
+    Duration? fallbackOffset,
+  }) async {
+    final dartName = timeZoneName ?? DateTime.now().timeZoneName;
+    try {
+      return tz.getLocation(dartName);
+    } on Object {
+      // Not an IANA identifier; ask the OS for the real zone.
+    }
+
+    final provider = timeZoneIdProvider ?? deviceTimeZoneId;
+    try {
+      final osId = await provider();
+      if (osId != null && osId.isNotEmpty) {
+        return tz.getLocation(osId);
+      }
+    } on Object {
+      // Fall through to the fixed-offset last resort.
+    }
+
+    final offset = fallbackOffset ?? DateTime.now().timeZoneOffset;
+    return tz.Location(
+      zoneIdForOffset(offset),
+      const <int>[],
+      const <int>[],
+      <tz.TimeZone>[
+        tz.TimeZone(offset.inMilliseconds, isDst: false, abbreviation: 'LOCAL'),
+      ],
+    );
   }
 
   /// Returns the next local occurrence of a task start time.

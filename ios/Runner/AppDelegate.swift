@@ -17,8 +17,13 @@ import UIKit
       binaryMessenger: controller.binaryMessenger
     )
     channel.setMethodCallHandler { call, result in
-      guard call.method == "openNotificationSettings" else {
+      guard call.method == "openNotificationSettings" || call.method == "getTimeZoneId" else {
         result(FlutterMethodNotImplemented)
+        return
+      }
+
+      if call.method == "getTimeZoneId" {
+        result(TimeZone.current.identifier)
         return
       }
 

@@ -1,9 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
 import 'package:asa/core/logger_service.dart';
 
 void main() {
   setUp(() {
     LoggerService.instance.clearBuffer();
+    LoggerService.diagnosticsEndpointOverride = null;
+    LoggerService.reportClientOverride = null;
+    LoggerService.installationIdProviderOverride = null;
+    LoggerService.deviceNameProviderOverride = null;
   });
 
   test(
@@ -67,5 +74,68 @@ void main() {
     expect(logger.logs, hasLength(500));
     expect(logger.logs.first.toString(), contains('error-5'));
     expect(logger.logs.last.toString(), contains('error-504'));
+  });
+
+  group('sendDiagnosticReport', () {
+    test('sends a report and clears the buffer on a 201 response', () async {
+      LoggerService.diagnosticsEndpointOverride =
+          'https://example.com/api/reports';
+      LoggerService.installationIdProviderOverride = () async => 'inst-1';
+      LoggerService.deviceNameProviderOverride = () async => 'Test Phone';
+      late http.Request captured;
+      LoggerService.reportClientOverride = MockClient((request) async {
+        captured = request;
+        return http.Response(
+          '{"reportId":"report-123"}',
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final logger = LoggerService.instance;
+      logger.i('hello');
+
+      final result = await logger.sendDiagnosticReport();
+
+      expect(result.success, isTrue);
+      expect(result.reportId, 'report-123');
+      expect(logger.logs, isEmpty);
+      expect(captured.url.toString(), 'https://example.com/api/reports');
+      expect(captured.headers['Content-Type'], 'application/json');
+      final body = String.fromCharCodes(captured.bodyBytes);
+      expect(body, contains('"installationId":"inst-1"'));
+      expect(body, contains('"deviceName":"Test Phone"'));
+      expect(body, contains('hello'));
+    });
+
+    test(
+      'reports failure without clearing the buffer on a 4xx response',
+      () async {
+        LoggerService.diagnosticsEndpointOverride =
+            'https://example.com/api/reports';
+        LoggerService.installationIdProviderOverride = () async => 'inst-2';
+        LoggerService.deviceNameProviderOverride = () async => 'Test Phone';
+        LoggerService.reportClientOverride = MockClient(
+          (_) async => http.Response('{"error":"bad"}', 400),
+        );
+        final logger = LoggerService.instance;
+        logger.i('keep me');
+
+        final result = await logger.sendDiagnosticReport();
+
+        expect(result.success, isFalse);
+        expect(result.error, 'server_rejected');
+        expect(logger.logs, isNotEmpty);
+      },
+    );
+
+    test('fails with a clear reason when no endpoint is configured', () async {
+      final logger = LoggerService.instance;
+      logger.i('unreachable');
+
+      final result = await logger.sendDiagnosticReport();
+
+      expect(result.success, isFalse);
+      expect(result.error, 'endpoint_not_configured');
+    });
   });
 }

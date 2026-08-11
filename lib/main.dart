@@ -79,32 +79,11 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
         );
       }
       tz_data.initializeTimeZones();
-      try {
-        tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
-      } catch (_) {
-        // Some platforms expose only an abbreviation (for example, "MSK"),
-        // which is not an IANA identifier. Keep the device's actual offset
-        // instead of silently shifting reminders to UTC. The location name
-        // must be a valid offset-based zone ID (for example, "UTC+03:00"):
-        // the native notification plugin resolves it on the Java side with
-        // ZoneId.of(), which rejects arbitrary labels such as "device-offset"
-        // with "Unknown time-zone ID".
-        final offset = DateTime.now().timeZoneOffset;
-        tz.setLocalLocation(
-          tz.Location(
-            NotificationService.zoneIdForOffset(offset),
-            const <int>[],
-            const <int>[],
-            <tz.TimeZone>[
-              tz.TimeZone(
-                offset.inMilliseconds,
-                isDst: false,
-                abbreviation: 'LOCAL',
-              ),
-            ],
-          ),
-        );
-      }
+      // Resolve the local zone with DST rules. Dart's timeZoneName can be a
+      // bare abbreviation (for example, "MSK") on some Android devices; the
+      // service then asks the OS for the real IANA identifier before falling
+      // back to a fixed offset.
+      tz.setLocalLocation(await NotificationService.resolveLocalLocation());
       await NotificationService.init();
       if (!mounted) return;
       final settings = context.read<SettingsProvider>();

@@ -46,7 +46,9 @@ class AttachmentMentionSuggestions extends StatelessWidget {
     if (attachments.isEmpty) return const SizedBox.shrink();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor =
-        isDark ? AppColors.surfaceSecondaryDark : AppColors.surfaceSecondaryLight;
+        isDark
+            ? AppColors.surfaceSecondaryDark
+            : AppColors.surfaceSecondaryLight;
     final borderColor =
         isDark
             ? AppColors.textSecondaryDark.withValues(alpha: 0.25)
@@ -79,32 +81,38 @@ class AttachmentMentionSuggestions extends StatelessWidget {
             return Semantics(
               button: true,
               label: '${attachment.name}, ${_typeLabel(attachment.type)}',
-              child: ListTile(
-                key: ValueKey('attachment-mention-${attachment.id}'),
-                minTileHeight: 44,
-                dense: true,
-                leading: Icon(
-                  _icon(attachment.type),
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                title: Text(
-                  attachment.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                ),
-                trailing: Text(
-                  _typeLabel(attachment.type),
-                  style: TextStyle(
-                    color:
-                        isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                    fontSize: 12,
+              child: Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  key: ValueKey('attachment-mention-${attachment.id}'),
+                  minTileHeight: 44,
+                  dense: true,
+                  leading: Icon(
+                    _icon(attachment.type),
+                    color: AppColors.primary,
+                    size: 20,
                   ),
+                  title: Text(
+                    attachment.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: Text(
+                    _typeLabel(attachment.type),
+                    style: TextStyle(
+                      color:
+                          isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                      fontSize: 12,
+                    ),
+                  ),
+                  onTap: () => onSelected(attachment),
                 ),
-                onTap: () => onSelected(attachment),
               ),
             );
           },

@@ -245,6 +245,61 @@ void main() {
     expect(find.byKey(const ValueKey('add-quantity-block')), findsOneWidget);
   });
 
+  testWidgets('shows attachment mention suggestions after typing @', (
+    tester,
+  ) async {
+    final task = TaskItem(
+      id: 'mention-task',
+      title: 'Mentions',
+      infoBlocks: [
+        TaskInfoBlock.description(
+          id: 'details',
+          attachments: const [
+            TaskAttachment(
+              id: 'contract',
+              type: TaskAttachmentType.file,
+              name: 'contract.pdf',
+              value: '/tmp/task_attachments/contract.pdf',
+            ),
+            TaskAttachment(
+              id: 'photo',
+              type: TaskAttachmentType.image,
+              name: 'photo.png',
+              value: '/tmp/task_attachments/photo.png',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(createEditorTestApp(task: task));
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    final description = find.byKey(const ValueKey('description-text-input'));
+    await tester.enterText(description, '@con');
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('attachment-mention-suggestions')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('attachment-mention-contract')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('attachment-mention-photo')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('attachment-mention-contract')));
+    await tester.pump();
+    expect(
+      tester.widget<TextFormField>(description).controller!.text,
+      '[@contract.pdf](attachment://contract) ',
+    );
+  });
+
   testWidgets('adds a description block and rejects an unsafe link', (
     tester,
   ) async {

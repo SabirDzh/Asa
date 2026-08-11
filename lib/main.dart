@@ -8,7 +8,6 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'core/permission_gate.dart';
-import 'core/fast_scroll.dart';
 import 'core/theme.dart';
 import 'core/notification_service.dart';
 import 'core/scale_utils.dart';
@@ -278,7 +277,6 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
     return MaterialApp(
       title: 'ASA — Задачи и список дел',
       debugShowCheckedModeBanner: false,
-      scrollBehavior: const FastScrollBehavior(),
       themeMode: themeMode,
       theme: AppTheme.lightThemeFor(appPalette),
       darkTheme: AppTheme.darkThemeFor(appPalette),

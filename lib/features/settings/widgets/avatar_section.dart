@@ -9,78 +9,92 @@ import '../../../core/theme.dart';
 import '../../../core/image_utils.dart';
 import '../providers/settings_provider.dart';
 
-class AvatarSection extends StatelessWidget {
+class AvatarSection extends StatefulWidget {
   const AvatarSection({super.key});
 
+  @override
+  State<AvatarSection> createState() => _AvatarSectionState();
+}
+
+class _AvatarSectionState extends State<AvatarSection> {
+  bool _isPickingAvatar = false;
+
   Future<void> _pickAvatar(BuildContext context) async {
-    final settings = Provider.of<SettingsProvider>(context, listen: false);
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: null,
-    );
-    if (pickedFile == null) return;
+    if (_isPickingAvatar) return;
+    setState(() => _isPickingAvatar = true);
 
-    final format = await detectImageFormat(pickedFile.path);
-    if (format == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(settings.tr('avatar_invalid_format'))),
-        );
-      }
-      return;
-    }
-
-    final withinLimit = await isImageFileWithinLimit(pickedFile.path);
-    if (!withinLimit) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(settings.tr('avatar_too_large'))),
-        );
-      }
-      return;
-    }
-
-    final dir = await getApplicationDocumentsDirectory();
-    final ext = format == ImageFormat.gif ? 'gif' : 'webp';
-    final targetPath =
-        '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
-
-    String? resultPath;
-
-    if (format == ImageFormat.gif) {
-      final sourceBytes = await readValidatedImageBytes(pickedFile.path);
-      if (sourceBytes == null) return;
-      final dst = File(targetPath);
-      await dst.writeAsBytes(sourceBytes);
-      resultPath = targetPath;
-    } else {
-      final result = await FlutterImageCompress.compressAndGetFile(
-        pickedFile.path,
-        targetPath,
-        format: CompressFormat.webp,
-        quality: 90,
+    try {
+      final settings = Provider.of<SettingsProvider>(context, listen: false);
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: null,
       );
-      resultPath = result?.path;
-    }
+      if (pickedFile == null || !mounted) return;
 
-    if (resultPath != null) {
-      String? previousPath;
-      try {
-        previousPath = await settings.setAvatarPath(resultPath);
-      } catch (_) {
-        try {
-          final newFile = File(resultPath);
-          if (await newFile.exists()) await newFile.delete();
-        } catch (_) {}
+      final format = await detectImageFormat(pickedFile.path);
+      if (format == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(settings.tr('avatar_invalid_format'))),
+          );
+        }
         return;
       }
-      if (previousPath != null && previousPath != resultPath) {
-        try {
-          final oldFile = File(previousPath);
-          if (await oldFile.exists()) await oldFile.delete();
-        } catch (_) {}
+
+      final withinLimit = await isImageFileWithinLimit(pickedFile.path);
+      if (!withinLimit) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(settings.tr('avatar_too_large'))),
+          );
+        }
+        return;
       }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final ext = format == ImageFormat.gif ? 'gif' : 'webp';
+      final targetPath =
+          '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+      String? resultPath;
+
+      if (format == ImageFormat.gif) {
+        final sourceBytes = await readValidatedImageBytes(pickedFile.path);
+        if (sourceBytes == null) return;
+        final dst = File(targetPath);
+        await dst.writeAsBytes(sourceBytes);
+        resultPath = targetPath;
+      } else {
+        final result = await FlutterImageCompress.compressAndGetFile(
+          pickedFile.path,
+          targetPath,
+          format: CompressFormat.webp,
+          quality: 90,
+        );
+        resultPath = result?.path;
+      }
+
+      if (resultPath != null) {
+        String? previousPath;
+        try {
+          previousPath = await settings.setAvatarPath(resultPath);
+        } catch (_) {
+          try {
+            final newFile = File(resultPath);
+            if (await newFile.exists()) await newFile.delete();
+          } catch (_) {}
+          return;
+        }
+        if (previousPath != null && previousPath != resultPath) {
+          try {
+            final oldFile = File(previousPath);
+            if (await oldFile.exists()) await oldFile.delete();
+          } catch (_) {}
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingAvatar = false);
     }
   }
 
@@ -150,13 +164,16 @@ class AvatarSection extends StatelessWidget {
       children: [
         Center(
           child: GestureDetector(
-            onTap: () {
-              if (hasAvatar) {
-                _showFullScreen(context, avatarPath);
-              } else {
-                _pickAvatar(context);
-              }
-            },
+            onTap:
+                _isPickingAvatar
+                    ? null
+                    : () {
+                      if (hasAvatar) {
+                        _showFullScreen(context, avatarPath);
+                      } else {
+                        _pickAvatar(context);
+                      }
+                    },
             child: Hero(
               tag: 'avatar_hero',
               child: Container(
@@ -202,7 +219,7 @@ class AvatarSection extends StatelessWidget {
         const SizedBox(height: 12),
         Center(
           child: ElevatedButton(
-            onPressed: () => _pickAvatar(context),
+            onPressed: _isPickingAvatar ? null : () => _pickAvatar(context),
             style: ElevatedButton.styleFrom(
               backgroundColor: surface,
               foregroundColor: textSecondary,

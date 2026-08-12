@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/calendar_service.dart';
 import '../../../core/anchored_popup_menu.dart';
 import '../../../core/snackbar_deduper.dart';
+import '../../../core/responsive_center.dart';
 import '../../../core/theme.dart';
 import 'task_editor_sheet.dart';
 import '../models/task_model.dart';
@@ -643,7 +644,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
         child: Material(
           color: Colors.transparent,
           child: SizedBox(
-            width: MediaQuery.of(context).size.width - 32,
+            width: responsiveContentWidth(context),
             child: Container(
               constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
               decoration: BoxDecoration(

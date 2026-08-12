@@ -2,6 +2,27 @@ import 'package:flutter/material.dart';
 
 import 'scale_utils.dart';
 
+/// Returns the width available to a child inside [ResponsiveCenter], minus
+/// the horizontal inset applied by the child list/card container.
+///
+/// This is also used for drag feedback, which is rendered in an overlay and
+/// therefore cannot infer the original row constraints through LayoutBuilder.
+double responsiveContentWidth(
+  BuildContext context, {
+  double horizontalInset = 32,
+}) {
+  final viewportWidth =
+      AppScaleViewport.maybeOf(context)?.width ??
+      MediaQuery.sizeOf(context).width;
+  final contentWidth =
+      viewportWidth > 900
+          ? 800 - 64
+          : viewportWidth > 600
+          ? 600 - 48
+          : viewportWidth;
+  return (contentWidth - horizontalInset).clamp(0.0, double.infinity);
+}
+
 /// Centers content and limits its width on large screens.
 ///
 /// - < 600 logical pixels: full width, normal phone layout.

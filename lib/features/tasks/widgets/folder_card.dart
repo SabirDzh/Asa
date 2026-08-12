@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/anchored_popup_menu.dart';
 import '../../../core/snackbar_deduper.dart';
+import '../../../core/responsive_center.dart';
 import '../../../core/theme.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/bottom_sheet.dart';
@@ -350,7 +351,7 @@ class _FolderRowState extends State<FolderRow> {
         child: Material(
           color: Colors.transparent,
           child: SizedBox(
-            width: MediaQuery.of(context).size.width - 32,
+            width: responsiveContentWidth(context),
             child: Container(
               constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
               decoration: BoxDecoration(

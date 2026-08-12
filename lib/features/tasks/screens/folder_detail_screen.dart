@@ -115,7 +115,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
 
     return Scaffold(
       backgroundColor: bg,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: ResponsiveCenter(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,

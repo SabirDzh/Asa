@@ -45,6 +45,11 @@ class DevicePermissions {
   @visibleForTesting
   static Future<bool> Function()? localNetworkPermissionOverride;
 
+  @visibleForTesting
+  static Future<void> Function()? openAutoStartSettingsOverride;
+
+  static const _autoStartConfirmedKey = 'asa_autostart_confirmed';
+
   /// Requests the Android permission needed by the mDNS sync transport.
   ///
   /// Android 13+ uses NEARBY_WIFI_DEVICES; older supported Android versions
@@ -100,7 +105,10 @@ class DevicePermissions {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final autoStartDone = prefs.getBool('asa_autostart_visited') ?? false;
+      // `asa_autostart_visited` was written merely by opening OEM settings in
+      // older builds. Ignore it so an update cannot treat an unverified visit
+      // as a real permission grant.
+      final autoStartDone = prefs.getBool(_autoStartConfirmedKey) ?? false;
 
       final notifications = await areNotificationsGranted();
       final exactAlarm = await isExactAlarmGranted();
@@ -203,16 +211,29 @@ class DevicePermissions {
     }
   }
 
-  /// Opens the OEM auto-start settings page.
+  /// Opens the OEM auto-start settings page without claiming that the user
+  /// enabled anything. The caller must obtain explicit confirmation after the
+  /// user returns from system settings.
   static Future<void> openAutoStartSettings() async {
+    final override = openAutoStartSettingsOverride;
+    if (override != null) {
+      await override();
+      return;
+    }
     if (kIsWeb || !Platform.isAndroid) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('asa_autostart_visited', true);
       await _channel.invokeMethod<void>('openAutoStartSettings');
     } on MissingPluginException {
       // No-op
     }
+  }
+
+  /// Records an explicit in-app confirmation that auto-start was enabled.
+  /// OEM settings do not expose a portable read API, so this is intentionally
+  /// separate from [openAutoStartSettings] and is never written automatically.
+  static Future<void> markAutoStartConfirmed() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoStartConfirmedKey, true);
   }
 
   /// Opens the system notification settings for this app.

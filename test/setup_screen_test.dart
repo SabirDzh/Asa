@@ -22,6 +22,7 @@ void main() {
     timeDilation = 1.0;
     DevicePermissions.permissionStateOverride = null;
     DevicePermissions.localNetworkPermissionOverride = null;
+    DevicePermissions.openAutoStartSettingsOverride = null;
     NotificationService.requestPermissionOverride = null;
     NotificationService.permanentlyDeniedOverride = null;
     NotificationService.openNotificationSettingsOverride = null;
@@ -49,6 +50,14 @@ void main() {
     exactAlarmGranted: true,
     batteryOptimizationDisabled: true,
     autoStartGranted: true,
+    autoStartSupported: true,
+  );
+
+  const autoStartIncompleteState = PermissionState(
+    notificationsGranted: true,
+    exactAlarmGranted: true,
+    batteryOptimizationDisabled: true,
+    autoStartGranted: false,
     autoStartSupported: true,
   );
 
@@ -100,7 +109,7 @@ void main() {
         required requestExactAlarms,
       }) async {
         requestCalled = true;
-        expect(requestExactAlarms, isTrue);
+        expect(requestExactAlarms, isFalse);
         return false;
       };
       NotificationService.permanentlyDeniedOverride = () async => false;
@@ -117,6 +126,49 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      'auto-start requires explicit confirmation after returning from settings',
+      (tester) async {
+        var settingsOpened = false;
+        DevicePermissions.permissionStateOverride = autoStartIncompleteState;
+        DevicePermissions.openAutoStartSettingsOverride = () async {
+          settingsOpened = true;
+        };
+
+        await tester.pumpWidget(createSetupScreenWidget());
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Включить'));
+        await tester.pump();
+        expect(settingsOpened, isTrue);
+        expect(
+          (await SharedPreferences.getInstance()).getBool(
+            'asa_autostart_confirmed',
+          ),
+          isNull,
+        );
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Автозапуск включён?'), findsOneWidget);
+
+        DevicePermissions.permissionStateOverride = completeState;
+        await tester.tap(find.text('Я включил автозапуск'));
+        await tester.pumpAndSettle();
+
+        expect(
+          (await SharedPreferences.getInstance()).getBool(
+            'asa_autostart_confirmed',
+          ),
+          isTrue,
+        );
+        expect(find.text('Продолжить'), findsOneWidget);
+      },
+    );
 
     testWidgets('granting permission enables the notifications setting', (
       tester,

@@ -7,6 +7,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     DevicePermissions.permissionStateOverride = null;
     DevicePermissions.localNetworkPermissionOverride = null;
+    DevicePermissions.openAutoStartSettingsOverride = null;
   });
 
   group('PermissionState Matrix', () {
@@ -109,5 +110,26 @@ void main() {
         );
       },
     );
+
+    test('opening auto-start settings does not grant auto-start', () async {
+      var opened = false;
+      DevicePermissions.openAutoStartSettingsOverride = () async {
+        opened = true;
+      };
+
+      await DevicePermissions.openAutoStartSettings();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(opened, isTrue);
+      expect(prefs.getBool('asa_autostart_confirmed'), isNull);
+      expect(prefs.getBool('asa_autostart_visited'), isNull);
+    });
+
+    test('auto-start is persisted only by explicit confirmation', () async {
+      await DevicePermissions.markAutoStartConfirmed();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('asa_autostart_confirmed'), isTrue);
+    });
   });
 }

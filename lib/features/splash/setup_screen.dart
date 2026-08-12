@@ -41,6 +41,10 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
   late PermissionState _state;
   bool _notificationBusy = false;
+  bool _autoStartSettingsPending = false;
+  bool _autoStartSettingsWasBackgrounded = false;
+  bool _autoStartConfirmationShowing = false;
+  Timer? _autoStartExpiryTimer;
 
   @override
   void initState() {
@@ -61,14 +65,30 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _autoStartExpiryTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_checkPermissions());
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (_autoStartSettingsPending) {
+        _autoStartSettingsWasBackgrounded = true;
+      }
+      return;
     }
+    if (state != AppLifecycleState.resumed) return;
+    if (_autoStartSettingsPending && _autoStartSettingsWasBackgrounded) {
+      _autoStartSettingsPending = false;
+      _autoStartSettingsWasBackgrounded = false;
+      _autoStartExpiryTimer?.cancel();
+      _autoStartExpiryTimer = null;
+      unawaited(_confirmAutoStartAfterReturn());
+      return;
+    }
+    unawaited(_checkPermissions());
   }
 
   Future<void> _checkPermissions() async {
@@ -166,10 +186,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                           label: settings.tr('setup_autostart'),
                           subtitle: settings.tr('setup_autostart_subtitle'),
                           granted: _state.autoStartGranted,
-                          onFix: () async {
-                            await DevicePermissions.openAutoStartSettings();
-                            await _checkPermissions();
-                          },
+                          onFix: _openAutoStartSettings,
                         ),
                       ],
                       const SizedBox(height: 24),
@@ -223,8 +240,11 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     try {
       var granted = false;
       try {
+        // Exact alarms have their own tile below. Keep this request limited
+        // to notifications so Android cannot navigate to two system screens
+        // in one tap.
         granted = await NotificationService.requestPermission(
-          requestExactAlarms: true,
+          requestExactAlarms: false,
         );
       } on Object catch (error, stackTrace) {
         // A platform/plugin failure must never look like a successful request
@@ -263,6 +283,67 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     } finally {
       if (mounted) setState(() => _notificationBusy = false);
     }
+  }
+
+  Future<void> _openAutoStartSettings() async {
+    if (_autoStartSettingsPending) return;
+    _autoStartSettingsPending = true;
+    _autoStartSettingsWasBackgrounded = false;
+    _autoStartExpiryTimer?.cancel();
+    _autoStartExpiryTimer = Timer(const Duration(seconds: 30), () {
+      _autoStartSettingsPending = false;
+      _autoStartSettingsWasBackgrounded = false;
+      _autoStartExpiryTimer = null;
+    });
+    try {
+      await DevicePermissions.openAutoStartSettings();
+    } on Object catch (error, stackTrace) {
+      _autoStartSettingsPending = false;
+      _autoStartExpiryTimer?.cancel();
+      _autoStartExpiryTimer = null;
+      LoggerService.instance.w(
+        'Failed to open auto-start settings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        _showSnack(
+          context.read<SettingsProvider>().tr('setup_autostart_failed'),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmAutoStartAfterReturn() async {
+    if (!mounted || _autoStartConfirmationShowing) return;
+    _autoStartConfirmationShowing = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        final settings = context.read<SettingsProvider>();
+        return AlertDialog(
+          title: Text(settings.tr('setup_autostart_confirm_title')),
+          content: Text(settings.tr('setup_autostart_confirm_content')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(settings.tr('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(settings.tr('setup_autostart_confirm')),
+            ),
+          ],
+        );
+      },
+    );
+    _autoStartConfirmationShowing = false;
+    if (!mounted) return;
+    if (confirmed == true) {
+      await DevicePermissions.markAutoStartConfirmed();
+    }
+    await _checkPermissions();
   }
 
   void _showSnack(String message) {

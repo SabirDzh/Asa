@@ -309,6 +309,11 @@ class AppStrings {
       'setup_autostart': 'Автозапуск',
       'setup_autostart_subtitle':
           'Требуется на устройствах Xiaomi/HyperOS для получения уведомлений после перезагрузки',
+      'setup_autostart_confirm_title': 'Автозапуск включён?',
+      'setup_autostart_confirm_content':
+          'Проверьте, что для ASA включён автозапуск в системных настройках. Подтверждайте только после этого.',
+      'setup_autostart_confirm': 'Я включил автозапуск',
+      'setup_autostart_failed': 'Не удалось открыть настройки автозапуска',
       'setup_exact_alarm': 'Точные будильники и напоминания',
       'setup_exact_alarm_subtitle':
           'Разрешение на срабатывание уведомлений секунда в секунду (Android 12+)',
@@ -623,6 +628,11 @@ class AppStrings {
       'setup_autostart': 'Auto-start',
       'setup_autostart_subtitle':
           'Required on Xiaomi/HyperOS to receive notifications after reboot',
+      'setup_autostart_confirm_title': 'Is auto-start enabled?',
+      'setup_autostart_confirm_content':
+          'Verify that auto-start is enabled for ASA in system settings. Confirm only after doing so.',
+      'setup_autostart_confirm': 'I enabled auto-start',
+      'setup_autostart_failed': 'Could not open auto-start settings',
       'setup_exact_alarm': 'Exact alarms & reminders',
       'setup_exact_alarm_subtitle':
           'Permission for notifications to trigger down to the second (Android 12+)',

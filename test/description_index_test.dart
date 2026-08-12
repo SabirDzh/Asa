@@ -79,6 +79,10 @@ void main() {
     expect(results.first.score, greaterThan(300));
   });
 
+  test('accepts a leading hash when searching for a tag', () {
+    expect(index.search('#project/asa').single.task.id, 'read-book');
+  });
+
   test('excludes deleted tasks from resolution, search, and backlinks', () {
     final deleted = readBook.copyWith(isDeleted: true);
     index.rebuild([deleted, writeReport], [projects]);

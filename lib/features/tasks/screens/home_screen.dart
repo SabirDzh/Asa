@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +12,8 @@ import '../../../core/responsive_center.dart';
 import '../../../core/scroll_hide_mixin.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
+import 'knowledge_search_screen.dart';
+import '../widgets/task_detail_sheet.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../settings/providers/settings_provider.dart';
 
@@ -204,6 +208,11 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildTasksBody() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fabColor = isDark ? AppColors.navDark : AppColors.navLight;
+    final searchState = context.select<TaskProvider, (String, TaskFilter)>(
+      (provider) => (provider.searchQuery, provider.filter),
+    );
+    final showKnowledgeSearch =
+        searchState.$1.isNotEmpty && searchState.$2 != TaskFilter.foldersOnly;
 
     return SafeArea(
       bottom: false,
@@ -215,7 +224,19 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildSearchBar(),
-                const Expanded(child: _HomeFolderList()),
+                Expanded(
+                  child:
+                      showKnowledgeSearch
+                          ? KnowledgeSearchScreen(
+                            initialQuery: searchState.$1,
+                            showSearchField: false,
+                            onTaskTap:
+                                (task) => unawaited(
+                                  showTaskDetailSheet(context, task),
+                                ),
+                          )
+                          : const _HomeFolderList(),
+                ),
               ],
             ),
           ),

@@ -5,18 +5,23 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:asa/features/settings/providers/settings_provider.dart';
+import 'package:asa/features/tasks/models/task_info_block.dart';
+import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
 import 'package:asa/features/tasks/screens/home_screen.dart';
 import 'package:asa/core/home_widget_service.dart';
 import 'home_widget_channel_mock.dart';
 
-Widget createTestApp({Widget? home}) {
+Widget createTestApp({Widget? home, TaskProvider? provider}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(
         create: (_) => SettingsProvider(systemLanguageCodeProvider: () => 'ru'),
       ),
-      ChangeNotifierProvider(create: (_) => TaskProvider()),
+      if (provider == null)
+        ChangeNotifierProvider(create: (_) => TaskProvider())
+      else
+        ChangeNotifierProvider<TaskProvider>.value(value: provider),
     ],
     child: MaterialApp(home: home ?? const HomeScreen()),
   );
@@ -81,6 +86,33 @@ void main() {
       );
     },
   );
+
+  testWidgets('shows ranked knowledge results for description matches', (
+    tester,
+  ) async {
+    final provider = TaskProvider();
+    await provider.ready;
+    provider.addTaskRaw(
+      TaskItem(
+        id: 'knowledge-home-task',
+        title: 'Read book',
+        infoBlocks: [
+          TaskInfoBlock.description(id: 'description', text: '#reading notes'),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(createTestApp(provider: provider));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'reading');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('knowledge-result-knowledge-home-task')),
+      findsOneWidget,
+    );
+    provider.dispose();
+  });
 
   testWidgets('opens create folder sheet on FAB tap', (tester) async {
     await tester.pumpWidget(createTestApp());

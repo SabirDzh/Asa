@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/description_markdown.dart';
 import '../../../core/description_render_context.dart';
 import '../../../core/drag_close_sheet.dart';
 import '../../../core/task_attachment_service.dart';
@@ -12,11 +13,13 @@ import '../../browser/screens/in_app_browser_screen.dart';
 import '../screens/task_image_viewer_screen.dart';
 import '../screens/task_text_viewer_screen.dart';
 import '../screens/task_pdf_viewer_screen.dart';
+import '../screens/knowledge_search_screen.dart';
 import '../screens/task_file_viewer_screen.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
+import 'description_backlinks.dart';
 import 'description_full_sheet.dart';
 import 'quantity_counter.dart';
 
@@ -334,14 +337,57 @@ class _TaskDetailSheet extends StatelessWidget {
         ).showSnackBar(SnackBar(content: Text(message)));
       },
       onTagTap: (tag) {
-        final settings = context.read<SettingsProvider>();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${settings.tr('description_tag')}: $tag')),
-        );
+        unawaited(showKnowledgeSearchSheet(context, initialQuery: tag));
       },
       onAttachmentEmbedTap:
           (attachment) => _openAttachment(context, attachment),
     );
+  }
+
+  List<TaskItem> _relatedTasks(TaskProvider provider, TaskItem currentTask) {
+    final tags = provider.tagsForTask(currentTask.id);
+    if (tags.isEmpty) return const [];
+    final backlinkIds =
+        provider
+            .backlinksForTask(currentTask.id)
+            .map((task) => task.id)
+            .toSet();
+    final scored = <({TaskItem task, int score})>[];
+    for (final candidate in provider.tasks) {
+      if (candidate.id == currentTask.id ||
+          backlinkIds.contains(candidate.id)) {
+        continue;
+      }
+      final overlap =
+          tags.intersection(provider.tagsForTask(candidate.id)).length;
+      if (overlap > 0) scored.add((task: candidate, score: overlap));
+    }
+    scored.sort((a, b) {
+      final scoreOrder = b.score.compareTo(a.score);
+      if (scoreOrder != 0) return scoreOrder;
+      final titleOrder = a.task.title.toLowerCase().compareTo(
+        b.task.title.toLowerCase(),
+      );
+      if (titleOrder != 0) return titleOrder;
+      return a.task.id.compareTo(b.task.id);
+    });
+    return scored.take(8).map((entry) => entry.task).toList(growable: false);
+  }
+
+  String _taskSubtitle(BuildContext context, TaskItem task) {
+    final folder = _folderName(context, task);
+    final description = task.infoBlocks
+        .where((block) => block.type == TaskInfoBlockType.description)
+        .map((block) => block.text.trim())
+        .where((text) => text.isNotEmpty)
+        .join(' ');
+    final preview = descriptionPreview(
+      description,
+      maxCodePoints: 96,
+    ).replaceAll(RegExp(r'\s+'), ' ');
+    if (preview.isEmpty) return folder;
+    if (folder.isEmpty) return preview;
+    return '$folder · $preview';
   }
 
   Widget _buildInfoBlocks(
@@ -643,6 +689,39 @@ class _TaskDetailSheet extends StatelessWidget {
                     textColor,
                   ),
                 _buildInfoBlocks(context, textColor, currentTask),
+                Builder(
+                  builder: (context) {
+                    final tags = taskProvider.tagsForTask(currentTask.id);
+                    final backlinks = taskProvider.backlinksForTask(
+                      currentTask.id,
+                    );
+                    final related = _relatedTasks(taskProvider, currentTask);
+                    if (tags.isEmpty && backlinks.isEmpty && related.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return DescriptionBacklinks(
+                      key: const ValueKey('description-backlinks-section'),
+                      tags: tags,
+                      backlinks: backlinks,
+                      relatedTasks: related,
+                      tagsLabel: settings.tr('description_tags'),
+                      backlinksLabel: settings.tr('description_backlinks'),
+                      relatedLabel: settings.tr('description_related'),
+                      taskSubtitle: (task) => _taskSubtitle(context, task),
+                      onTagTap:
+                          (tag) => unawaited(
+                            showKnowledgeSearchSheet(
+                              context,
+                              initialQuery: tag,
+                            ),
+                          ),
+                      onTaskTap: (target) {
+                        if (target.id == currentTask.id) return;
+                        unawaited(showTaskDetailSheet(context, target));
+                      },
+                    );
+                  },
+                ),
                 if (currentTask.folderId != 'system_streak_folder')
                   _infoTile(
                     currentTask.calendarEventId != null

@@ -63,7 +63,7 @@ class DescriptionIndex {
   }
 
   List<DescriptionSearchResult> search(String query) {
-    final normalizedQuery = _normalize(query);
+    final normalizedQuery = _normalize(query).replaceFirst(RegExp(r'^#+'), '');
     if (normalizedQuery.isEmpty) return const [];
 
     final results = <DescriptionSearchResult>[];

@@ -633,6 +633,47 @@ void main() {
       expect(provider.filteredFolders[0].name, 'Work Projects');
     });
 
+    test('searches descriptions and exposes backlinks', () async {
+      await provider.ready;
+      provider.addFolder('Projects');
+      final folderId =
+          provider.folders.firstWhere((folder) => folder.name == 'Projects').id;
+      provider.addTask(
+        'Read book',
+        folderId: folderId,
+        infoBlocks: [
+          TaskInfoBlock.description(
+            id: 'details',
+            text: 'Notes about #reading.',
+          ),
+        ],
+      );
+      final readBookId = provider.tasks.last.id;
+      provider.addTask(
+        'Write report',
+        infoBlocks: [
+          TaskInfoBlock.description(
+            id: 'details',
+            text: 'Depends on [[Projects/Read book]].',
+          ),
+        ],
+      );
+
+      expect(provider.searchKnowledge('reading').single.task.id, readBookId);
+      expect(
+        provider.resolveDescriptionLink('Projects/Read book').task?.id,
+        readBookId,
+      );
+      expect(
+        provider.backlinksForTask(readBookId).single.title,
+        'Write report',
+      );
+      expect(provider.tagsForTask(readBookId), {'reading'});
+
+      provider.setSearchQuery('reading');
+      expect(provider.filteredInProgressTasks.single.id, readBookId);
+    });
+
     test(
       'search and filters compose across active and completed tasks',
       () async {
@@ -1272,13 +1313,44 @@ void main() {
     );
 
     group('upsertTask / upsertFolder', () {
-      test('upsertTask adds a new task', () {
-        final task = TaskItem(id: 't1', title: 'New');
-        final changed = provider.upsertTask(task);
+      test(
+        'upsertTask adds a new task and refreshes knowledge state',
+        () async {
+          await provider.ready;
+          final task = TaskItem(
+            id: 't1',
+            title: 'New',
+            infoBlocks: [
+              TaskInfoBlock.description(
+                id: 'details',
+                text: 'A note about #imported.',
+              ),
+            ],
+          );
+          var notifications = 0;
+          provider.addListener(() => notifications++);
 
-        expect(changed, true);
-        expect(provider.tasks.length, 1);
-        expect(provider.tasks.first.id, 't1');
+          final changed = provider.upsertTask(task);
+
+          expect(changed, true);
+          expect(provider.tasks.length, 1);
+          expect(provider.tasks.first.id, 't1');
+          expect(provider.searchKnowledge('imported').single.task.id, 't1');
+          expect(provider.tagsForTask('t1'), {'imported'});
+          expect(notifications, 1);
+        },
+      );
+
+      test('upsertTask persists imported task state', () async {
+        await provider.ready;
+        final task = TaskItem(id: 'persisted-upsert', title: 'Imported task');
+
+        expect(provider.upsertTask(task), isTrue);
+        await provider.flushPersistence();
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('saved_tasks'), contains('persisted-upsert'));
+        expect(prefs.getString('saved_tasks'), contains('Imported task'));
       });
 
       test('upsertTask overwrites with newer updatedAt', () {

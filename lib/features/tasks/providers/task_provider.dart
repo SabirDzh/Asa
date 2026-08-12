@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task_info_block.dart';
 import '../models/task_model.dart';
+import '../services/description_index.dart';
+import '../services/description_link_resolver.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/calendar_service.dart';
@@ -37,6 +39,7 @@ class _PersistenceSnapshot {
 
 class TaskProvider with ChangeNotifier {
   final _uuid = const Uuid();
+  final _descriptionIndex = DescriptionIndex();
   final List<TaskItem> _tasks = [];
   final List<FolderItem> _folders = [];
   final _initCompleter = Completer<void>();
@@ -60,17 +63,24 @@ class TaskProvider with ChangeNotifier {
   int _foldersVersion = 0;
   String? _lastViewedFolderName;
 
+  void _rebuildDescriptionIndex() {
+    _descriptionIndex.rebuild(_tasks, _folders);
+  }
+
   void _notifyTasksChanged() {
+    _rebuildDescriptionIndex();
     _tasksVersion++;
     notifyListeners();
   }
 
   void _notifyFoldersChanged() {
+    _rebuildDescriptionIndex();
     _foldersVersion++;
     notifyListeners();
   }
 
   void _notifyTasksAndFoldersChanged() {
+    _rebuildDescriptionIndex();
     _tasksVersion++;
     _foldersVersion++;
     notifyListeners();
@@ -87,6 +97,7 @@ class TaskProvider with ChangeNotifier {
     try {
       await _loadFromPrefs();
       await checkDailyStreak();
+      _rebuildDescriptionIndex();
       // The in-memory removal runs synchronously; only attachment file
       // deletion is deferred, so startup is never blocked by cleanup.
       unawaited(_purgeSoftDeletedItems());
@@ -110,6 +121,25 @@ class TaskProvider with ChangeNotifier {
   int get tasksVersion => _tasksVersion;
   int get foldersVersion => _foldersVersion;
   String? get lastViewedFolderName => _lastViewedFolderName;
+
+  List<DescriptionSearchResult> searchKnowledge(String query) {
+    return _descriptionIndex.search(query);
+  }
+
+  DescriptionLinkResolution resolveDescriptionLink(String target) {
+    return _descriptionIndex.resolve(target);
+  }
+
+  List<TaskItem> backlinksForTask(String taskId) {
+    final ids = _descriptionIndex.backlinkTaskIds(taskId);
+    return List.unmodifiable(
+      _tasks.where((task) => !task.isDeleted && ids.contains(task.id)),
+    );
+  }
+
+  Set<String> tagsForTask(String taskId) {
+    return _descriptionIndex.tagsForTask(taskId);
+  }
 
   void setSearchQuery(String query) {
     _searchQuery = query.trim().toLowerCase();
@@ -452,10 +482,17 @@ class TaskProvider with ChangeNotifier {
     if (_filter == TaskFilter.completed || _filter == TaskFilter.foldersOnly) {
       return [];
     }
+    final matchingIds =
+        _searchQuery.isEmpty
+            ? null
+            : _descriptionIndex
+                .search(_searchQuery)
+                .map((result) => result.task.id)
+                .toSet();
     return _tasks.where((t) {
       if (t.isDeleted || t.isCompleted) return false;
-      if (_searchQuery.isEmpty) return true;
-      return t.title.toLowerCase().contains(_searchQuery);
+      if (matchingIds == null) return true;
+      return matchingIds.contains(t.id);
     }).toList();
   }
 
@@ -463,10 +500,17 @@ class TaskProvider with ChangeNotifier {
     if (_filter == TaskFilter.active || _filter == TaskFilter.foldersOnly) {
       return [];
     }
+    final matchingIds =
+        _searchQuery.isEmpty
+            ? null
+            : _descriptionIndex
+                .search(_searchQuery)
+                .map((result) => result.task.id)
+                .toSet();
     return _tasks.where((t) {
       if (t.isDeleted || !t.isCompleted) return false;
-      if (_searchQuery.isEmpty) return true;
-      return t.title.toLowerCase().contains(_searchQuery);
+      if (matchingIds == null) return true;
+      return matchingIds.contains(t.id);
     }).toList();
   }
 
@@ -811,10 +855,14 @@ class TaskProvider with ChangeNotifier {
     );
     if (index == -1) {
       _tasks.add(normalizedTask);
+      _notifyTasksChanged();
+      _saveToPrefs(waitForReady: false);
       return true;
     }
     if (normalizedTask.updatedAt.isAfter(_tasks[index].updatedAt)) {
       _tasks[index] = normalizedTask;
+      _notifyTasksChanged();
+      _saveToPrefs(waitForReady: false);
       return true;
     }
     return false;

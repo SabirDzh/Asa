@@ -9,8 +9,16 @@ import 'package:asa/features/tasks/providers/task_provider.dart';
 
 class _BonsoirMock {
   static const _channel = MethodChannel('fr.skyost.bonsoir');
+  static var broadcastStartCalls = 0;
+  static var broadcastStopCalls = 0;
+
+  static void resetCounters() {
+    broadcastStartCalls = 0;
+    broadcastStopCalls = 0;
+  }
 
   static void setup() {
+    resetCounters();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, _handle);
   }
@@ -22,6 +30,8 @@ class _BonsoirMock {
 
   static Future<Object?> _handle(MethodCall call) async {
     final method = call.method;
+    if (method == 'broadcast.start') broadcastStartCalls++;
+    if (method == 'broadcast.stop') broadcastStopCalls++;
     if (method == 'broadcast.initialize' ||
         method == 'broadcast.start' ||
         method == 'broadcast.stop' ||
@@ -42,6 +52,7 @@ void main() {
     late TaskProvider provider;
 
     setUp(() async {
+      _BonsoirMock.resetCounters();
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
@@ -131,6 +142,19 @@ void main() {
       expect(await second, true);
       expect(SyncService.instance.isRunning, true);
       expect(SyncService.instance.actualPort, isNotNull);
+    });
+
+    test('coalesces back-to-back broadcast setting updates', () async {
+      SyncService.instance.setProvider(provider);
+      await SyncService.instance.start();
+      final startsAfterInitialStart = _BonsoirMock.broadcastStartCalls;
+
+      SyncService.instance.setDeviceName('Phone');
+      SyncService.instance.setDeviceId('device-id');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(_BonsoirMock.broadcastStopCalls, 1);
+      expect(_BonsoirMock.broadcastStartCalls, startsAfterInitialStart + 1);
     });
 
     test('sendToPeer round-trips a payload to the local server', () async {

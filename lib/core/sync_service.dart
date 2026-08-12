@@ -55,6 +55,8 @@ class SyncService {
   final Set<Socket> _activeSockets = <Socket>{};
   final Map<Socket, Timer> _socketTimeouts = <Socket, Timer>{};
   Future<bool>? _startFuture;
+  Future<void>? _broadcastUpdateFuture;
+  String? _activeBroadcastSignature;
   int _lifecycleGeneration = 0;
   bool _running = false;
   int? _actualPort;
@@ -154,6 +156,7 @@ class SyncService {
     _actualPort = null;
     _broadcast = null;
     _currentService = null;
+    _activeBroadcastSignature = null;
     _discoverySubscription = null;
     _discovery = null;
 
@@ -177,6 +180,11 @@ class SyncService {
   Future<void> stop() async {
     _lifecycleGeneration++;
     _running = false;
+    final pendingBroadcastUpdate = _broadcastUpdateFuture;
+    await _stopResource(
+      'pending sync broadcast update',
+      pendingBroadcastUpdate == null ? null : () => pendingBroadcastUpdate,
+    );
     final server = _server;
     final broadcast = _broadcast;
     final discoverySubscription = _discoverySubscription;
@@ -185,6 +193,7 @@ class SyncService {
     _actualPort = null;
     _broadcast = null;
     _currentService = null;
+    _activeBroadcastSignature = null;
     _discoverySubscription = null;
     _discovery = null;
 
@@ -385,6 +394,7 @@ class SyncService {
       _broadcast = BonsoirBroadcast(service: _currentService!);
       await _broadcast!.ready;
       await _broadcast!.start();
+      _activeBroadcastSignature = _broadcastSignatureForCurrentSettings();
       return true;
     } on Exception catch (error, stackTrace) {
       LoggerService.instance.e(
@@ -397,30 +407,94 @@ class SyncService {
   }
 
   /// Restarts the mDNS broadcast with the current device name and port.
-  Future<void> _updateBroadcast() async {
-    if (!_running || _broadcast == null || _actualPort == null) return;
-    try {
-      await _broadcast!.stop();
-      _currentService = BonsoirService(
-        name: _deviceName,
-        type: _serviceType,
-        port: _actualPort!,
-        attributes: <String, String>{
-          if (_deviceId.isNotEmpty) 'did': _deviceId,
-        },
-      );
-      _broadcast = BonsoirBroadcast(service: _currentService!);
-      await _broadcast!.ready;
-      await _broadcast!.start();
-      LoggerService.instance.i('Sync broadcast updated to $_deviceName');
-    } on Exception catch (error, stackTrace) {
-      LoggerService.instance.e(
-        'Failed to update sync broadcast',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
+  ///
+  /// Settings can update the name and device ID back-to-back. Queue updates so
+  /// Bonsoir never receives overlapping stop/start calls, and coalesce changes
+  /// that are already represented by the active broadcast.
+  void _updateBroadcast() {
+    final previous = _broadcastUpdateFuture ?? Future<void>.value();
+    final update = previous.then<void>((_) async {
+      if (!_running || _broadcast == null || _actualPort == null) return;
+      if (_activeBroadcastSignature ==
+          _broadcastSignatureForCurrentSettings()) {
+        return;
+      }
+
+      final generation = _lifecycleGeneration;
+      final broadcast = _broadcast!;
+      final port = _actualPort!;
+      try {
+        await broadcast.stop();
+        if (!_isCurrentGeneration(generation) ||
+            !identical(_broadcast, broadcast) ||
+            _actualPort != port) {
+          return;
+        }
+
+        final signature = _broadcastSignatureForCurrentSettings();
+        final replacement = BonsoirBroadcast(
+          service: BonsoirService(
+            name: _deviceName,
+            type: _serviceType,
+            port: port,
+            attributes: <String, String>{
+              if (_deviceId.isNotEmpty) 'did': _deviceId,
+            },
+          ),
+        );
+        _currentService = replacement.service;
+        _broadcast = replacement;
+        await replacement.ready;
+        if (!_isCurrentGeneration(generation) ||
+            !identical(_broadcast, replacement)) {
+          await _stopResource(
+            'stale sync broadcast replacement',
+            replacement.stop,
+          );
+          if (identical(_broadcast, replacement)) {
+            _broadcast = null;
+            _currentService = null;
+          }
+          return;
+        }
+
+        await replacement.start();
+        if (!_isCurrentGeneration(generation) ||
+            !identical(_broadcast, replacement)) {
+          await _stopResource(
+            'stale sync broadcast replacement',
+            replacement.stop,
+          );
+          if (identical(_broadcast, replacement)) {
+            _broadcast = null;
+            _currentService = null;
+          }
+          return;
+        }
+
+        _activeBroadcastSignature = signature;
+        LoggerService.instance.i('Sync broadcast updated to $_deviceName');
+      } on Exception catch (error, stackTrace) {
+        LoggerService.instance.e(
+          'Failed to update sync broadcast',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    });
+
+    _broadcastUpdateFuture = update;
+    unawaited(
+      update.whenComplete(() {
+        if (identical(_broadcastUpdateFuture, update)) {
+          _broadcastUpdateFuture = null;
+        }
+      }),
+    );
   }
+
+  String _broadcastSignatureForCurrentSettings() =>
+      '$_deviceName\u0000$_deviceId';
 
   Future<bool> _startDiscovery() async {
     try {

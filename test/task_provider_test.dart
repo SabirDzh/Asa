@@ -1358,5 +1358,199 @@ void main() {
         );
       });
     });
+
+    group('soft-delete retention purge', () {
+      test(
+        'purges deleted tasks and folders older than the retention period',
+        () async {
+          final oldDeletedTask = TaskItem(
+            id: 'old-deleted-task',
+            title: 'Old deleted task',
+            isDeleted: true,
+            updatedAt: DateTime.now().subtract(const Duration(days: 30)),
+          );
+          final recentDeletedTask = TaskItem(
+            id: 'recent-deleted-task',
+            title: 'Recent deleted task',
+            isDeleted: true,
+            updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+          );
+          final activeTask = TaskItem(
+            id: 'active-task',
+            title: 'Active task',
+            updatedAt: DateTime.now().subtract(const Duration(days: 30)),
+          );
+          final oldDeletedFolder = FolderItem(
+            id: 'old-deleted-folder',
+            name: 'Old deleted folder',
+            isDeleted: true,
+            updatedAt: DateTime.now().subtract(const Duration(days: 30)),
+          );
+          final recentDeletedFolder = FolderItem(
+            id: 'recent-deleted-folder',
+            name: 'Recent deleted folder',
+            isDeleted: true,
+            updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+          );
+          SharedPreferences.setMockInitialValues({
+            'saved_tasks': jsonEncode([
+              oldDeletedTask.toJson(),
+              recentDeletedTask.toJson(),
+              activeTask.toJson(),
+            ]),
+            'saved_folders': jsonEncode([
+              oldDeletedFolder.toJson(),
+              recentDeletedFolder.toJson(),
+            ]),
+          });
+
+          final restored = TaskProvider();
+          await restored.ready;
+          await restored.persist();
+
+          expect(
+            restored.allTasks.map((task) => task.id),
+            isNot(contains('old-deleted-task')),
+          );
+          expect(
+            restored.allTasks.map((task) => task.id),
+            containsAll(<String>['recent-deleted-task', 'active-task']),
+          );
+          expect(
+            restored.folders.map((folder) => folder.id),
+            isNot(contains('old-deleted-folder')),
+          );
+          // The app-owned streak folder is recreated at startup and survives.
+          expect(
+            restored.folders.any(
+              (folder) => folder.id == 'system_streak_folder',
+            ),
+            isTrue,
+          );
+
+          final prefs = await SharedPreferences.getInstance();
+          expect(
+            prefs.getString('saved_tasks'),
+            isNot(contains('old-deleted-task')),
+          );
+          expect(
+            prefs.getString('saved_folders'),
+            contains('recent-deleted-folder'),
+          );
+          expect(
+            prefs.getString('saved_folders'),
+            isNot(contains('old-deleted-folder')),
+          );
+        },
+      );
+
+      test('keeps deleted tasks still inside the retention period', () async {
+        final recentDeletedTask = TaskItem(
+          id: 'recent-deleted-task',
+          title: 'Recent deleted task',
+          isDeleted: true,
+          updatedAt: DateTime.now().subtract(const Duration(days: 6)),
+        );
+        SharedPreferences.setMockInitialValues({
+          'saved_tasks': jsonEncode([recentDeletedTask.toJson()]),
+        });
+
+        final restored = TaskProvider();
+        await restored.ready;
+        await restored.persist();
+
+        expect(
+          restored.allTasks.map((task) => task.id),
+          contains('recent-deleted-task'),
+        );
+      });
+
+      test('purges old deleted items merged during import or sync', () async {
+        await provider.ready;
+        final oldDeleted = TaskItem(
+          id: 'synced-old-deleted',
+          title: 'Synced old deleted',
+          isDeleted: true,
+          updatedAt: DateTime.now().subtract(const Duration(days: 30)),
+        );
+        final freshDeleted = TaskItem(
+          id: 'synced-fresh-deleted',
+          title: 'Synced fresh deleted',
+          isDeleted: true,
+          updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+        );
+
+        provider.addTaskRaw(oldDeleted);
+        provider.addTaskRaw(freshDeleted);
+        await provider.persist();
+
+        expect(
+          provider.allTasks.map((task) => task.id),
+          contains('synced-fresh-deleted'),
+        );
+        expect(
+          provider.allTasks.map((task) => task.id),
+          isNot(contains('synced-old-deleted')),
+        );
+      });
+
+      test('deletes attachment files of purged tasks', () async {
+        await provider.ready;
+        final attachment = await storeTaskAttachment(
+          type: TaskAttachmentType.file,
+          name: 'purged.pdf',
+          bytes: const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31],
+          mimeType: 'application/pdf',
+        );
+        expect(attachment, isNotNull);
+        final storedAttachment = attachment!;
+        provider.addTaskRaw(
+          TaskItem(
+            id: 'purged-with-attachment',
+            title: 'Purged attachment',
+            isDeleted: true,
+            updatedAt: DateTime.now().subtract(const Duration(days: 30)),
+            infoBlocks: [
+              TaskInfoBlock.description(
+                id: 'notes',
+                attachments: [storedAttachment],
+              ),
+            ],
+          ),
+        );
+
+        await provider.persist();
+
+        expect(
+          provider.allTasks.map((task) => task.id),
+          isNot(contains('purged-with-attachment')),
+        );
+        expect(
+          await readStoredTaskAttachmentBytes(storedAttachment.value),
+          isNull,
+        );
+      });
+
+      test(
+        'stale widget completion does not reset the retention clock',
+        () async {
+          await provider.ready;
+          final oldDeleted = TaskItem(
+            id: 'widget-deleted',
+            title: 'Widget deleted',
+            isDeleted: true,
+            updatedAt: DateTime.now().subtract(const Duration(days: 30)),
+          );
+          provider.addTaskRaw(oldDeleted);
+
+          // A stale background widget callback must not bump `updatedAt` on a
+          // soft-deleted task, otherwise it would keep the record alive.
+          provider.completeTaskFromWidget('widget-deleted');
+          await provider.persist();
+
+          expect(provider.allTasks, isEmpty);
+        },
+      );
+    });
   });
 }

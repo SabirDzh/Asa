@@ -12,6 +12,15 @@ import '../../../core/logger_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/task_attachment_service.dart';
 
+/// How long a soft-deleted task or folder is kept before it is permanently
+/// purged from the local database.
+///
+/// Records older than this are removed during app startup and after every
+/// import/sync merge (via [TaskProvider.persist]). Purged records cannot be
+/// restored, and the attachment files they reference are deleted from disk, so
+/// the persisted JSON never grows without bound.
+const Duration kDeletedItemRetention = Duration(days: 7);
+
 enum TaskFilter { all, active, completed, foldersOnly }
 
 class _PersistenceSnapshot {
@@ -78,6 +87,9 @@ class TaskProvider with ChangeNotifier {
     try {
       await _loadFromPrefs();
       await checkDailyStreak();
+      // The in-memory removal runs synchronously; only attachment file
+      // deletion is deferred, so startup is never blocked by cleanup.
+      unawaited(_purgeSoftDeletedItems());
     } finally {
       if (!_initCompleter.isCompleted) {
         _initCompleter.complete();
@@ -303,6 +315,49 @@ class TaskProvider with ChangeNotifier {
         }
       }
     } catch (_) {}
+  }
+
+  /// Permanently removes soft-deleted tasks and folders older than
+  /// [kDeletedItemRetention].
+  ///
+  /// Attachment files of purged tasks are deleted from disk. Legacy records
+  /// without a persisted `updatedAt` default to the current time and are
+  /// therefore kept, so old data is never accidentally purged. The system
+  /// streak folder is exempt. Nothing is persisted when there is nothing to
+  /// purge.
+  Future<void> _purgeSoftDeletedItems() async {
+    final cutoff = DateTime.now().subtract(kDeletedItemRetention);
+    final purgedTasks = <TaskItem>[];
+    _tasks.removeWhere((task) {
+      if (!task.isDeleted || !task.updatedAt.isBefore(cutoff)) return false;
+      purgedTasks.add(task);
+      return true;
+    });
+    final purgedFolders = <FolderItem>[];
+    _folders.removeWhere((folder) {
+      if (!folder.isDeleted ||
+          folder.isSystemStreak ||
+          !folder.updatedAt.isBefore(cutoff)) {
+        return false;
+      }
+      purgedFolders.add(folder);
+      return true;
+    });
+    if (purgedTasks.isEmpty && purgedFolders.isEmpty) return;
+
+    if (purgedTasks.isNotEmpty) {
+      try {
+        await _deleteAttachmentsForTasks(purgedTasks);
+      } on Object catch (error, stackTrace) {
+        LoggerService.instance.w(
+          'Attachment cleanup for purged tasks failed',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+    _notifyTasksAndFoldersChanged();
+    _saveToPrefs(waitForReady: false);
   }
 
   // ── Daily streak check logic ────────────────────────────────
@@ -793,9 +848,13 @@ class TaskProvider with ChangeNotifier {
   /// Applies a completion action already persisted by an Android widget
   /// background callback. Unlike [toggleTask], this is idempotent and cannot
   /// accidentally reopen a task when the callback ran before the app resumed.
+  /// Deleted tasks are skipped so a stale callback cannot bump `updatedAt` and
+  /// reset the soft-delete retention clock.
   void completeTaskFromWidget(String id) {
     final index = _tasks.indexWhere((task) => task.id == id);
-    if (index == -1 || _tasks[index].isCompleted) return;
+    if (index == -1 || _tasks[index].isDeleted || _tasks[index].isCompleted) {
+      return;
+    }
     final task = _tasks[index];
     var elapsedSeconds = task.timerElapsedSeconds;
     if (task.timerStartedAt != null) {
@@ -1178,6 +1237,9 @@ class TaskProvider with ChangeNotifier {
   /// Notifies listeners and persists the current state. Called after bulk
   /// operations such as import/sync merges.
   Future<void> persist() async {
+    // Imported or synced items may include old soft-deleted records; purge
+    // them so a stale peer cannot keep resurrecting deleted data.
+    await _purgeSoftDeletedItems();
     _notifyTasksAndFoldersChanged();
     await flushPersistence();
   }

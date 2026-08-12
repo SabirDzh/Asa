@@ -192,6 +192,7 @@ class SyncEnvelope {
 /// Exports and imports app data as a portable JSON file.
 class ExportImportService {
   static const String _version = '1.1.0';
+  static const int _maxRetainedExportFiles = 5;
 
   /// Builds a serializable snapshot from the current provider state.
   static AsaDataSnapshot buildSnapshot(TaskProvider provider) {
@@ -795,6 +796,58 @@ class ExportImportService {
     final path = '${dir.path}/asa_backup_$timestamp.json';
     final file = File(path);
     await file.writeAsString(json);
+    await _pruneExportFiles(dir, keep: file);
     return file;
+  }
+
+  /// Keeps exports bounded so repeated manual backups cannot grow app storage
+  /// forever. The newest [ _maxRetainedExportFiles ] files are retained.
+  static Future<void> _pruneExportFiles(
+    Directory directory, {
+    required File keep,
+  }) async {
+    try {
+      final exports =
+          await directory
+              .list(followLinks: false)
+              .where(
+                (entity) =>
+                    entity is File &&
+                    entity.path
+                        .split(Platform.pathSeparator)
+                        .last
+                        .startsWith('asa_backup_') &&
+                    entity.path.endsWith('.json'),
+              )
+              .cast<File>()
+              .toList();
+      exports.sort((left, right) => right.path.compareTo(left.path));
+      final retained = <String>{keep.path};
+      for (final file in exports) {
+        if (retained.length < _maxRetainedExportFiles) {
+          retained.add(file.path);
+          continue;
+        }
+        if (!retained.contains(file.path)) {
+          try {
+            await file.delete();
+          } on Object catch (error, stackTrace) {
+            LoggerService.instance.w(
+              'Failed to prune old export file',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }
+        }
+      }
+    } on Object catch (error, stackTrace) {
+      // Export success must not be turned into failure because cleanup is
+      // unavailable on a restricted filesystem.
+      LoggerService.instance.w(
+        'Failed to enumerate old export files',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 }

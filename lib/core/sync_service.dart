@@ -242,7 +242,16 @@ class SyncService {
   }
 
   /// Sends the current data snapshot to [peer].
+  ///
+  /// Sync transport is never allowed to send a plaintext snapshot. Export
+  /// files may remain unencrypted by design, but LAN sync requires the shared
+  /// secret that also authenticates/encrypts the payload.
   Future<bool> sendToPeer(TaskProvider provider, SyncPeer peer) async {
+    if (_secret == null || _secret!.isEmpty) {
+      LoggerService.instance.w('Sync send rejected: shared secret is required');
+      return false;
+    }
+
     Socket? socket;
     try {
       socket = await Socket.connect(

@@ -158,6 +158,17 @@ void main() {
       expect(_BonsoirMock.broadcastStartCalls, startsAfterInitialStart + 1);
     });
 
+    test('sendToPeer rejects plaintext transport without a secret', () async {
+      SyncService.instance.setSecret(null);
+
+      final ok = await SyncService.instance.sendToPeer(
+        provider,
+        const SyncPeer(name: 'peer', host: '127.0.0.1', port: 1),
+      );
+
+      expect(ok, isFalse);
+    });
+
     test('sendToPeer round-trips a payload to the local server', () async {
       provider.addTask('Local task');
       final receiver = TaskProvider();

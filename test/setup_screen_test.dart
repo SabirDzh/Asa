@@ -100,6 +100,34 @@ void main() {
       );
     });
 
+    testWidgets(
+      'permission action is below text with an accessible tap target',
+      (tester) async {
+        DevicePermissions.permissionStateOverride = incompleteState;
+
+        await tester.pumpWidget(createSetupScreenWidget());
+        await tester.pumpAndSettle();
+
+        final labelFinder = find.text('Уведомления');
+        final actionTextFinder = find.text('Включить');
+        final actionButtonFinder = find.ancestor(
+          of: actionTextFinder,
+          matching: find.byType(TextButton),
+        );
+        expect(labelFinder, findsOneWidget);
+        expect(actionTextFinder, findsOneWidget);
+        expect(actionButtonFinder, findsOneWidget);
+        expect(
+          tester.getTopLeft(actionButtonFinder).dy,
+          greaterThan(tester.getBottomLeft(labelFinder).dy),
+        );
+        expect(
+          tester.getSize(actionButtonFinder).height,
+          greaterThanOrEqualTo(48),
+        );
+      },
+    );
+
     testWidgets('notification enable action requests permission', (
       tester,
     ) async {

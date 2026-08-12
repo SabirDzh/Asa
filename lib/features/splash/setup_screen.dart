@@ -372,62 +372,80 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
         color: surface,
         borderRadius: BorderRadius.circular(14),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            granted ? Icons.check_circle : icon,
-            color: granted ? AppColors.primary : secondary,
-            size: 28,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(
+                  granted ? Icons.check_circle : icon,
+                  color: granted ? AppColors.primary : secondary,
+                  size: 24,
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: secondary,
-                      fontSize: 12,
-                      height: 1.3,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (!granted && onFix != null)
-            busy
-                ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-                : TextButton(
-                  onPressed: onFix,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  child: Text(
-                    context.watch<SettingsProvider>().tr('setup_enable'),
-                    style: const TextStyle(fontSize: 13),
-                  ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: secondary,
+                          fontSize: 12,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
+            ],
+          ),
+          if (!granted && onFix != null) ...[
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.centerRight,
+              child:
+                  busy
+                      ? const SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                      : TextButton(
+                        onPressed: onFix,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Text(
+                          context.watch<SettingsProvider>().tr('setup_enable'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+            ),
+          ],
         ],
       ),
     );

@@ -6,5 +6,5 @@
 /// `version:` в `pubspec.yaml`; при релизе его обновляет `scripts/release.sh`.
 const String appVersion = String.fromEnvironment(
   'APP_VERSION',
-  defaultValue: '1.1.6',
+  defaultValue: '1.2.6',
 );

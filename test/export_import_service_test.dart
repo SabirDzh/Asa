@@ -67,6 +67,121 @@ void main() {
       },
     );
 
+    test(
+      'round-trips raw Obsidian references and rebuilds the derived index',
+      () async {
+        final rawDescription =
+            '> [!note] Reading plan\n'
+            '> Link [[Read book|the book]] and keep #reading.\n'
+            '![[cover.png]] 😀';
+        provider.addTaskRaw(TaskItem(id: 'target', title: 'Read book'));
+        provider.addTaskRaw(
+          TaskItem(
+            id: 'source',
+            title: 'Reading plan',
+            infoBlocks: [
+              TaskInfoBlock.description(
+                id: 'description',
+                text: rawDescription,
+                attachments: [
+                  const TaskAttachment(
+                    id: 'cover',
+                    type: TaskAttachmentType.image,
+                    name: 'cover.png',
+                    value: '/tmp/task_attachments/cover.png',
+                    mimeType: 'image/png',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+        await provider.ready;
+
+        final snapshot = ExportImportService.buildSnapshot(provider);
+        final wire = jsonEncode(snapshot.toJson());
+        final wireSnapshot = AsaDataSnapshot.fromJson(
+          jsonDecode(wire) as Map<String, dynamic>,
+        );
+        final restored = TaskProvider();
+        final result = await ExportImportService.importFromSnapshot(
+          restored,
+          wireSnapshot,
+        );
+        await restored.ready;
+
+        expect(result.success, isTrue);
+        final restoredSource = restored.tasks.firstWhere(
+          (task) => task.id == 'source',
+        );
+        expect(restoredSource.infoBlocks.single.text, rawDescription);
+        final restoredAttachment =
+            restoredSource.infoBlocks.single.attachments.single;
+        expect(restoredAttachment.id, 'cover');
+        expect(restoredAttachment.name, 'cover.png');
+        expect(restoredAttachment.mimeType, 'image/png');
+        expect(restoredAttachment.value, '/tmp/task_attachments/cover.png');
+        expect(restored.resolveDescriptionLink('Read book').task?.id, 'target');
+        expect(restored.tagsForTask('source'), {'reading'});
+        expect(restored.backlinksForTask('target').map((task) => task.id), {
+          'source',
+        });
+
+        final rebuilt = TaskProvider();
+        await rebuilt.ready;
+        expect(
+          rebuilt.tasks
+              .firstWhere((task) => task.id == 'source')
+              .infoBlocks
+              .single
+              .text,
+          rawDescription,
+        );
+        expect(rebuilt.resolveDescriptionLink('Read book').task?.id, 'target');
+        expect(rebuilt.backlinksForTask('target').map((task) => task.id), {
+          'source',
+        });
+      },
+    );
+
+    test(
+      'ignores unknown optional description metadata without changing source',
+      () async {
+        final taskJson =
+            TaskItem(
+              id: 'legacy',
+              title: 'Legacy notes',
+              infoBlocks: [
+                TaskInfoBlock.description(
+                  id: 'description',
+                  text: '[[Read book]] #legacy',
+                ),
+              ],
+            ).toJson();
+        final blocks = taskJson['infoBlocks'] as List<dynamic>;
+        (blocks.single as Map<String, dynamic>)['parsedMetadata'] = {
+          'references': 'malformed',
+        };
+        final snapshot = AsaDataSnapshot(
+          version: '1.1.0',
+          exportedAt: 0,
+          tasks: [taskJson],
+          folders: [],
+        );
+
+        final result = await ExportImportService.importFromSnapshot(
+          provider,
+          snapshot,
+        );
+
+        expect(result.success, isTrue);
+        expect(
+          provider.tasks.single.infoBlocks.single.text,
+          '[[Read book]] #legacy',
+        );
+      },
+    );
+
     test('importFromFile reports cancelled when no file is picked', () {
       const result = ImportResult(cancelled: true);
       expect(result.cancelled, true);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -19,9 +20,23 @@ Future<void> showKnowledgeSearchSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder:
-        (sheetContext) => Container(
-          height: MediaQuery.sizeOf(sheetContext).height * 0.86,
+    builder: (sheetContext) {
+      final mediaQuery = MediaQuery.of(sheetContext);
+      final keyboardInset = mediaQuery.viewInsets.bottom;
+      final availableHeight = math.max(
+        0.0,
+        mediaQuery.size.height - keyboardInset,
+      );
+      final sheetHeight = math.min(
+        mediaQuery.size.height * 0.86,
+        availableHeight,
+      );
+      return AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Container(
+          height: sheetHeight,
           decoration: BoxDecoration(
             color: Theme.of(sheetContext).colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -44,6 +59,8 @@ Future<void> showKnowledgeSearchSheet(
             ),
           ),
         ),
+      );
+    },
   );
 }
 

@@ -4,6 +4,9 @@ import '../models/task_info_block.dart';
 import '../models/task_model.dart';
 import 'description_link_resolver.dart';
 
+/// Prevents a broad query from materializing an unbounded result list in UI.
+const int kMaxDescriptionSearchResults = 200;
+
 class DescriptionSearchResult {
   final TaskItem task;
   final List<String> matchedFields;
@@ -120,17 +123,29 @@ class DescriptionIndex {
             score: score,
           ),
         );
+        // Keep the working set bounded while scanning, not only at return
+        // time. This prevents a broad query from retaining every match until
+        // after sorting, even when the caller only needs the top K results.
+        if (results.length > kMaxDescriptionSearchResults) {
+          results.sort(_compareSearchResults);
+          results.removeLast();
+        }
       }
     }
 
-    results.sort((a, b) {
-      final scoreOrder = b.score.compareTo(a.score);
-      if (scoreOrder != 0) return scoreOrder;
-      final updatedOrder = b.task.updatedAt.compareTo(a.task.updatedAt);
-      if (updatedOrder != 0) return updatedOrder;
-      return a.task.id.compareTo(b.task.id);
-    });
+    results.sort(_compareSearchResults);
     return List.unmodifiable(results);
+  }
+
+  static int _compareSearchResults(
+    DescriptionSearchResult a,
+    DescriptionSearchResult b,
+  ) {
+    final scoreOrder = b.score.compareTo(a.score);
+    if (scoreOrder != 0) return scoreOrder;
+    final updatedOrder = b.task.updatedAt.compareTo(a.task.updatedAt);
+    if (updatedOrder != 0) return updatedOrder;
+    return a.task.id.compareTo(b.task.id);
   }
 
   DescriptionLinkResolution resolve(String target) {

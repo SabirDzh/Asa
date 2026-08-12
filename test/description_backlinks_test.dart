@@ -128,6 +128,79 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets(
+    'knowledge sheet adapts to 320dp, large text, and keyboard insets',
+    (tester) async {
+      final provider = TaskProvider();
+      await provider.ready;
+      provider.addTaskRaw(
+        TaskItem(
+          id: 'adaptive-task',
+          title: 'A deliberately long adaptive knowledge result title',
+          infoBlocks: [
+            TaskInfoBlock.description(
+              id: 'adaptive-description',
+              text: 'adaptive result with a long description preview',
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider(
+              create:
+                  (_) =>
+                      SettingsProvider(systemLanguageCodeProvider: () => 'en'),
+            ),
+          ],
+          child: MaterialApp(
+            builder:
+                (context, child) => MediaQuery(
+                  data: const MediaQueryData(
+                    size: Size(320, 640),
+                    viewInsets: EdgeInsets.only(bottom: 220),
+                    textScaler: TextScaler.linear(2),
+                  ),
+                  child: child!,
+                ),
+            home: Builder(
+              builder:
+                  (context) => Scaffold(
+                    body: ElevatedButton(
+                      key: const ValueKey('open-adaptive-knowledge-search'),
+                      onPressed:
+                          () => showKnowledgeSearchSheet(
+                            context,
+                            initialQuery: 'adaptive',
+                          ),
+                      child: const Text('Search'),
+                    ),
+                  ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('open-adaptive-knowledge-search')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('knowledge-search-input')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('knowledge-result-adaptive-task')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      provider.dispose();
+    },
+  );
+
   testWidgets('stays usable on a narrow viewport with large text', (
     tester,
   ) async {

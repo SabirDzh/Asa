@@ -1,7 +1,7 @@
 # ASA — Developer Documentation
 
 > **Audience:** engineers joining the project, maintainers, and anyone who wants to extend the app.  
-> **Last updated:** 2026-07-31
+> **Last updated:** 2026-08-12
 > **Project:** [`pubspec.yaml`](../pubspec.yaml)
 
 ---
@@ -55,8 +55,8 @@ lib/
 │   ├── folder_icons.dart              # Built-in SVG folder icons
 │   ├── home_widget_service.dart       # Widget update debouncer
 │   ├── image_utils.dart               # Avatar compression helpers
-│   ├── input_utils.dart               # Text formatters and sanitizers  │   ├── logger_service.dart            # Buffered logging + HTTPS diagnostic reporter
-
+│   ├── input_utils.dart               # Text formatters and sanitizers
+│   ├── logger_service.dart            # Buffered logging + HTTPS diagnostic reporter
 │   ├── notification_service.dart      # Local notifications wrapper
 │   ├── responsive_center.dart         # Large-screen layout wrapper
 │   ├── scale_utils.dart               # Adaptive UI scale limits
@@ -75,6 +75,9 @@ lib/
     └── tasks/
         ├── models/task_model.dart
         ├── providers/task_provider.dart
+        ├── services/
+        │   ├── description_index.dart
+        │   └── description_link_resolver.dart
         ├── screens/
         │   ├── home_screen.dart
         │   └── folder_detail_screen.dart
@@ -183,6 +186,31 @@ The task detail sheet is intentionally read-only. Editing (including description
 Search is lower-cased and matched against names/titles. `setSearchQuery` triggers a `notifyListeners()`, so the UI rebuilds.
 
 ---
+
+### 6.5 Obsidian-like descriptions
+
+Description source text remains the durable source of truth. The parser and index are derived in-memory state and are rebuilt after startup, import, sync, and task/folder mutations; do not persist the parsed AST.
+
+Supported source syntax:
+
+* `[[Task title]]` — resolves by exact title.
+* `[[Folder/Task title|display label]]` — resolves by root-to-leaf folder path and renders the alias.
+* `![[attachment-name.ext]]` — embeds only an attachment belonging to the same description.
+* `#tag` and `#nested/tag` — indexed as canonical lower-case tags and exposed through tag navigation.
+* `> [!note]`, `tip`, `warning`, `important`, and `quote` — rendered as bounded callouts.
+* `^block-id` — parsed as metadata for future block navigation; it is not implicitly clickable.
+
+Resolution rules are deterministic: exact title/path matches win, duplicate titles return an explicit ambiguous result, deleted tasks are excluded, and unresolved links never create or mutate tasks. Search ranks title, folder path, tags, and description in that order and returns at most `kMaxDescriptionSearchResults` results.
+
+Security and limits:
+
+* Descriptions are capped at `kMaxTaskDescriptionLength` (10,000 characters); the parser scans at most 256 references.
+* Only `http`/`https` external links are interactive. `javascript:`, `file:`, `data:`, malformed internal schemes, and remote Markdown images remain inert.
+* Local embeds must resolve to validated, owned task attachments; missing files render a placeholder and must not crash the UI.
+* The editor keeps raw Markdown in `TaskInfoBlock.text`; toolbar and preview transformations never rewrite persisted source.
+* UI consumers must keep result lists bounded, preserve semantics/tooltips, and test 320 dp layouts with large text.
+
+The main implementation files are `lib/core/description_document.dart`, `lib/core/description_reference_parser.dart`, `lib/features/tasks/services/description_index.dart`, `lib/features/tasks/screens/knowledge_search_screen.dart`, and `lib/features/tasks/widgets/description_backlinks.dart`.
 
 ## 7. Core Services
 

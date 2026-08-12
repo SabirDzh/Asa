@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -632,10 +633,18 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     if (stream != null) {
       final builder = BytesBuilder(copy: false);
       var totalLength = 0;
-      await for (final chunk in stream) {
-        totalLength += chunk.length;
-        if (totalLength > kMaxTaskAttachmentBytes) return null;
-        builder.add(chunk);
+      final iterator = StreamIterator<List<int>>(stream);
+      try {
+        while (await iterator.moveNext()) {
+          final chunk = iterator.current;
+          totalLength += chunk.length;
+          if (totalLength > kMaxTaskAttachmentBytes) return null;
+          builder.add(chunk);
+        }
+      } finally {
+        // Explicitly cancel the picker stream on both success and early size
+        // rejection so a platform file descriptor is not left open.
+        await iterator.cancel();
       }
       if (totalLength == 0) return null;
       return builder.takeBytes();

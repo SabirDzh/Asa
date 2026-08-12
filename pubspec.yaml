@@ -2,7 +2,7 @@ name: asa
 description: "ASA — modern task manager with folders and filtering."
 publish_to: 'none'
 # Keep lib/core/app_version.dart in sync when bumping this version.
-version: 1.2.6+8
+version: 1.2.7+9
 
 environment:
   sdk: ^3.7.2

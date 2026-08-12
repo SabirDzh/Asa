@@ -94,10 +94,20 @@ class _InAppBrowserScreenState extends State<InAppBrowserScreen> {
 
   String _tr(String key) => AppStrings.get(key, _language);
 
+  bool _controllerInitialized = false;
+
   @override
   void initState() {
     super.initState();
     _currentUrl = widget.url;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controllerInitialized) return;
+    _controllerInitialized = true;
+
     if (!widget.forceExternal &&
         InAppBrowserScreen.supportsEmbeddedWebView &&
         widget.url.scheme == 'https' &&

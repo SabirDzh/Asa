@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:asa/core/description_markdown.dart';
+import 'package:asa/core/description_render_context.dart';
 import 'package:asa/features/tasks/models/task_info_block.dart';
+import 'package:asa/features/tasks/models/task_model.dart';
+import 'package:asa/features/tasks/services/description_link_resolver.dart';
 
 void main() {
   group('description preview', () {
@@ -133,6 +136,145 @@ void main() {
 
       expect(expandAttachmentMentions(source, const [attachment]), source);
     });
+  });
+
+  test('prepares Wikilinks, tags, and local embeds without touching code', () {
+    const attachment = TaskAttachment(
+      id: 'notes-1',
+      type: TaskAttachmentType.file,
+      name: 'notes.txt',
+      value: '/private/task_attachments/notes.txt',
+    );
+    final prepared = prepareDescriptionMarkdown(
+      '[[Read book|open]] #project ![[notes.txt]] `[[literal]]`',
+      const [attachment],
+    );
+
+    expect(prepared, contains('asa-wikilink://link?value=Read+book'));
+    expect(prepared, contains('asa-tag://link?value=project'));
+    expect(prepared, contains('![notes.txt](attachment://notes-1)'));
+    expect(prepared, contains('`[[literal]]`'));
+    expect(prepared, isNot(contains('[[Read book|open]]')));
+  });
+
+  testWidgets('renders safe Wikilinks, tags, callouts, and embeds', (
+    tester,
+  ) async {
+    var wikilinkTapped = false;
+    var tagTapped = false;
+    var embedTapped = false;
+    const attachment = TaskAttachment(
+      id: 'notes-1',
+      type: TaskAttachmentType.file,
+      name: 'notes.txt',
+      value: '/private/task_attachments/notes.txt',
+    );
+    final target = TaskItem(id: 'read-book', title: 'Read book');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DescriptionBody(
+            text:
+                '[[Read book]] #project\n\n> [!warning] Care\n> Be careful with [[Care plan]] and #inside.\n\n![[notes.txt]]',
+            format: DescriptionFormat.markdown,
+            attachments: const [attachment],
+            onAttachmentTap: (_) {},
+            onExternalLinkTap: null,
+            renderContext: DescriptionRenderContext(
+              resolveLink:
+                  (value) => DescriptionLinkResolution(
+                    target: value,
+                    task: target,
+                    candidates: [target],
+                  ),
+              onWikilinkTap: (_) => wikilinkTapped = true,
+              onTagTap: (_) => tagTapped = true,
+              onAttachmentEmbedTap: (_) async => embedTapped = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('markdown-wikilink-Read book')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('markdown-wikilink-Care plan')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('markdown-tag-project')), findsOneWidget);
+    expect(find.byKey(const ValueKey('markdown-tag-inside')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('description-callout-warning')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('markdown-embed-notes-1')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('markdown-wikilink-Read book')));
+    await tester.tap(find.byKey(const ValueKey('markdown-wikilink-Care plan')));
+    await tester.tap(find.byKey(const ValueKey('markdown-tag-project')));
+    await tester.tap(find.byKey(const ValueKey('markdown-tag-inside')));
+    await tester.tap(find.byKey(const ValueKey('markdown-embed-notes-1')));
+    expect(wikilinkTapped, isTrue);
+    expect(tagTapped, isTrue);
+    expect(embedTapped, isTrue);
+  });
+
+  testWidgets('embeds stay adaptive and reload when the source changes', (
+    tester,
+  ) async {
+    const first = TaskAttachment(
+      id: 'first-attachment',
+      type: TaskAttachmentType.file,
+      name: 'first.txt',
+      value: '/private/task_attachments/first.txt',
+    );
+    const second = TaskAttachment(
+      id: 'second-attachment',
+      type: TaskAttachmentType.file,
+      name: 'second.txt',
+      value: '/private/task_attachments/second.txt',
+    );
+
+    Widget body(String source) {
+      return MediaQuery(
+        data: const MediaQueryData(size: Size(320, 640)),
+        child: SizedBox(
+          width: 320,
+          height: 300,
+          child: Scaffold(
+            body: DescriptionBody(
+              text: source,
+              format: DescriptionFormat.markdown,
+              attachments: const [first, second],
+              onAttachmentTap: (_) {},
+              onExternalLinkTap: null,
+            ),
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(MaterialApp(home: body('![[first.txt]]')));
+    expect(
+      find.byKey(const ValueKey('markdown-embed-first-attachment')),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(MaterialApp(home: body('![[second.txt]]')));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('markdown-embed-second-attachment')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('attachment mentions show only the name and remain tappable', (

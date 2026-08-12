@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/description_markdown.dart';
+import '../../../core/description_render_context.dart';
 import '../../../core/drag_close_sheet.dart';
 import '../../../core/theme.dart';
 import '../models/task_info_block.dart';
@@ -12,6 +13,7 @@ class DescriptionPreview extends StatelessWidget {
   final VoidCallback onTap;
   final DescriptionAttachmentTap onAttachmentTap;
   final DescriptionExternalLinkTap? onExternalLinkTap;
+  final DescriptionRenderContext? renderContext;
   final Color textColor;
   final String semanticsLabel;
 
@@ -23,6 +25,7 @@ class DescriptionPreview extends StatelessWidget {
     required this.onTap,
     required this.onAttachmentTap,
     required this.onExternalLinkTap,
+    this.renderContext,
     required this.textColor,
     required this.semanticsLabel,
   });
@@ -48,6 +51,7 @@ class DescriptionPreview extends StatelessWidget {
               attachments: attachments,
               onAttachmentTap: onAttachmentTap,
               onExternalLinkTap: onExternalLinkTap,
+              renderContext: renderContext,
             );
 
     return Semantics(
@@ -71,6 +75,7 @@ Future<void> showFullDescriptionSheet(
   required String title,
   required DescriptionAttachmentTap onAttachmentTap,
   required DescriptionExternalLinkTap? onExternalLinkTap,
+  DescriptionRenderContext? renderContext,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -87,6 +92,7 @@ Future<void> showFullDescriptionSheet(
             title: title,
             onAttachmentTap: onAttachmentTap,
             onExternalLinkTap: onExternalLinkTap,
+            renderContext: renderContext,
           ),
         ),
   );
@@ -99,6 +105,7 @@ class DescriptionFullSheet extends StatelessWidget {
   final String title;
   final DescriptionAttachmentTap onAttachmentTap;
   final DescriptionExternalLinkTap? onExternalLinkTap;
+  final DescriptionRenderContext? renderContext;
 
   const DescriptionFullSheet({
     super.key,
@@ -108,6 +115,7 @@ class DescriptionFullSheet extends StatelessWidget {
     required this.title,
     required this.onAttachmentTap,
     required this.onExternalLinkTap,
+    this.renderContext,
   });
 
   @override
@@ -171,6 +179,7 @@ class DescriptionFullSheet extends StatelessWidget {
                   attachments: attachments,
                   onAttachmentTap: onAttachmentTap,
                   onExternalLinkTap: onExternalLinkTap,
+                  renderContext: renderContext,
                 ),
               ),
             ),

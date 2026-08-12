@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/description_render_context.dart';
 import '../../../core/drag_close_sheet.dart';
 import '../../../core/task_attachment_service.dart';
 import '../../../core/theme.dart';
@@ -316,6 +317,33 @@ class _TaskDetailSheet extends StatelessWidget {
     );
   }
 
+  DescriptionRenderContext _descriptionRenderContext(BuildContext context) {
+    final provider = context.read<TaskProvider>();
+    return DescriptionRenderContext(
+      resolveLink: provider.resolveDescriptionLink,
+      onWikilinkTap: (resolution) {
+        if (resolution.task != null) {
+          unawaited(showTaskDetailSheet(context, resolution.task!));
+          return;
+        }
+        final settings = context.read<SettingsProvider>();
+        final message =
+            '${settings.tr(resolution.isAmbiguous ? 'description_link_ambiguous' : 'description_link_unresolved')}: ${resolution.target}';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      },
+      onTagTap: (tag) {
+        final settings = context.read<SettingsProvider>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${settings.tr('description_tag')}: $tag')),
+        );
+      },
+      onAttachmentEmbedTap:
+          (attachment) => _openAttachment(context, attachment),
+    );
+  }
+
   Widget _buildInfoBlocks(
     BuildContext context,
     Color textColor,
@@ -323,6 +351,7 @@ class _TaskDetailSheet extends StatelessWidget {
   ) {
     if (currentTask.infoBlocks.isEmpty) return const SizedBox.shrink();
     final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final renderContext = _descriptionRenderContext(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -334,7 +363,14 @@ class _TaskDetailSheet extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         for (final block in currentTask.infoBlocks)
-          _buildInfoBlock(context, currentTask, block, settings, textColor),
+          _buildInfoBlock(
+            context,
+            currentTask,
+            block,
+            settings,
+            textColor,
+            renderContext,
+          ),
       ],
     );
   }
@@ -345,6 +381,7 @@ class _TaskDetailSheet extends StatelessWidget {
     TaskInfoBlock block,
     SettingsProvider settings,
     Color textColor,
+    DescriptionRenderContext renderContext,
   ) {
     final isQuantity = block.type == TaskInfoBlockType.quantity;
     final title =
@@ -408,12 +445,14 @@ class _TaskDetailSheet extends StatelessWidget {
                       onExternalLinkTap:
                           (href, {title}) =>
                               _openExternalLink(context, href, title: title),
+                      renderContext: renderContext,
                     ),
                 onAttachmentTap:
                     (attachment) => _openAttachment(context, attachment),
                 onExternalLinkTap:
                     (href, {title}) =>
                         _openExternalLink(context, href, title: title),
+                renderContext: renderContext,
               ),
             ],
             if (block.attachments.isNotEmpty) ...[

@@ -187,7 +187,7 @@ class _InputSheetBodyState extends State<_InputSheetBody> {
     }
 
     return Container(
-      height: AppTheme.rowHeight,
+      constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
       decoration: BoxDecoration(
         color: widget.inputBg,
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),

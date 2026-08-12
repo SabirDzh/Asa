@@ -89,80 +89,82 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
             ),
             padding: const EdgeInsets.all(20),
             child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    settings.tr(titleKey),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      settings.tr(titleKey),
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 180,
-                    child: Row(
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 180,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _WheelList(
+                              initialIndex: hour,
+                              itemCount: 24,
+                              label: (i) => i.toString().padLeft(2, '0'),
+                              onChanged: (i) => hour = i,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              ':',
+                              style: TextStyle(color: textColor, fontSize: 24),
+                            ),
+                          ),
+                          Expanded(
+                            child: _WheelList(
+                              initialIndex: minute,
+                              itemCount: 60,
+                              label: (i) => i.toString().padLeft(2, '0'),
+                              onChanged: (i) => minute = i,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
                       children: [
                         Expanded(
-                          child: _WheelList(
-                            initialIndex: hour,
-                            itemCount: 24,
-                            label: (i) => i.toString().padLeft(2, '0'),
-                            onChanged: (i) => hour = i,
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              foregroundColor: textSecondary,
+                            ),
+                            child: Text(settings.tr('cancel')),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            ':',
-                            style: TextStyle(color: textColor, fontSize: 24),
-                          ),
-                        ),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: _WheelList(
-                            initialIndex: minute,
-                            itemCount: 60,
-                            label: (i) => i.toString().padLeft(2, '0'),
-                            onChanged: (i) => minute = i,
+                          child: ElevatedButton(
+                            onPressed:
+                                () => Navigator.pop(
+                                  ctx,
+                                  TimeOfDay(hour: hour, minute: minute),
+                                ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                            ),
+                            child: Text(
+                              settings.tr('save'),
+                              style: TextStyle(color: AppColors.textDark),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: TextButton.styleFrom(
-                            foregroundColor: textSecondary,
-                          ),
-                          child: Text(settings.tr('cancel')),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed:
-                              () => Navigator.pop(
-                                ctx,
-                                TimeOfDay(hour: hour, minute: minute),
-                              ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                          ),
-                          child: Text(
-                            settings.tr('save'),
-                            style: TextStyle(color: AppColors.textDark),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -239,112 +241,114 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AnimatedSize(
-                duration: animationDuration,
-                curve: Curves.easeInOut,
-                alignment: Alignment.topCenter,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedSize(
+                  duration: animationDuration,
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.topCenter,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 48,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: textSecondary,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.sheetHandleRadius,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        settings.tr('set_time'),
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _timeButton(
+                              label:
+                                  _startTime != null
+                                      ? _formatTime(_startTime!)
+                                      : settings.tr('start_time'),
+                              onTap: () => _pickTime(true),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _timeButton(
+                              label:
+                                  _endTime != null
+                                      ? _formatTime(_endTime!)
+                                      : settings.tr('end_time'),
+                              onTap: () => _pickTime(false),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
                   children: [
-                    Center(
-                      child: Container(
-                        width: 48,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: textSecondary,
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.sheetHandleRadius,
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => _clear(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: textSecondary,
+                          minimumSize: const Size(
+                            double.infinity,
+                            AppTheme.rowHeight,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.pillRadius,
+                            ),
                           ),
                         ),
+                        child: Text(settings.tr('clear')),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      settings.tr('set_time'),
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed:
+                            _hasCompletePeriod ? () => _save(context) : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              _hasCompletePeriod
+                                  ? AppColors.primary
+                                  : AppColors.primary.withValues(alpha: 0.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.pillRadius,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          settings.tr('save'),
+                          style: TextStyle(color: AppColors.textDark),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _timeButton(
-                            label:
-                                _startTime != null
-                                    ? _formatTime(_startTime!)
-                                    : settings.tr('start_time'),
-                            onTap: () => _pickTime(true),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _timeButton(
-                            label:
-                                _endTime != null
-                                    ? _formatTime(_endTime!)
-                                    : settings.tr('end_time'),
-                            onTap: () => _pickTime(false),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => _clear(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: textSecondary,
-                        minimumSize: const Size(
-                          double.infinity,
-                          AppTheme.rowHeight,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.pillRadius,
-                          ),
-                        ),
-                      ),
-                      child: Text(settings.tr('clear')),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed:
-                          _hasCompletePeriod ? () => _save(context) : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            _hasCompletePeriod
-                                ? AppColors.primary
-                                : AppColors.primary.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.pillRadius,
-                          ),
-                        ),
-                      ),
-                      child: Text(
-                        settings.tr('save'),
-                        style: TextStyle(color: AppColors.textDark),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -356,7 +360,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: AppTheme.rowHeight,
+        constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
         decoration: BoxDecoration(
           color:
               isDark

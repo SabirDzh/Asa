@@ -273,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen>
         AppTheme.screenPad,
       ),
       child: Container(
-        height: AppTheme.rowHeight,
+        constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(AppTheme.pillRadius),

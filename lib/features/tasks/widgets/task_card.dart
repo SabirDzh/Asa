@@ -383,7 +383,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
   Widget _swipeBackground(Color color) {
     final settings = context.read<SettingsProvider>();
     return Container(
-      height: AppTheme.rowHeight,
+      constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),
@@ -494,7 +494,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
 
     final cardChild = Container(
       key: _cardKey,
-      height: AppTheme.rowHeight,
+      constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),
@@ -645,7 +645,7 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
           child: SizedBox(
             width: MediaQuery.of(context).size.width - 32,
             child: Container(
-              height: AppTheme.rowHeight,
+              constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.navDark : AppColors.navLight,
                 borderRadius: BorderRadius.circular(AppTheme.pillRadius),

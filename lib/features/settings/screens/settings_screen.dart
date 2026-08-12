@@ -126,7 +126,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        bottom: false,
+        // The embedded settings page already sits above HomeScreen's bottom
+        // navigation. Standalone settings still needs the system bottom inset.
+        bottom: widget.standalone,
         child: ListView(
           padding: const EdgeInsets.symmetric(
             horizontal: AppTheme.screenPad,

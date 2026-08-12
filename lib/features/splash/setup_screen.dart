@@ -196,10 +196,11 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
               ),
               SizedBox(
                 width: double.infinity,
-                height: 52,
                 child: FilledButton(
                   onPressed: isComplete ? _finish : null,
                   style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     backgroundColor:
                         isComplete
                             ? AppColors.primary

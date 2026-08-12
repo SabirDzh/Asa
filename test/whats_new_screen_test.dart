@@ -11,14 +11,23 @@ import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/screens/whats_new_screen.dart';
 import 'home_widget_channel_mock.dart';
 
-Widget _harness(Future<List<UpdateInfo>> Function() fetch) {
+Widget _harness(
+  Future<List<UpdateInfo>> Function() fetch, {
+  MediaQueryData? mediaQuery,
+}) {
+  final screen = WhatsNewScreen(fetchHistory: fetch);
   return ChangeNotifierProvider(
     create:
         (_) => SettingsProvider(
           deviceNameProvider: () async => 'Test Device',
           systemLanguageCodeProvider: () => 'ru',
         ),
-    child: MaterialApp(home: WhatsNewScreen(fetchHistory: fetch)),
+    child: MaterialApp(
+      home:
+          mediaQuery == null
+              ? screen
+              : MediaQuery(data: mediaQuery, child: screen),
+    ),
   );
 }
 
@@ -82,6 +91,37 @@ void main() {
     expect(find.text('New bold feature', findRichText: true), findsOneWidget);
     expect(find.text('Older release', findRichText: true), findsOneWidget);
     expect(find.text('Установить обновление (v1.2.0)'), findsOneWidget);
+  });
+
+  testWidgets('keeps release action visible on a narrow screen with large text', (
+    tester,
+  ) async {
+    await _pumpAndInit(
+      tester,
+      _harness(
+        () async => [
+          const UpdateInfo(
+            version: '1.1.1',
+            url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.1.1',
+            notes:
+                'A deliberately long release note that should remain readable when the system text size is large.',
+          ),
+        ],
+        mediaQuery: const MediaQueryData(
+          size: Size(320, 640),
+          textScaler: TextScaler.linear(2.0),
+        ),
+      ),
+    );
+
+    final button = find.byType(FilledButton);
+    expect(button, findsOneWidget);
+    final viewport = tester.getSize(find.byType(WhatsNewScreen));
+    final buttonBounds = tester.getRect(button);
+    expect(buttonBounds.left, greaterThanOrEqualTo(0));
+    expect(buttonBounds.right, lessThanOrEqualTo(viewport.width));
+    expect(buttonBounds.bottom, lessThanOrEqualTo(viewport.height));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shows check for updates button when up to date', (tester) async {

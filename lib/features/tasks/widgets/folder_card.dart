@@ -209,7 +209,7 @@ class _FolderRowState extends State<FolderRow> {
         child: AnimatedContainer(
           key: _cardKey,
           duration: const Duration(milliseconds: 200),
-          height: AppTheme.rowHeight,
+          constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
           decoration: BoxDecoration(
             color:
                 _isDragHovered
@@ -352,7 +352,7 @@ class _FolderRowState extends State<FolderRow> {
           child: SizedBox(
             width: MediaQuery.of(context).size.width - 32,
             child: Container(
-              height: AppTheme.rowHeight,
+              constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.navDark : AppColors.navLight,
                 borderRadius: BorderRadius.circular(AppTheme.pillRadius),
@@ -417,7 +417,7 @@ class _FolderRowState extends State<FolderRow> {
   Widget _swipeBackground(Color color) {
     final settings = context.read<SettingsProvider>();
     return Container(
-      height: AppTheme.rowHeight,
+      constraints: const BoxConstraints(minHeight: AppTheme.rowHeight),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(AppTheme.pillRadius),

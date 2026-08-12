@@ -188,7 +188,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
                       child: _FolderFloatingMenu(
                         onMenuClose: () {},
                         showCreateSheet: _showCreateSheet,
-                        bottomOffset: AppTheme.navHeight,
+                        bottomOffset: MediaQuery.paddingOf(context).bottom,
                         isVisible: fabVisible,
                       ),
                     ),
@@ -410,12 +410,17 @@ class _FolderContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 9),
               child: Align(
                 alignment: Alignment.center,
-                child: SizedBox(
-                  width: AppTheme.rowWidth,
-                  child: Divider(
-                    color: isDark ? Colors.white30 : AppColors.navLight,
-                    thickness: 2,
-                    height: 2,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppTheme.rowWidth,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Divider(
+                      color: isDark ? Colors.white30 : AppColors.navLight,
+                      thickness: 2,
+                      height: 2,
+                    ),
                   ),
                 ),
               ),
@@ -565,13 +570,17 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
           children: [
             Icon(icon, color: onSurface, size: 24),
             const SizedBox(width: AppTheme.menuItemGapInner),
-            Text(
-              label,
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                color: onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.left,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ),
           ],
@@ -586,6 +595,19 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final menuColor = isDark ? AppColors.navDark : AppColors.navLight;
     final fabColor = isDark ? AppColors.navDark : AppColors.navLight;
+    final mediaQuery = MediaQuery.of(context);
+    final maxMenuWidth =
+        (mediaQuery.size.width - AppTheme.screenPad * 2)
+            .clamp(48.0, double.infinity)
+            .toDouble();
+    final maxMenuHeight =
+        (mediaQuery.size.height -
+                widget.bottomOffset -
+                AppTheme.fabSize -
+                AppTheme.screenPad * 2 -
+                12)
+            .clamp(48.0, double.infinity)
+            .toDouble();
 
     return Stack(
       children: [
@@ -603,64 +625,76 @@ class _FolderFloatingMenuState extends State<_FolderFloatingMenu> {
               widget.bottomOffset + AppTheme.fabSize + AppTheme.screenPad + 12,
           child: IgnorePointer(
             ignoring: !_isOpen,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(
-                begin: _isOpen ? 0.0 : 1.0,
-                end: _isOpen ? 1.0 : 0.0,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: maxMenuWidth,
+                maxHeight: maxMenuHeight,
               ),
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                return Opacity(
-                  opacity: value,
-                  child: Transform.scale(
-                    scale: value,
-                    alignment: Alignment.bottomRight,
-                    child: child,
+              child: SingleChildScrollView(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(
+                    begin: _isOpen ? 0.0 : 1.0,
+                    end: _isOpen ? 1.0 : 0.0,
                   ),
-                );
-              },
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: menuColor,
-                    borderRadius: BorderRadius.circular(AppTheme.menuRadius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.scale(
+                        scale: value,
+                        alignment: Alignment.bottomRight,
+                        child: child,
                       ),
-                    ],
-                  ),
-                  child: IntrinsicWidth(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _menuOption(
-                          settings,
-                          icon: Iconsax.folder_minus,
-                          label: settings.tr('create_folder'),
-                          onTap: () {
-                            _toggleMenu();
-                            widget.showCreateSheet(context, isTask: false);
-                          },
-                          onSurface: Theme.of(context).colorScheme.onSurface,
+                    );
+                  },
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: menuColor,
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.menuRadius,
                         ),
-                        SizedBox(height: AppTheme.menuItemGap),
-                        _menuOption(
-                          settings,
-                          icon: Iconsax.clipboard_tick,
-                          label: settings.tr('create_task'),
-                          onTap: () {
-                            _toggleMenu();
-                            widget.showCreateSheet(context, isTask: true);
-                          },
-                          onSurface: Theme.of(context).colorScheme.onSurface,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: IntrinsicWidth(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _menuOption(
+                              settings,
+                              icon: Iconsax.folder_minus,
+                              label: settings.tr('create_folder'),
+                              onTap: () {
+                                _toggleMenu();
+                                widget.showCreateSheet(context, isTask: false);
+                              },
+                              onSurface:
+                                  Theme.of(context).colorScheme.onSurface,
+                            ),
+                            SizedBox(height: AppTheme.menuItemGap),
+                            _menuOption(
+                              settings,
+                              icon: Iconsax.clipboard_tick,
+                              label: settings.tr('create_task'),
+                              onTap: () {
+                                _toggleMenu();
+                                widget.showCreateSheet(context, isTask: true);
+                              },
+                              onSurface:
+                                  Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

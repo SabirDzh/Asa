@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum ColorPalette { base, ocean, custom }
+enum ColorPalette { base, ocean, ember, custom }
 
 /// Three user-configurable semantic colors: accent, surface and background.
 /// Dark-mode variants are derived from the same three-color input so custom
@@ -42,6 +42,16 @@ class AppPalette {
     primaryDark: Color(0xFF55B1FF),
     surfaceDark: Color(0xFF17324A),
     backgroundDark: Color(0xFF091A2A),
+    customColorCount: 3,
+  );
+
+  static const ember = AppPalette._(
+    primary: Color(0xFFF97316),
+    surfaceLight: Color(0xFFFFFFFF),
+    backgroundLight: Color(0xFFFFF7ED),
+    primaryDark: Color(0xFFFB923C),
+    surfaceDark: Color(0xFF2A2018),
+    backgroundDark: Color(0xFF1A130E),
     customColorCount: 3,
   );
 

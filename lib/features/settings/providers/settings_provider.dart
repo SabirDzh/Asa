@@ -662,6 +662,8 @@ class SettingsProvider with ChangeNotifier {
         return AppPalette.base;
       case ColorPalette.ocean:
         return AppPalette.ocean;
+      case ColorPalette.ember:
+        return AppPalette.ember;
       case ColorPalette.custom:
         return AppPalette.base;
     }

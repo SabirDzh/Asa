@@ -72,8 +72,8 @@ void main() {
       _harness(
         () async => [
           UpdateInfo(
-            version: '1.2.0',
-            url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+            version: '2.0.0',
+            url: 'https://github.com/SabirDzh/Asa/releases/tag/v2.0.0',
             notes: 'New **bold** feature',
             publishedAt: DateTime.utc(2026, 8, 1),
           ),
@@ -86,11 +86,11 @@ void main() {
       ),
     );
 
-    expect(find.text('v1.2.0'), findsOneWidget);
+    expect(find.text('v2.0.0'), findsOneWidget);
     expect(find.text('v1.1.0'), findsOneWidget);
     expect(find.text('New bold feature', findRichText: true), findsOneWidget);
     expect(find.text('Older release', findRichText: true), findsOneWidget);
-    expect(find.text('Установить обновление (v1.2.0)'), findsOneWidget);
+    expect(find.text('Установить обновление (v2.0.0)'), findsOneWidget);
   });
 
   testWidgets('keeps release action visible on a narrow screen with large text', (
@@ -193,8 +193,8 @@ void main() {
         if (calls == 1) throw Exception('network');
         return [
           const UpdateInfo(
-            version: '1.2.0',
-            url: 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
+            version: '2.0.0',
+            url: 'https://github.com/SabirDzh/Asa/releases/tag/v2.0.0',
             notes: 'Recovered',
           ),
         ];
@@ -205,7 +205,7 @@ void main() {
     await tester.tap(find.text('Повторить'));
     await tester.pumpAndSettle();
     expect(find.text('Recovered', findRichText: true), findsOneWidget);
-    expect(find.text('Установить обновление (v1.2.0)'), findsOneWidget);
+    expect(find.text('Установить обновление (v2.0.0)'), findsOneWidget);
   });
 
   testWidgets('paginates releases 15 at a time with load more button', (

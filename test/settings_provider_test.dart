@@ -106,6 +106,16 @@ void main() {
       expect(prefs.getString('colorPalette'), 'ocean');
     });
 
+    test('persists built-in ember palette', () async {
+      await provider.ready;
+      await provider.setColorPalette(ColorPalette.ember);
+
+      expect(provider.colorPalette, ColorPalette.ember);
+      expect(provider.appPalette, AppPalette.ember);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('colorPalette'), 'ember');
+    });
+
     test(
       'persists and restores a custom palette with at most three colors',
       () async {

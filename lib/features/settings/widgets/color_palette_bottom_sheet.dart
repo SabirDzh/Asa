@@ -11,6 +11,8 @@ String colorPaletteLabel(SettingsProvider settings) {
       return settings.tr('palette_base');
     case ColorPalette.ocean:
       return settings.tr('palette_ocean');
+    case ColorPalette.ember:
+      return settings.tr('palette_ember');
     case ColorPalette.custom:
       return settings.tr('palette_custom');
   }
@@ -79,6 +81,16 @@ void showColorPaletteSheet(BuildContext context) {
                     subtitle: settings.tr('palette_ocean_description'),
                     colors: AppPalette.ocean.customColors,
                     icon: Iconsax.drop,
+                    textColor: textColor,
+                  ),
+                  _paletteTile(
+                    sheetContext,
+                    settings,
+                    palette: ColorPalette.ember,
+                    title: settings.tr('palette_ember'),
+                    subtitle: settings.tr('palette_ember_description'),
+                    colors: AppPalette.ember.customColors,
+                    icon: Iconsax.sun,
                     textColor: textColor,
                   ),
                   if (hasCustom) ...[

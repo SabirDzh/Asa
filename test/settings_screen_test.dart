@@ -143,6 +143,27 @@ void main() {
     expect(find.text('Палитра: Ocean'), findsOneWidget);
   });
 
+  testWidgets('selects the ember palette from the profile', (tester) async {
+    await pumpAndInit(tester, createTestApp());
+
+    final paletteRow = find.text('Палитра: Базовая');
+    expect(paletteRow, findsOneWidget);
+    await tester.tap(paletteRow);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('palette-sheet')), findsOneWidget);
+    expect(find.text('Ember'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('palette-ember-option')));
+    await tester.pumpAndSettle();
+
+    final settings = Provider.of<SettingsProvider>(
+      tester.element(find.byType(SettingsScreen)),
+      listen: false,
+    );
+    expect(settings.colorPalette, ColorPalette.ember);
+    expect(find.text('Палитра: Ember'), findsOneWidget);
+  });
+
   testWidgets('custom palette editor never allows more than three colors', (
     tester,
   ) async {

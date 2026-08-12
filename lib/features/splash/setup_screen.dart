@@ -44,6 +44,9 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
   bool _autoStartSettingsPending = false;
   bool _autoStartSettingsWasBackgrounded = false;
   bool _autoStartConfirmationShowing = false;
+  bool _permissionResolutionCallbackSent = false;
+  Future<void>? _permissionCheckFuture;
+  int _permissionCheckGeneration = 0;
   Timer? _autoStartExpiryTimer;
 
   @override
@@ -91,21 +94,64 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     unawaited(_checkPermissions());
   }
 
-  Future<void> _checkPermissions() async {
-    final newState = await DevicePermissions.getPermissionState();
-    if (!mounted) return;
-    setState(() {
-      _state = newState;
+  Future<void> _checkPermissions() {
+    final previous = _permissionCheckFuture ?? Future<void>.value();
+    final generation = ++_permissionCheckGeneration;
+    final check = previous.then((_) async {
+      final newState = await DevicePermissions.getPermissionState();
+      if (!mounted || generation != _permissionCheckGeneration) return;
+      setState(() {
+        _state = newState;
+      });
+      if (newState.isComplete) {
+        await _notifyPermissionsResolved();
+      } else {
+        _permissionResolutionCallbackSent = false;
+      }
     });
-    if (newState.isComplete) {
-      await widget.onPermissionsResolved?.call();
+    final guarded = check.catchError((Object error, StackTrace stackTrace) {
+      LoggerService.instance.w(
+        'Setup permission check failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    });
+    _permissionCheckFuture = guarded;
+    unawaited(
+      guarded.then<void>((_) {
+        if (identical(_permissionCheckFuture, guarded)) {
+          _permissionCheckFuture = null;
+        }
+      }),
+    );
+    return guarded;
+  }
+
+  Future<void> _notifyPermissionsResolved() async {
+    if (widget.onPermissionsResolved == null ||
+        _permissionResolutionCallbackSent) {
+      return;
+    }
+    _permissionResolutionCallbackSent = true;
+    try {
+      await widget.onPermissionsResolved!();
+    } on Object catch (error, stackTrace) {
+      // Allow a later retry if the parent gate failed to refresh after the
+      // permission callback. The setup screen remains usable in that case.
+      _permissionResolutionCallbackSent = false;
+      LoggerService.instance.w(
+        'Permission resolution callback failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
   Future<void> _finish() async {
     await SetupScreen.markCompleted();
     if (widget.onPermissionsResolved != null) {
-      await widget.onPermissionsResolved!();
+      await _notifyPermissionsResolved();
       return;
     }
     if (!mounted) return;
@@ -375,6 +421,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     bool busy = false,
     VoidCallback? onFix,
   }) {
+    final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? AppColors.textDark : AppColors.textLight;
     final secondary =
@@ -395,10 +442,15 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 1),
-                child: Icon(
-                  granted ? Icons.check_circle : icon,
-                  color: granted ? AppColors.primary : secondary,
-                  size: 24,
+                child: Semantics(
+                  label:
+                      '$label, ${settings.tr(granted ? 'setup_permission_granted' : 'setup_permission_not_granted')}',
+                  image: true,
+                  child: Icon(
+                    granted ? Icons.check_circle : icon,
+                    color: granted ? AppColors.primary : secondary,
+                    size: 24,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

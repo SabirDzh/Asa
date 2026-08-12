@@ -47,9 +47,24 @@ class SettingsProvider with ChangeNotifier {
   String? _syncSecret;
   bool _initialized = false;
   final _initCompleter = Completer<void>();
-  Future<void> _customValuesOperation = Future<void>.value();
   Future<void> _avatarPathOperation = Future<void>.value();
   Future<void> _notificationPermissionOperation = Future<void>.value();
+  Future<void> _settingsWriteOperation = Future<void>.value();
+
+  Future<T> _enqueueSettingsWrite<T>(Future<T> Function() operation) {
+    final next = _settingsWriteOperation.then((_) => operation());
+    _settingsWriteOperation = next.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {
+        LoggerService.instance.w(
+          'Settings write failed; continuing queued writes',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      },
+    );
+    return next;
+  }
 
   SettingsProvider({
     Future<String> Function() deviceNameProvider = getDefaultDeviceName,
@@ -233,37 +248,44 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
-  Future<void> setThemeMode(ThemeMode mode) async {
-    _themeMode = mode;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('themeMode', mode.index);
+  Future<void> setThemeMode(ThemeMode mode) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      _themeMode = mode;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('themeMode', mode.index);
+    });
   }
 
-  Future<void> setColorPalette(ColorPalette palette) async {
-    await ready;
-    if (palette == ColorPalette.custom && !_hasCustomPalette) return;
-    _colorPalette = palette;
-    AppColors.applyPalette(appPalette);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('colorPalette', palette.name);
+  Future<void> setColorPalette(ColorPalette palette) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      if (palette == ColorPalette.custom && !_hasCustomPalette) return;
+      _colorPalette = palette;
+      AppColors.applyPalette(appPalette);
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('colorPalette', palette.name);
+    });
   }
 
-  Future<void> setCustomPalette(List<Color> colors) async {
-    await ready;
-    final palette = AppPalette.fromCustomColors(colors);
-    _customPalette = palette;
-    _hasCustomPalette = true;
-    _colorPalette = ColorPalette.custom;
-    AppColors.applyPalette(palette);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('colorPalette', ColorPalette.custom.name);
-    await prefs.setStringList(
-      'customPaletteColors',
-      palette.customColors.map(AppPalette.colorToHex).toList(),
-    );
+  Future<void> setCustomPalette(List<Color> colors) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      final palette = AppPalette.fromCustomColors(colors);
+      _customPalette = palette;
+      _hasCustomPalette = true;
+      _colorPalette = ColorPalette.custom;
+      AppColors.applyPalette(palette);
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('colorPalette', ColorPalette.custom.name);
+      await prefs.setStringList(
+        'customPaletteColors',
+        palette.customColors.map(AppPalette.colorToHex).toList(),
+      );
+    });
   }
 
   /// Serializes permission reads and user toggles so a delayed lifecycle
@@ -372,24 +394,29 @@ class SettingsProvider with ChangeNotifier {
     });
   }
 
-  Future<void> setLanguage(String code) async {
-    if (code != 'ru' && code != 'en') return;
-    // Wait for the initial preference read so a quick user choice cannot be
-    // overwritten by the asynchronous startup fallback.
-    await ready;
-    _languageCode = code;
-    NotificationService.setLanguage(code);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('languageCode', code);
+  Future<void> setLanguage(String code) {
+    if (code != 'ru' && code != 'en') return Future<void>.value();
+    return _enqueueSettingsWrite(() async {
+      // Wait for the initial preference read so a quick user choice cannot be
+      // overwritten by the asynchronous startup fallback.
+      await ready;
+      _languageCode = code;
+      NotificationService.setLanguage(code);
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('languageCode', code);
+    });
   }
 
-  Future<void> setAnimationSpeed(double speed) async {
-    _animationSpeed = speed;
-    timeDilation = speed;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('animationSpeed', speed);
+  Future<void> setAnimationSpeed(double speed) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      _animationSpeed = speed;
+      timeDilation = speed;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('animationSpeed', speed);
+    });
   }
 
   /// Saves a custom animation speed to the history (max 3 entries, LRU),
@@ -415,12 +442,15 @@ class SettingsProvider with ChangeNotifier {
     });
   }
 
-  Future<void> setAppScale(double scale) async {
-    final clamped = scale.clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
-    _appScale = clamped;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('appScale', clamped);
+  Future<void> setAppScale(double scale) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      final clamped = scale.clamp(kAbsoluteMinAppScale, kAbsoluteMaxAppScale);
+      _appScale = clamped;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('appScale', clamped);
+    });
   }
 
   /// Removes a saved custom animation speed. If it is active, use the default
@@ -496,53 +526,65 @@ class SettingsProvider with ChangeNotifier {
     });
   }
 
-  Future<void> setShowInWidget(bool value) async {
-    _showInWidget = value;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('showInWidget', value);
-    _syncWidgetSettings();
+  Future<void> setShowInWidget(bool value) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      _showInWidget = value;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('showInWidget', value);
+      _syncWidgetSettings();
+    });
   }
 
-  Future<void> setWidgetDisplayMode(WidgetDisplayMode mode) async {
-    _widgetDisplayMode = mode;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('widgetDisplayMode', mode.index);
-    _syncWidgetSettings();
+  Future<void> setWidgetDisplayMode(WidgetDisplayMode mode) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      _widgetDisplayMode = mode;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('widgetDisplayMode', mode.index);
+      _syncWidgetSettings();
+    });
   }
 
   /// Sets the sync switch and returns whether the requested state was
   /// accepted. Enabling without a shared secret is rejected and persisted as
   /// disabled rather than silently reporting success to another caller.
-  Future<bool> setSyncEnabled(bool value) async {
-    if (value && (_syncSecret == null || _syncSecret!.isEmpty)) {
-      _syncEnabled = false;
+  Future<bool> setSyncEnabled(bool value) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      if (value && (_syncSecret == null || _syncSecret!.isEmpty)) {
+        _syncEnabled = false;
+        notifyListeners();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('syncEnabled', false);
+        return false;
+      }
+      _syncEnabled = value;
       notifyListeners();
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('syncEnabled', false);
-      return false;
-    }
-    _syncEnabled = value;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('syncEnabled', value);
-    return true;
+      await prefs.setBool('syncEnabled', value);
+      return true;
+    });
   }
 
-  Future<void> setSyncDeviceName(String name) async {
-    final trimmed = name.trim();
-    final prefs = await SharedPreferences.getInstance();
-    if (trimmed.isEmpty) {
-      // When the user clears the custom name, fall back to the device name
-      // and remove the saved override so the name stays dynamic.
-      _syncDeviceName = await _deviceNameProvider();
-      await prefs.remove('syncDeviceName');
-    } else {
-      _syncDeviceName = trimmed;
-      await prefs.setString('syncDeviceName', _syncDeviceName);
-    }
-    notifyListeners();
+  Future<void> setSyncDeviceName(String name) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      final trimmed = name.trim();
+      final prefs = await SharedPreferences.getInstance();
+      if (trimmed.isEmpty) {
+        // When the user clears the custom name, fall back to the device name
+        // and remove the saved override so the name stays dynamic.
+        _syncDeviceName = await _deviceNameProvider();
+        await prefs.remove('syncDeviceName');
+      } else {
+        _syncDeviceName = trimmed;
+        await prefs.setString('syncDeviceName', _syncDeviceName);
+      }
+      notifyListeners();
+    });
   }
 
   /// Returns the stable device ID used to identify this device during sync.
@@ -566,24 +608,27 @@ class SettingsProvider with ChangeNotifier {
     return id;
   }
 
-  Future<void> setSyncSecret(String? secret) async {
-    final trimmed = secret?.trim();
-    LoggerService.instance.registerSecret(trimmed);
-    _syncSecret = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
-    if (_syncSecret == null && _syncEnabled) {
-      // Removing credentials must revoke the running transport immediately;
-      // otherwise the old in-memory secret would keep accepting/sending data.
-      await SyncService.instance.stop();
-      _syncEnabled = false;
-    }
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (_syncSecret == null) {
-      await prefs.remove('syncSecret');
-      await prefs.setBool('syncEnabled', false);
-    } else {
-      await prefs.setString('syncSecret', _syncSecret!);
-    }
+  Future<void> setSyncSecret(String? secret) {
+    return _enqueueSettingsWrite(() async {
+      await ready;
+      final trimmed = secret?.trim();
+      LoggerService.instance.registerSecret(trimmed);
+      _syncSecret = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+      if (_syncSecret == null && _syncEnabled) {
+        // Removing credentials must revoke the running transport immediately;
+        // otherwise the old in-memory secret would keep accepting/sending data.
+        await SyncService.instance.stop();
+        _syncEnabled = false;
+      }
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      if (_syncSecret == null) {
+        await prefs.remove('syncSecret');
+        await prefs.setBool('syncEnabled', false);
+      } else {
+        await prefs.setString('syncSecret', _syncSecret!);
+      }
+    });
   }
 
   String widgetModeLabel(WidgetDisplayMode mode) {
@@ -662,9 +707,10 @@ class SettingsProvider with ChangeNotifier {
   Future<void> _enqueueCustomValuesOperation(
     Future<void> Function() operation,
   ) {
-    final next = _customValuesOperation.then((_) => operation());
-    _customValuesOperation = next.catchError((_) {});
-    return next;
+    // Custom values update the same persisted keys as the regular setters;
+    // share one queue so a preset/custom value cannot overwrite a newer user
+    // selection when both are changed rapidly.
+    return _enqueueSettingsWrite(operation);
   }
 
   /// Loads a list of doubles from [prefs] under [key].

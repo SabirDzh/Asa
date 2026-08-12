@@ -227,8 +227,9 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Checks whether the device exposes an auto-start settings page.
-     * Xiaomi/HyperOS, Huawei, Oppo, Vivo are common examples that do.
+     * Checks whether the device exposes the supported Xiaomi/HyperOS
+     * auto-start settings page. Other OEMs use the generic app settings
+     * fallback until their public component is verified.
      */
     private fun isAutoStartAvailable(): Boolean {
         val intent = autoStartIntent() ?: return false
@@ -245,8 +246,8 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Returns the OEM-specific auto-start settings intent, or null when the
-     * device does not expose one through a public action string.
+     * Returns the verified Xiaomi/HyperOS auto-start settings intent, or null
+     * when this device does not expose that public component.
      */
     private fun autoStartIntent(): Intent? {
         // Xiaomi / HyperOS

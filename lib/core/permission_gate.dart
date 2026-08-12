@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../features/splash/setup_screen.dart';
 import 'device_permissions.dart';
+import 'logger_service.dart';
 
 /// Single source of truth for background-reliability permission gating.
 ///
@@ -28,6 +29,8 @@ class _PermissionGateState extends State<PermissionGate>
   PermissionState? _state;
   bool _loading = true;
   bool _readyCallbackScheduled = false;
+  Future<void>? _refreshFuture;
+  int _refreshGeneration = 0;
 
   @override
   void initState() {
@@ -49,13 +52,47 @@ class _PermissionGateState extends State<PermissionGate>
     }
   }
 
-  Future<void> _refreshPermissionState() async {
-    final state = await DevicePermissions.getPermissionState();
-    if (!mounted) return;
-    setState(() {
-      _state = state;
-      _loading = false;
+  Future<void> _refreshPermissionState() {
+    final previous = _refreshFuture ?? Future<void>.value();
+    final generation = ++_refreshGeneration;
+    final refresh = previous.then((_) async {
+      final state = await DevicePermissions.getPermissionState();
+      if (!mounted || generation != _refreshGeneration) return;
+      setState(() {
+        _state = state;
+        _loading = false;
+      });
+      if (!state.isComplete) _readyCallbackScheduled = false;
     });
+    final guarded = refresh.catchError((Object error, StackTrace stackTrace) {
+      if (!mounted || generation != _refreshGeneration) return;
+      setState(() {
+        _state = const PermissionState(
+          notificationsGranted: false,
+          exactAlarmGranted: false,
+          batteryOptimizationDisabled: false,
+          autoStartGranted: false,
+          autoStartSupported: false,
+          permissionCheckFailed: true,
+        );
+        _loading = false;
+        _readyCallbackScheduled = false;
+      });
+      // The setup screen exposes a retry action; preserve the error only in
+      // diagnostics so a transient platform failure cannot leave a spinner.
+      LoggerService.instance.w(
+        'Permission state refresh failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    });
+    _refreshFuture = guarded;
+    unawaited(
+      guarded.then<void>((_) {
+        if (identical(_refreshFuture, guarded)) _refreshFuture = null;
+      }),
+    );
+    return guarded;
   }
 
   @override

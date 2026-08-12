@@ -349,6 +349,8 @@ class AppStrings {
       'setup_grant_all': 'Выдайте все разрешения для продолжения',
       'setup_permission_check_failed':
           'Не удалось проверить разрешения. Повторите попытку или откройте настройки приложения.',
+      'setup_permission_granted': 'разрешение выдано',
+      'setup_permission_not_granted': 'разрешение не выдано',
       'setup_notification_denied':
           'Разрешение на уведомления не выдано — повторите попытку',
       'setup_notification_permanently_denied':
@@ -699,6 +701,8 @@ class AppStrings {
       'setup_grant_all': 'Grant all permissions to continue',
       'setup_permission_check_failed':
           'Could not verify permissions. Retry or open the app settings.',
+      'setup_permission_granted': 'permission granted',
+      'setup_permission_not_granted': 'permission not granted',
       'setup_notification_denied':
           'Notification permission was not granted — please try again',
       'setup_notification_permanently_denied':

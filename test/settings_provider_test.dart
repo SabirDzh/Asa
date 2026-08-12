@@ -198,16 +198,16 @@ void main() {
       },
     );
 
-    test('setThemeMode switches between light, dark and system', () {
-      provider.setThemeMode(ThemeMode.light);
+    test('setThemeMode switches between light, dark and system', () async {
+      await provider.setThemeMode(ThemeMode.light);
       expect(provider.themeMode, ThemeMode.light);
       expect(provider.isDarkMode, false);
 
-      provider.setThemeMode(ThemeMode.dark);
+      await provider.setThemeMode(ThemeMode.dark);
       expect(provider.themeMode, ThemeMode.dark);
       expect(provider.isDarkMode, true);
 
-      provider.setThemeMode(ThemeMode.system);
+      await provider.setThemeMode(ThemeMode.system);
       expect(provider.themeMode, ThemeMode.system);
     });
 
@@ -413,11 +413,11 @@ void main() {
       expect(provider.languageCode, 'en');
     });
 
-    test('setAnimationSpeed changes speed', () {
-      provider.setAnimationSpeed(0.5);
+    test('setAnimationSpeed changes speed', () async {
+      await provider.setAnimationSpeed(0.5);
       expect(provider.animationSpeed, 0.5);
 
-      provider.setAnimationSpeed(2.0);
+      await provider.setAnimationSpeed(2.0);
       expect(provider.animationSpeed, 2.0);
     });
 

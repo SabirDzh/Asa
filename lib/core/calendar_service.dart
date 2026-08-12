@@ -5,6 +5,25 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'device_permissions.dart';
 
+/// Signals that a calendar event would overlap an existing event.
+class CalendarEventConflictException implements Exception {
+  final int conflictingEventCount;
+
+  const CalendarEventConflictException({this.conflictingEventCount = 1});
+
+  @override
+  String toString() =>
+      'CalendarEventConflictException($conflictingEventCount conflicts)';
+}
+
+/// Signals that the native calendar provider did not persist an event.
+class CalendarEventUpdateException implements Exception {
+  const CalendarEventUpdateException();
+
+  @override
+  String toString() => 'CalendarEventUpdateException';
+}
+
 /// Wraps the native Android Calendar Provider (and iOS EventKit) via the
 /// `device_calendar` package.
 class CalendarService {
@@ -43,6 +62,15 @@ class CalendarService {
   @visibleForTesting
   static Future<bool> Function(String calendarId, String eventId)?
   deleteEventOverride;
+
+  @visibleForTesting
+  static Future<bool> Function({
+    required String calendarId,
+    required DateTime start,
+    required DateTime end,
+    String? excludeEventId,
+  })?
+  hasOverlappingEventsOverride;
 
   static Future<void>? _fallbackCreationFuture;
   static const _fallbackCalendarIdKey = 'asa_calendar_fallback_id';
@@ -202,6 +230,64 @@ class CalendarService {
 
     final result = await _plugin.createOrUpdateEvent(event);
     return result?.data;
+  }
+
+  /// Returns whether an existing event in [calendarId] overlaps the proposed
+  /// interval. The event identified by [excludeEventId] is ignored, which lets
+  /// an update compare against other events without conflicting with itself.
+  ///
+  /// Calendar-provider read failures fail open: the caller may still create the
+  /// event, because a transient provider failure must not make calendar linking
+  /// impossible. The user-facing operation remains serialized by TaskProvider.
+  static Future<bool> hasOverlappingEvents({
+    required String calendarId,
+    required DateTime start,
+    required DateTime end,
+    String? excludeEventId,
+  }) async {
+    final override = hasOverlappingEventsOverride;
+    if (override != null) {
+      return override(
+        calendarId: calendarId,
+        start: start,
+        end: end,
+        excludeEventId: excludeEventId,
+      );
+    }
+    if (!end.isAfter(start) || !await requestPermission()) return false;
+
+    try {
+      final result = await _plugin.retrieveEvents(
+        calendarId,
+        RetrieveEventsParams(
+          startDate: tz.TZDateTime.from(start, tz.local),
+          endDate: tz.TZDateTime.from(end, tz.local),
+        ),
+      );
+      if (!result.isSuccess || result.data == null) return false;
+      return result.data!.any((event) {
+        if (event.eventId == excludeEventId ||
+            event.start == null ||
+            event.end == null) {
+          return false;
+        }
+        return intervalsOverlap(start, end, event.start!, event.end!);
+      });
+    } on Object {
+      return false;
+    }
+  }
+
+  /// Uses half-open intervals, so an event ending exactly when another starts
+  /// is not considered a conflict.
+  @visibleForTesting
+  static bool intervalsOverlap(
+    DateTime start,
+    DateTime end,
+    DateTime otherStart,
+    DateTime otherEnd,
+  ) {
+    return start.isBefore(otherEnd) && otherStart.isBefore(end);
   }
 
   /// Deletes the calendar event with [eventId] from [calendarId]. Returns

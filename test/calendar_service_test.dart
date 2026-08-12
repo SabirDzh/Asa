@@ -21,6 +21,7 @@ void main() {
     CalendarService.calendarPlatformAndroidOverride = true;
     CalendarService.requestPermissionOverride = null;
     CalendarService.openAppSettingsOverride = null;
+    CalendarService.hasOverlappingEventsOverride = null;
     retrieveCalls = 0;
     createCalls = 0;
     alwaysEmpty = false;
@@ -64,6 +65,7 @@ void main() {
     CalendarService.calendarPlatformAndroidOverride = null;
     CalendarService.requestPermissionOverride = null;
     CalendarService.openAppSettingsOverride = null;
+    CalendarService.hasOverlappingEventsOverride = null;
   });
 
   test('retries calendar retrieval after permission is granted', () async {
@@ -171,6 +173,110 @@ void main() {
     await CalendarService.openAppSettings();
     expect(settingsOpened, isTrue);
   });
+
+  test('detects strict interval overlap and excludes adjacent events', () {
+    final start = DateTime(2025, 1, 1, 10);
+    final end = DateTime(2025, 1, 1, 11);
+
+    expect(
+      CalendarService.intervalsOverlap(
+        start,
+        end,
+        DateTime(2025, 1, 1, 10, 30),
+        DateTime(2025, 1, 1, 12),
+      ),
+      isTrue,
+    );
+    expect(
+      CalendarService.intervalsOverlap(
+        start,
+        end,
+        DateTime(2025, 1, 1, 11),
+        DateTime(2025, 1, 1, 12),
+      ),
+      isFalse,
+    );
+  });
+  test('reads native events and excludes the event being updated', () async {
+    final existingStart = DateTime(2025, 1, 1, 10);
+    final existingEnd = DateTime(2025, 1, 1, 11);
+    CalendarService.requestPermissionOverride = () async => true;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'retrieveEvents') {
+        return jsonEncode([
+          {
+            'eventId': 'event-1',
+            'calendarId': 'calendar-1',
+            'eventTitle': 'Existing event',
+            'eventStartDate': existingStart.millisecondsSinceEpoch,
+            'eventEndDate': existingEnd.millisecondsSinceEpoch,
+            'eventStartTimeZone': 'UTC',
+            'eventEndTimeZone': 'UTC',
+            'eventAllDay': false,
+          },
+        ]);
+      }
+      return null;
+    });
+
+    expect(
+      await CalendarService.hasOverlappingEvents(
+        calendarId: 'calendar-1',
+        start: DateTime(2025, 1, 1, 10, 30),
+        end: DateTime(2025, 1, 1, 11, 30),
+      ),
+      isTrue,
+    );
+    expect(
+      await CalendarService.hasOverlappingEvents(
+        calendarId: 'calendar-1',
+        start: DateTime(2025, 1, 1, 10, 30),
+        end: DateTime(2025, 1, 1, 11, 30),
+        excludeEventId: 'event-1',
+      ),
+      isFalse,
+    );
+  });
+
+  test('fails open when native event retrieval fails', () async {
+    CalendarService.requestPermissionOverride = () async => true;
+    messenger.setMockMethodCallHandler(channel, (call) async => null);
+
+    expect(
+      await CalendarService.hasOverlappingEvents(
+        calendarId: 'calendar-1',
+        start: DateTime(2025, 1, 1, 10),
+        end: DateTime(2025, 1, 1, 11),
+      ),
+      isFalse,
+    );
+  });
+
+  test(
+    'uses the overlap result override with the event being updated excluded',
+    () async {
+      String? excludedEventId;
+      CalendarService.hasOverlappingEventsOverride = ({
+        required String calendarId,
+        required DateTime start,
+        required DateTime end,
+        String? excludeEventId,
+      }) async {
+        excludedEventId = excludeEventId;
+        return true;
+      };
+
+      final result = await CalendarService.hasOverlappingEvents(
+        calendarId: 'calendar-1',
+        start: DateTime(2025, 1, 1, 10),
+        end: DateTime(2025, 1, 1, 11),
+        excludeEventId: 'event-1',
+      );
+
+      expect(result, isTrue);
+      expect(excludedEventId, 'event-1');
+    },
+  );
 
   test('suppresses fallback outside Android', () async {
     CalendarService.calendarPlatformAndroidOverride = false;

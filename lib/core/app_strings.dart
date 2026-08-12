@@ -299,6 +299,11 @@ class AppStrings {
           'Разрешите ASA доступ к календарю в настройках приложения, чтобы добавлять задачи в события.',
       'calendar_select': 'Выберите календарь',
       'calendar_no_calendars': 'Нет доступных календарей для записи',
+      'calendar_conflict_title': 'Пересечение событий',
+      'calendar_conflict_content':
+          'На это время уже запланировано другое событие. Всё равно добавить задачу в календарь?',
+      'calendar_conflict_continue': 'Добавить всё равно',
+      'calendar_update_failed': 'Не удалось обновить событие календаря',
       'set_time': 'Установить время',
       'duration': 'Плановая длительность',
       'invalid_period': 'Начало и конец периода не должны совпадать',
@@ -651,6 +656,11 @@ class AppStrings {
           'Allow ASA to access your calendar in app settings to add tasks to events.',
       'calendar_select': 'Select calendar',
       'calendar_no_calendars': 'No writable calendars found',
+      'calendar_conflict_title': 'Overlapping events',
+      'calendar_conflict_content':
+          'Another event is already scheduled for this time. Add the task to the calendar anyway?',
+      'calendar_conflict_continue': 'Add anyway',
+      'calendar_update_failed': 'Could not update the calendar event',
       'set_time': 'Set time',
       'duration': 'Planned duration',
       'invalid_period': 'Start and end of the period must be different',

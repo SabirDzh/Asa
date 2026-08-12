@@ -35,6 +35,7 @@ void main() {
           );
       CalendarService.createOrUpdateEventOverride = null;
       CalendarService.deleteEventOverride = null;
+      CalendarService.hasOverlappingEventsOverride = null;
       provider = TaskProvider();
     });
 
@@ -46,6 +47,7 @@ void main() {
           );
       CalendarService.createOrUpdateEventOverride = null;
       CalendarService.deleteEventOverride = null;
+      CalendarService.hasOverlappingEventsOverride = null;
       if (await documentsDirectory.exists()) {
         await documentsDirectory.delete(recursive: true);
       }
@@ -621,6 +623,183 @@ void main() {
       );
 
       expect(provider.tasks.first.expectedDuration, 90);
+    });
+
+    test('preserves task times when initially linking to a calendar', () async {
+      DateTime? createdStart;
+      DateTime? createdEnd;
+      CalendarService.hasOverlappingEventsOverride =
+          ({
+            required String calendarId,
+            required DateTime start,
+            required DateTime end,
+            String? excludeEventId,
+          }) async => false;
+      CalendarService.createOrUpdateEventOverride = ({
+        required String calendarId,
+        required String title,
+        required DateTime date,
+        DateTime? endTime,
+        String? eventId,
+        String? description,
+      }) async {
+        createdStart = date;
+        createdEnd = endTime;
+        return 'event-1';
+      };
+      provider.addTaskRaw(
+        TaskItem(
+          id: 'timed-calendar-task',
+          title: 'Timed calendar task',
+          startTime: DateTime(2025, 1, 1, 10),
+          endTime: DateTime(2025, 1, 1, 11),
+        ),
+      );
+
+      await provider.linkTaskToCalendar(
+        'timed-calendar-task',
+        'calendar-1',
+        DateTime(2025, 1, 5),
+      );
+
+      expect(createdStart, DateTime(2025, 1, 5, 10));
+      expect(createdEnd, DateTime(2025, 1, 5, 11));
+      expect(provider.tasks.single.dueDate, DateTime(2025, 1, 5));
+    });
+
+    test('reports a calendar conflict before creating an event', () async {
+      var createCalls = 0;
+      CalendarService.hasOverlappingEventsOverride =
+          ({
+            required String calendarId,
+            required DateTime start,
+            required DateTime end,
+            String? excludeEventId,
+          }) async => true;
+      CalendarService.createOrUpdateEventOverride = ({
+        required String calendarId,
+        required String title,
+        required DateTime date,
+        DateTime? endTime,
+        String? eventId,
+        String? description,
+      }) async {
+        createCalls++;
+        return 'event-1';
+      };
+      final taskId = addTaskForTest('Conflicting task');
+
+      await expectLater(
+        provider.linkTaskToCalendar(
+          taskId,
+          'calendar-1',
+          DateTime(2025, 1, 5, 10),
+        ),
+        throwsA(isA<CalendarEventConflictException>()),
+      );
+      expect(createCalls, 0);
+
+      await provider.linkTaskToCalendar(
+        taskId,
+        'calendar-1',
+        DateTime(2025, 1, 5, 10),
+        allowOverlapping: true,
+      );
+      expect(createCalls, 1);
+    });
+
+    test(
+      'does not mutate linked task time until a conflict is confirmed',
+      () async {
+        CalendarService.hasOverlappingEventsOverride =
+            ({
+              required String calendarId,
+              required DateTime start,
+              required DateTime end,
+              String? excludeEventId,
+            }) async => true;
+        CalendarService.createOrUpdateEventOverride =
+            ({
+              required String calendarId,
+              required String title,
+              required DateTime date,
+              DateTime? endTime,
+              String? eventId,
+              String? description,
+            }) async => eventId ?? 'event-1';
+        provider.addTaskRaw(
+          TaskItem(
+            id: 'linked-time-task',
+            title: 'Linked time task',
+            dueDate: DateTime(2025, 1, 5),
+            startTime: DateTime(2025, 1, 5, 10),
+            endTime: DateTime(2025, 1, 5, 11),
+            calendarId: 'calendar-1',
+            calendarEventId: 'event-1',
+          ),
+        );
+
+        await expectLater(
+          provider.setTaskTime(
+            'linked-time-task',
+            startTime: DateTime(2025, 1, 5, 12),
+            endTime: DateTime(2025, 1, 5, 13),
+          ),
+          throwsA(isA<CalendarEventConflictException>()),
+        );
+        expect(provider.tasks.single.startTime?.hour, 10);
+
+        await provider.setTaskTime(
+          'linked-time-task',
+          startTime: DateTime(2025, 1, 5, 12),
+          endTime: DateTime(2025, 1, 5, 13),
+          allowOverlapping: true,
+        );
+        expect(provider.tasks.single.startTime?.hour, 12);
+        expect(provider.tasks.single.endTime?.hour, 13);
+      },
+    );
+
+    test('keeps linked task time when native calendar update fails', () async {
+      CalendarService.hasOverlappingEventsOverride =
+          ({
+            required String calendarId,
+            required DateTime start,
+            required DateTime end,
+            String? excludeEventId,
+          }) async => false;
+      CalendarService.createOrUpdateEventOverride =
+          ({
+            required String calendarId,
+            required String title,
+            required DateTime date,
+            DateTime? endTime,
+            String? eventId,
+            String? description,
+          }) async => null;
+      provider.addTaskRaw(
+        TaskItem(
+          id: 'failed-update-task',
+          title: 'Failed update task',
+          dueDate: DateTime(2025, 1, 5),
+          startTime: DateTime(2025, 1, 5, 10),
+          endTime: DateTime(2025, 1, 5, 11),
+          calendarId: 'calendar-1',
+          calendarEventId: 'event-1',
+        ),
+      );
+
+      await expectLater(
+        provider.setTaskTime(
+          'failed-update-task',
+          startTime: DateTime(2025, 1, 5, 12),
+          endTime: DateTime(2025, 1, 5, 13),
+          allowOverlapping: true,
+        ),
+        throwsA(isA<CalendarEventUpdateException>()),
+      );
+      expect(provider.tasks.single.startTime?.hour, 10);
+      expect(provider.tasks.single.endTime?.hour, 11);
     });
 
     test('serializes calendar updates for the same task', () async {

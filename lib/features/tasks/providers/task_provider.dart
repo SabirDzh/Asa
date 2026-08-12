@@ -25,6 +25,13 @@ const Duration kDeletedItemRetention = Duration(days: 7);
 
 enum TaskFilter { all, active, completed, foldersOnly }
 
+class _CalendarPeriod {
+  final DateTime start;
+  final DateTime end;
+
+  const _CalendarPeriod(this.start, this.end);
+}
+
 class _PersistenceSnapshot {
   final String tasksJson;
   final String foldersJson;
@@ -1435,24 +1442,41 @@ class TaskProvider with ChangeNotifier {
 
   /// Links the task to a calendar event on [calendarId] at [date].
   /// Updates the existing event if [task.calendarEventId] is already set.
-  Future<void> linkTaskToCalendar(String id, String calendarId, DateTime date) {
+  ///
+  /// A conflict is reported before the native write unless
+  /// [allowOverlapping] is true. The UI can then ask for explicit confirmation
+  /// and retry without holding this per-task queue open on a dialog.
+  Future<void> linkTaskToCalendar(
+    String id,
+    String calendarId,
+    DateTime date, {
+    bool allowOverlapping = false,
+  }) {
     return _enqueueCalendarOperation(id, () async {
       final index = _tasks.indexWhere((t) => t.id == id);
       if (index == -1 || _tasks[index].isDeleted) return;
 
       final task = _tasks[index];
-      final eventId = await CalendarService.createOrUpdateEvent(
+      final period = _calendarPeriodForTask(task, date);
+      if (!allowOverlapping &&
+          await CalendarService.hasOverlappingEvents(
+            calendarId: calendarId,
+            start: period.start,
+            end: period.end,
+            excludeEventId: task.calendarEventId,
+          )) {
+        throw const CalendarEventConflictException();
+      }
+
+      final eventId = await _createCalendarEvent(
         calendarId: calendarId,
         title: task.title,
-        date: date,
+        period: period,
         eventId: task.calendarEventId,
-        description: 'Task from Asa',
       );
 
       final currentIndex = _tasks.indexWhere((t) => t.id == id);
-      if (eventId != null &&
-          currentIndex != -1 &&
-          !_tasks[currentIndex].isDeleted) {
+      if (currentIndex != -1 && !_tasks[currentIndex].isDeleted) {
         _tasks[currentIndex] = _tasks[currentIndex].copyWith(
           dueDate: date,
           calendarId: calendarId,
@@ -1499,8 +1523,84 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Updates the time fields of a task. Pass null to clear a field.
-  /// Also updates the linked calendar event if one exists.
-  void setTaskTime(String id, {DateTime? startTime, DateTime? endTime}) {
+  /// Also updates the linked calendar event if one exists. Linked updates are
+  /// serialized and check for overlaps before changing local task state.
+  Future<void> setTaskTime(
+    String id, {
+    DateTime? startTime,
+    DateTime? endTime,
+    bool allowOverlapping = false,
+  }) {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index == -1) return Future<void>.value();
+    final task = _tasks[index];
+    if (task.calendarId == null || task.calendarEventId == null) {
+      _applyTaskTime(id, startTime: startTime, endTime: endTime);
+      return Future<void>.value();
+    }
+
+    return _enqueueCalendarOperation(
+      id,
+      () => _setLinkedTaskTime(
+        id,
+        startTime: startTime,
+        endTime: endTime,
+        allowOverlapping: allowOverlapping,
+      ),
+    );
+  }
+
+  Future<void> _setLinkedTaskTime(
+    String id, {
+    DateTime? startTime,
+    DateTime? endTime,
+    required bool allowOverlapping,
+  }) async {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index == -1) return;
+    final task = _tasks[index];
+    if (task.calendarId == null || task.calendarEventId == null) {
+      _applyTaskTime(id, startTime: startTime, endTime: endTime);
+      return;
+    }
+
+    final period = _calendarPeriodForValues(
+      task,
+      startTime: startTime,
+      endTime: endTime,
+    );
+    if (!allowOverlapping &&
+        await CalendarService.hasOverlappingEvents(
+          calendarId: task.calendarId!,
+          start: period.start,
+          end: period.end,
+          excludeEventId: task.calendarEventId,
+        )) {
+      throw const CalendarEventConflictException();
+    }
+
+    final eventId = await _createCalendarEvent(
+      calendarId: task.calendarId!,
+      title: task.title,
+      period: period,
+      eventId: task.calendarEventId,
+    );
+    _applyTaskTime(id, startTime: startTime, endTime: endTime);
+
+    if (eventId != task.calendarEventId) {
+      final currentIndex = _tasks.indexWhere((item) => item.id == id);
+      if (currentIndex != -1 && !_tasks[currentIndex].isDeleted) {
+        _tasks[currentIndex] = _tasks[currentIndex].copyWith(
+          calendarEventId: eventId,
+          updatedAt: DateTime.now(),
+        );
+        _notifyTasksChanged();
+        _saveToPrefs();
+      }
+    }
+  }
+
+  void _applyTaskTime(String id, {DateTime? startTime, DateTime? endTime}) {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index == -1) return;
     final calculatedDuration =
@@ -1515,7 +1615,6 @@ class TaskProvider with ChangeNotifier {
     );
     _notifyTasksChanged();
     _saveToPrefs();
-    syncTaskCalendarEvent(id).catchError((_) {});
   }
 
   /// Updates the linked calendar event to reflect the current task title,
@@ -1534,40 +1633,75 @@ class TaskProvider with ChangeNotifier {
 
     final baseDate = task.dueDate;
     if (baseDate == null) return;
+    final period = _calendarPeriodForTask(task, baseDate);
 
-    DateTime start = baseDate;
-    if (task.startTime != null) {
+    await _createCalendarEvent(
+      calendarId: task.calendarId!,
+      title: task.title,
+      period: period,
+      eventId: task.calendarEventId,
+    );
+  }
+
+  Future<String> _createCalendarEvent({
+    required String calendarId,
+    required String title,
+    required _CalendarPeriod period,
+    String? eventId,
+  }) async {
+    final createdEventId = await CalendarService.createOrUpdateEvent(
+      calendarId: calendarId,
+      title: title,
+      date: period.start,
+      endTime: period.end,
+      eventId: eventId,
+      description: 'Task from Asa',
+    );
+    if (createdEventId == null || createdEventId.isEmpty) {
+      throw const CalendarEventUpdateException();
+    }
+    return createdEventId;
+  }
+
+  _CalendarPeriod _calendarPeriodForTask(TaskItem task, DateTime date) {
+    return _calendarPeriodForValues(
+      task,
+      startTime: task.startTime,
+      endTime: task.endTime,
+      date: date,
+    );
+  }
+
+  _CalendarPeriod _calendarPeriodForValues(
+    TaskItem task, {
+    DateTime? startTime,
+    DateTime? endTime,
+    DateTime? date,
+  }) {
+    final baseDate = date ?? task.dueDate ?? DateTime.now();
+    var start = DateTime(baseDate.year, baseDate.month, baseDate.day);
+    if (startTime != null) {
       start = DateTime(
         baseDate.year,
         baseDate.month,
         baseDate.day,
-        task.startTime!.hour,
-        task.startTime!.minute,
+        startTime.hour,
+        startTime.minute,
       );
     }
 
-    DateTime? end;
-    if (task.endTime != null) {
-      end = DateTime(
-        baseDate.year,
-        baseDate.month,
-        baseDate.day,
-        task.endTime!.hour,
-        task.endTime!.minute,
-      );
-      if (end.isBefore(start)) {
-        end = end.add(const Duration(days: 1));
-      }
-    }
-
-    await CalendarService.createOrUpdateEvent(
-      calendarId: task.calendarId!,
-      title: task.title,
-      date: start,
-      eventId: task.calendarEventId,
-      description: 'Task from Asa',
-      endTime: end,
-    );
+    var end =
+        endTime == null
+            ? start.add(const Duration(hours: 1))
+            : DateTime(
+              baseDate.year,
+              baseDate.month,
+              baseDate.day,
+              endTime.hour,
+              endTime.minute,
+            );
+    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+    return _CalendarPeriod(start, end);
   }
 
   void addFolder(String name, {String? parentFolderId, String? iconAsset}) {

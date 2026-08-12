@@ -9,6 +9,7 @@ import '../../../core/snackbar_deduper.dart';
 import '../../../core/responsive_center.dart';
 import '../../../core/theme.dart';
 import 'task_editor_sheet.dart';
+import 'calendar_conflict_dialog.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -315,11 +316,30 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     }
 
     if (selected == null || !context.mounted) return;
-    await context.read<TaskProvider>().linkTaskToCalendar(
-      widget.task.id,
-      selected.id!,
-      date,
-    );
+    final provider = context.read<TaskProvider>();
+    try {
+      await provider.linkTaskToCalendar(widget.task.id, selected.id!, date);
+    } on CalendarEventConflictException {
+      if (!context.mounted) return;
+      final confirmed = await showCalendarConflictDialog(context, settings);
+      if (!confirmed || !context.mounted) return;
+      try {
+        await provider.linkTaskToCalendar(
+          widget.task.id,
+          selected.id!,
+          date,
+          allowOverlapping: true,
+        );
+      } on Object {
+        if (context.mounted) {
+          showCalendarOperationError(context, settings);
+        }
+      }
+    } on Object {
+      if (context.mounted) {
+        showCalendarOperationError(context, settings);
+      }
+    }
   }
 
   Future<void> _showCalendarPermissionDialog(

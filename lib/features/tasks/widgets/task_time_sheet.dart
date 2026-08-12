@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/calendar_service.dart';
 import '../../../core/drag_close_sheet.dart';
 import '../../../core/theme.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../../settings/providers/settings_provider.dart';
+import 'calendar_conflict_dialog.dart';
 
 /// Shows a bottom sheet to set the start and end period for [task].
 Future<void> showTaskTimeSheet(BuildContext context, TaskItem task) async {
@@ -183,7 +185,7 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
     return '$h:$m';
   }
 
-  void _save(BuildContext context) {
+  Future<void> _save(BuildContext context) async {
     if (!_hasCompletePeriod) return;
     if (_startTime!.hour == _endTime!.hour &&
         _startTime!.minute == _endTime!.minute) {
@@ -200,21 +202,74 @@ class _TaskTimeSheetState extends State<_TaskTimeSheet> {
       return;
     }
     final provider = context.read<TaskProvider>();
-    provider.setTaskTime(
-      widget.task.id,
-      startTime: _toDateTime(_startTime),
-      endTime: _toDateTime(_endTime),
-    );
-    Navigator.pop(context);
+    final settings = context.read<SettingsProvider>();
+    final startTime = _toDateTime(_startTime);
+    final endTime = _toDateTime(_endTime);
+    try {
+      await provider.setTaskTime(
+        widget.task.id,
+        startTime: startTime,
+        endTime: endTime,
+      );
+    } on CalendarEventConflictException {
+      if (!context.mounted) return;
+      final confirmed = await showCalendarConflictDialog(context, settings);
+      if (!confirmed || !context.mounted) return;
+      try {
+        await provider.setTaskTime(
+          widget.task.id,
+          startTime: startTime,
+          endTime: endTime,
+          allowOverlapping: true,
+        );
+      } on Object {
+        if (context.mounted) {
+          showCalendarOperationError(context, settings);
+        }
+        return;
+      }
+    } on Object {
+      if (context.mounted) {
+        showCalendarOperationError(context, settings);
+      }
+      return;
+    }
+    if (context.mounted) Navigator.pop(context);
   }
 
-  void _clear(BuildContext context) {
-    context.read<TaskProvider>().setTaskTime(
-      widget.task.id,
-      startTime: null,
-      endTime: null,
-    );
-    Navigator.pop(context);
+  Future<void> _clear(BuildContext context) async {
+    final provider = context.read<TaskProvider>();
+    final settings = context.read<SettingsProvider>();
+    try {
+      await provider.setTaskTime(
+        widget.task.id,
+        startTime: null,
+        endTime: null,
+      );
+    } on CalendarEventConflictException {
+      if (!context.mounted) return;
+      final confirmed = await showCalendarConflictDialog(context, settings);
+      if (!confirmed || !context.mounted) return;
+      try {
+        await provider.setTaskTime(
+          widget.task.id,
+          startTime: null,
+          endTime: null,
+          allowOverlapping: true,
+        );
+      } on Object {
+        if (context.mounted) {
+          showCalendarOperationError(context, settings);
+        }
+        return;
+      }
+    } on Object {
+      if (context.mounted) {
+        showCalendarOperationError(context, settings);
+      }
+      return;
+    }
+    if (context.mounted) Navigator.pop(context);
   }
 
   @override

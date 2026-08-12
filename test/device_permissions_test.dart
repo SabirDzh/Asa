@@ -6,6 +6,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     DevicePermissions.permissionStateOverride = null;
+    DevicePermissions.localNetworkPermissionOverride = null;
   });
 
   group('PermissionState Matrix', () {
@@ -96,5 +97,17 @@ void main() {
       expect(result.isComplete, isFalse);
       expect(result.notificationsGranted, isFalse);
     });
+
+    test(
+      'requests local network permission through the platform hook',
+      () async {
+        DevicePermissions.localNetworkPermissionOverride = () async => false;
+
+        expect(
+          await DevicePermissions.requestLocalNetworkPermission(),
+          isFalse,
+        );
+      },
+    );
   });
 }

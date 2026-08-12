@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/device_permissions.dart';
 import '../../../core/theme.dart';
 import '../providers/settings_provider.dart';
 import '../../tasks/providers/task_provider.dart';
@@ -60,10 +61,57 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.dispose();
   }
 
+  bool _syncBusy = false;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (widget.standalone && state == AppLifecycleState.resumed && mounted) {
       unawaited(context.read<SettingsProvider>().syncNotificationPermission());
+    }
+  }
+
+  Future<void> _toggleSync(bool value) async {
+    if (_syncBusy) return;
+    setState(() => _syncBusy = true);
+    try {
+      final settings = context.read<SettingsProvider>();
+      final tasks = context.read<TaskProvider>();
+
+      if (value) {
+        final localNetworkGranted =
+            await DevicePermissions.requestLocalNetworkPermission();
+        if (!localNetworkGranted) {
+          await settings.setSyncEnabled(false);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(settings.tr('sync_permission_denied'))),
+          );
+          return;
+        }
+      }
+
+      await settings.setSyncEnabled(value);
+      if (!mounted) return;
+      if (value) {
+        final deviceId = await settings.ensureSyncDeviceId();
+        if (!mounted) return;
+        SyncService.instance.setProvider(tasks);
+        SyncService.instance.setDeviceName(settings.syncDeviceName);
+        SyncService.instance.setDeviceId(deviceId);
+        SyncService.instance.setSecret(settings.syncSecret);
+        final started = await SyncService.instance.start();
+        if (!started) {
+          await settings.setSyncEnabled(false);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(settings.tr('sync_start_failed'))),
+          );
+        }
+      } else {
+        await SyncService.instance.stop();
+      }
+    } finally {
+      if (mounted) setState(() => _syncBusy = false);
     }
   }
 
@@ -195,36 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   label: settings.tr('sync'),
                   trailing: Switch(
                     value: settings.syncEnabled,
-                    onChanged: (value) async {
-                      final tasks = Provider.of<TaskProvider>(
-                        context,
-                        listen: false,
-                      );
-                      await settings.setSyncEnabled(value);
-                      if (!context.mounted) return;
-                      if (value) {
-                        final deviceId = await settings.ensureSyncDeviceId();
-                        if (!context.mounted) return;
-                        SyncService.instance.setProvider(tasks);
-                        SyncService.instance.setDeviceName(
-                          settings.syncDeviceName,
-                        );
-                        SyncService.instance.setDeviceId(deviceId);
-                        SyncService.instance.setSecret(settings.syncSecret);
-                        final started = await SyncService.instance.start();
-                        if (!started) {
-                          await settings.setSyncEnabled(false);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(settings.tr('sync_start_failed')),
-                            ),
-                          );
-                        }
-                      } else {
-                        await SyncService.instance.stop();
-                      }
-                    },
+                    onChanged: _syncBusy ? null : _toggleSync,
                     activeThumbColor: AppColors.primary,
                     trackOutlineColor: WidgetStateProperty.all(
                       Colors.transparent,

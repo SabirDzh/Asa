@@ -210,6 +210,8 @@ class AppStrings {
       'sync_send_success': 'Отправлено на',
       'sync_send_failed': 'Отправка не удалась',
       'sync_start_failed': 'Не удалось запустить синхронизацию',
+      'sync_permission_denied':
+          'Для синхронизации нужен доступ к устройствам в локальной сети',
       'sync_peers': 'Устройства рядом',
       'no_peers':
           'Устройства не обнаружены. Убедитесь, что синхронизация включена на другом устройстве.',
@@ -264,6 +266,8 @@ class AppStrings {
       'add_to_calendar': 'Добавить в календарь',
       'remove_from_calendar': 'Убрать из календаря',
       'calendar_no_permission': 'Нет разрешения на работу с календарём',
+      'calendar_permission_hint':
+          'Разрешите ASA доступ к календарю в настройках приложения, чтобы добавлять задачи в события.',
       'calendar_select': 'Выберите календарь',
       'calendar_no_calendars': 'Нет доступных календарей для записи',
       'set_time': 'Установить время',
@@ -521,6 +525,8 @@ class AppStrings {
       'sync_send_success': 'Sent to',
       'sync_send_failed': 'Send failed',
       'sync_start_failed': 'Could not start sync',
+      'sync_permission_denied':
+          'Local network access is needed to discover sync devices',
       'sync_peers': 'Nearby devices',
       'no_peers':
           'No devices found. Make sure sync is enabled on the other device.',
@@ -574,6 +580,8 @@ class AppStrings {
       'add_to_calendar': 'Add to calendar',
       'remove_from_calendar': 'Remove from calendar',
       'calendar_no_permission': 'Calendar permission denied',
+      'calendar_permission_hint':
+          'Allow ASA to access your calendar in app settings to add tasks to events.',
       'calendar_select': 'Select calendar',
       'calendar_no_calendars': 'No writable calendars found',
       'set_time': 'Set time',

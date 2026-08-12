@@ -10,6 +10,7 @@ import 'package:asa/features/settings/screens/whats_new_screen.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
+import 'package:asa/core/device_permissions.dart';
 import 'package:asa/core/home_widget_service.dart';
 import 'package:asa/core/notification_service.dart';
 import 'package:asa/core/theme.dart';
@@ -53,6 +54,7 @@ void main() {
     installHomeWidgetChannelMock();
     NotificationService.initializedOverride = null;
     NotificationService.requestPermissionOverride = null;
+    DevicePermissions.localNetworkPermissionOverride = null;
     NotificationService.permanentlyDeniedOverride = null;
   });
 
@@ -65,6 +67,7 @@ void main() {
     removeHomeWidgetChannelMock();
     NotificationService.initializedOverride = null;
     NotificationService.requestPermissionOverride = null;
+    DevicePermissions.localNetworkPermissionOverride = null;
     NotificationService.permanentlyDeniedOverride = null;
     NotificationService.openNotificationSettingsOverride = null;
   });
@@ -223,6 +226,37 @@ void main() {
 
     expect(find.text('О приложении ASA'), findsOneWidget);
     expect(find.textContaining(VersionService.currentVersion), findsOneWidget);
+  });
+
+  testWidgets('keeps sync disabled when local network access is denied', (
+    tester,
+  ) async {
+    DevicePermissions.localNetworkPermissionOverride = () async => false;
+    await pumpAndInit(tester, createTestApp());
+
+    final syncLabel = find.text('Синхронизация');
+    await tester.scrollUntilVisible(
+      syncLabel,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.ancestor(of: syncLabel, matching: find.byType(SettingRow));
+    await tester.tap(find.descendant(of: row, matching: find.byType(Switch)));
+    await tester.pumpAndSettle();
+
+    final settings = Provider.of<SettingsProvider>(
+      tester.element(find.byType(SettingsScreen)),
+      listen: false,
+    );
+    expect(settings.syncEnabled, isFalse);
+    expect(
+      find.text(
+        'Для синхронизации нужен доступ к устройствам в локальной сети',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

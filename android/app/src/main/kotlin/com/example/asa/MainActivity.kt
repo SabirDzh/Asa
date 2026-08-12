@@ -29,6 +29,12 @@ class MainActivity : FlutterActivity() {
                     openNotificationSettings()
                     result.success(null)
                 }
+                "openAppSettings" -> {
+                    openAppDetails()
+                    result.success(null)
+                }
+                "requestLocalNetworkPermission" ->
+                    requestLocalNetworkPermission(result)
                 "getTimeZoneId" ->
                     result.success(TimeZone.getDefault().id)
                 "isExactAlarmGranted" ->
@@ -56,6 +62,52 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private var localNetworkPermissionResult: MethodChannel.Result? = null
+
+    private fun requestLocalNetworkPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            result.success(true)
+            return
+        }
+
+        val permission =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.NEARBY_WIFI_DEVICES
+            } else {
+                Manifest.permission.ACCESS_FINE_LOCATION
+            }
+        if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            result.success(true)
+            return
+        }
+        if (localNetworkPermissionResult != null) {
+            result.error(
+                "permission_in_progress",
+                "A local network permission request is already in progress",
+                null,
+            )
+            return
+        }
+
+        localNetworkPermissionResult = result
+        requestPermissions(arrayOf(permission), LOCAL_NETWORK_PERMISSION_REQUEST_CODE)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != LOCAL_NETWORK_PERMISSION_REQUEST_CODE) return
+
+        val result = localNetworkPermissionResult
+        localNetworkPermissionResult = null
+        result?.success(
+            grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED,
+        )
     }
 
     /**
@@ -221,7 +273,21 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {}
     }
 
+    override fun onDestroy() {
+        // Complete the pending Dart call instead of leaving the sync toggle
+        // suspended forever if Android recreates the Activity while the
+        // permission dialog is visible (rotation, process handoff, etc.).
+        localNetworkPermissionResult?.error(
+            "activity_destroyed",
+            "Activity was recreated before local network permission completed",
+            null,
+        )
+        localNetworkPermissionResult = null
+        super.onDestroy()
+    }
+
     companion object {
         private const val CHANNEL = "asa/notifications"
+        private const val LOCAL_NETWORK_PERMISSION_REQUEST_CODE = 4107
     }
 }

@@ -253,10 +253,17 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
     );
     if (date == null || !context.mounted) return;
 
+    final permissionGranted = await CalendarService.requestPermission();
+    if (!permissionGranted) {
+      if (!context.mounted) return;
+      await _showCalendarPermissionDialog(context, settings);
+      return;
+    }
+
     final calendars =
-        (await CalendarService.getCalendars())
-            .where((c) => c.id != null && c.id!.isNotEmpty)
-            .toList();
+        (await CalendarService.getCalendars(
+          permissionAlreadyGranted: true,
+        )).where((c) => c.id != null && c.id!.isNotEmpty).toList();
     if (calendars.isEmpty) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -311,6 +318,49 @@ class _TaskRowState extends State<TaskRow> with SingleTickerProviderStateMixin {
       widget.task.id,
       selected.id!,
       date,
+    );
+  }
+
+  Future<void> _showCalendarPermissionDialog(
+    BuildContext context,
+    SettingsProvider settings,
+  ) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final background = isDark ? AppColors.navDark : AppColors.navLight;
+    final textColor = isDark ? AppColors.textDark : AppColors.textLight;
+    final secondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: background,
+            title: Text(
+              settings.tr('calendar_no_permission'),
+              style: TextStyle(color: textColor),
+            ),
+            content: Text(
+              settings.tr('calendar_permission_hint'),
+              style: TextStyle(color: secondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  settings.tr('cancel'),
+                  style: TextStyle(color: secondary),
+                ),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  await CalendarService.openAppSettings();
+                },
+                child: Text(settings.tr('open_settings')),
+              ),
+            ],
+          ),
     );
   }
 

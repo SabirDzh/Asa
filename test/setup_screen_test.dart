@@ -21,6 +21,7 @@ void main() {
   tearDown(() {
     timeDilation = 1.0;
     DevicePermissions.permissionStateOverride = null;
+    DevicePermissions.localNetworkPermissionOverride = null;
     NotificationService.requestPermissionOverride = null;
     NotificationService.permanentlyDeniedOverride = null;
     NotificationService.openNotificationSettingsOverride = null;

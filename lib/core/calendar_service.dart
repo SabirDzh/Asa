@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import 'device_permissions.dart';
+
 /// Wraps the native Android Calendar Provider (and iOS EventKit) via the
 /// `device_calendar` package.
 class CalendarService {
@@ -21,16 +23,36 @@ class CalendarService {
   @visibleForTesting
   static bool? calendarPlatformAndroidOverride;
 
+  @visibleForTesting
+  static Future<bool> Function()? requestPermissionOverride;
+
+  @visibleForTesting
+  static Future<void> Function()? openAppSettingsOverride;
+
   static Future<void>? _fallbackCreationFuture;
   static const _fallbackCalendarIdKey = 'asa_calendar_fallback_id';
 
   /// Requests calendar read/write permissions. Returns true if granted.
   static Future<bool> requestPermission() async {
+    final override = requestPermissionOverride;
+    if (override != null) return override();
+
     final has = await _plugin.hasPermissions();
     if (has.isSuccess && (has.data ?? false)) return true;
 
     final requested = await _plugin.requestPermissions();
     return requested.isSuccess && (requested.data ?? false);
+  }
+
+  /// Opens the app's system settings so the user can restore calendar access
+  /// after a permanent denial.
+  static Future<void> openAppSettings() async {
+    final override = openAppSettingsOverride;
+    if (override != null) {
+      await override();
+      return;
+    }
+    await DevicePermissions.openAppSettings();
   }
 
   /// Returns calendars that are not explicitly marked read-only.
@@ -44,8 +66,10 @@ class CalendarService {
   /// create a private local calendar owned by ASA and read the provider again.
   /// The fallback is deliberately performed only after the normal lookup fails;
   /// existing user calendars are never modified.
-  static Future<List<Calendar>> getCalendars() async {
-    if (!await requestPermission()) return [];
+  static Future<List<Calendar>> getCalendars({
+    bool permissionAlreadyGranted = false,
+  }) async {
+    if (!permissionAlreadyGranted && !await requestPermission()) return [];
 
     final calendars = await _retrieveWritableCalendars();
     final isAndroid =
@@ -85,8 +109,9 @@ class CalendarService {
         localAccountName: 'ASA',
       );
       final calendarId = created.data;
-      if (!created.isSuccess || calendarId == null || calendarId.isEmpty)
+      if (!created.isSuccess || calendarId == null || calendarId.isEmpty) {
         return;
+      }
       calendarFallbackAttempted = true;
       await prefs.setString(_fallbackCalendarIdKey, calendarId);
     } on Object {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/device_permissions.dart';
 import '../../../core/permission_gate.dart';
 import '../../../core/sync_service.dart';
 import '../../../core/logger_service.dart';
@@ -31,22 +32,23 @@ class _SplashScreenState extends State<SplashScreen> {
     final settings = context.read<SettingsProvider>();
     final tasks = context.read<TaskProvider>();
     _readyFuture = Future.wait([settings.ready, tasks.ready]);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(
-        _startSyncInBackground(settings, tasks).catchError((
-          Object error,
-          StackTrace stackTrace,
-        ) {
-          // Sync is optional and must never turn a post-frame callback into an
-          // unhandled error or delay the first usable screen.
-          LoggerService.instance.w(
-            'Background sync startup failed',
-            error: error,
-            stackTrace: stackTrace,
-          );
-        }),
+  }
+
+  Future<void> _startSyncSafely(
+    SettingsProvider settings,
+    TaskProvider tasks,
+  ) async {
+    try {
+      await _startSyncInBackground(settings, tasks);
+    } on Object catch (error, stackTrace) {
+      // Sync is optional and must never turn a post-frame callback into an
+      // unhandled error or delay the first usable screen.
+      LoggerService.instance.w(
+        'Background sync startup failed',
+        error: error,
+        stackTrace: stackTrace,
       );
-    });
+    }
   }
 
   Future<void> _startSyncInBackground(
@@ -55,6 +57,13 @@ class _SplashScreenState extends State<SplashScreen> {
   ) async {
     await _readyFuture;
     if (!settings.syncEnabled) return;
+
+    final localNetworkGranted =
+        await DevicePermissions.requestLocalNetworkPermission();
+    if (!localNetworkGranted) {
+      await settings.setSyncEnabled(false);
+      return;
+    }
 
     final deviceId = await settings.ensureSyncDeviceId();
     SyncService.instance.setProvider(tasks);
@@ -92,7 +101,12 @@ class _SplashScreenState extends State<SplashScreen> {
           });
         }
 
-        return const PermissionGate(child: HomeScreen());
+        final settings = context.read<SettingsProvider>();
+        final tasks = context.read<TaskProvider>();
+        return PermissionGate(
+          onReady: () => _startSyncSafely(settings, tasks),
+          child: const HomeScreen(),
+        );
       },
     );
   }

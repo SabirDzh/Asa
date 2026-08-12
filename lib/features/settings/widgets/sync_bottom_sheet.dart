@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/device_permissions.dart';
 import '../../../core/sync_service.dart';
 import '../../../core/theme.dart';
 import '../providers/settings_provider.dart';
@@ -228,6 +229,16 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
   }
 
   Future<void> _refresh() async {
+    final localNetworkGranted =
+        await DevicePermissions.requestLocalNetworkPermission();
+    if (!localNetworkGranted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.settings.tr('sync_permission_denied'))),
+      );
+      return;
+    }
+
     final deviceId = await widget.settings.ensureSyncDeviceId();
     SyncService.instance.setProvider(widget.taskProvider);
     SyncService.instance.setDeviceName(widget.settings.syncDeviceName);

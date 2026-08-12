@@ -19,6 +19,8 @@ void main() {
     CalendarService.calendarRetryDelay = Duration.zero;
     CalendarService.calendarFallbackAttempted = false;
     CalendarService.calendarPlatformAndroidOverride = true;
+    CalendarService.requestPermissionOverride = null;
+    CalendarService.openAppSettingsOverride = null;
     retrieveCalls = 0;
     createCalls = 0;
     alwaysEmpty = false;
@@ -60,6 +62,8 @@ void main() {
     CalendarService.calendarRetryDelay = const Duration(milliseconds: 250);
     CalendarService.calendarFallbackAttempted = false;
     CalendarService.calendarPlatformAndroidOverride = null;
+    CalendarService.requestPermissionOverride = null;
+    CalendarService.openAppSettingsOverride = null;
   });
 
   test('retries calendar retrieval after permission is granted', () async {
@@ -154,6 +158,18 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('asa_calendar_fallback_id'), isNull);
     expect(CalendarService.calendarFallbackAttempted, isFalse);
+  });
+
+  test('uses the injected permission result and settings action', () async {
+    var settingsOpened = false;
+    CalendarService.requestPermissionOverride = () async => false;
+    CalendarService.openAppSettingsOverride = () async {
+      settingsOpened = true;
+    };
+
+    expect(await CalendarService.requestPermission(), isFalse);
+    await CalendarService.openAppSettings();
+    expect(settingsOpened, isTrue);
   });
 
   test('suppresses fallback outside Android', () async {

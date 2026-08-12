@@ -17,7 +17,7 @@ import UIKit
       binaryMessenger: controller.binaryMessenger
     )
     channel.setMethodCallHandler { call, result in
-      guard call.method == "openNotificationSettings" || call.method == "getTimeZoneId" else {
+      guard call.method == "openNotificationSettings" || call.method == "openAppSettings" || call.method == "getTimeZoneId" else {
         result(FlutterMethodNotImplemented)
         return
       }
@@ -28,7 +28,7 @@ import UIKit
       }
 
       let settingsURL: URL?
-      if #available(iOS 15.4, *) {
+      if call.method == "openNotificationSettings", #available(iOS 15.4, *) {
         settingsURL = URL(string: UIApplication.openNotificationSettingsURLString)
       } else {
         settingsURL = URL(string: UIApplication.openSettingsURLString)

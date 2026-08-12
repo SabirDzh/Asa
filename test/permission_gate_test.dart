@@ -43,6 +43,68 @@ void main() {
       expect(find.text('Home Screen Content'), findsOneWidget);
     });
 
+    testWidgets('calls onReady once after all permissions are granted', (
+      tester,
+    ) async {
+      var readyCalls = 0;
+      DevicePermissions.permissionStateOverride = const PermissionState(
+        notificationsGranted: true,
+        exactAlarmGranted: true,
+        batteryOptimizationDisabled: true,
+        autoStartGranted: true,
+        autoStartSupported: true,
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: MaterialApp(
+            home: PermissionGate(
+              onReady: () async {
+                readyCalls++;
+              },
+              child: const Text('Home Screen Content'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump();
+
+      expect(readyCalls, 1);
+    });
+
+    testWidgets('does not call onReady while SetupScreen is visible', (
+      tester,
+    ) async {
+      var readyCalls = 0;
+      DevicePermissions.permissionStateOverride = const PermissionState(
+        notificationsGranted: false,
+        exactAlarmGranted: true,
+        batteryOptimizationDisabled: true,
+        autoStartGranted: true,
+        autoStartSupported: true,
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: MaterialApp(
+            home: PermissionGate(
+              onReady: () async {
+                readyCalls++;
+              },
+              child: const Text('Home Screen Content'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(readyCalls, 0);
+      expect(find.byType(SetupScreen), findsOneWidget);
+    });
+
     testWidgets('renders SetupScreen when any permission is missing', (
       tester,
     ) async {

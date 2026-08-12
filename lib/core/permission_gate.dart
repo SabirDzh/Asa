@@ -15,8 +15,9 @@ import 'device_permissions.dart';
 /// and blocks access to [child] until [PermissionState.isComplete] is true.
 class PermissionGate extends StatefulWidget {
   final Widget child;
+  final Future<void> Function()? onReady;
 
-  const PermissionGate({super.key, required this.child});
+  const PermissionGate({super.key, required this.child, this.onReady});
 
   @override
   State<PermissionGate> createState() => _PermissionGateState();
@@ -26,6 +27,7 @@ class _PermissionGateState extends State<PermissionGate>
     with WidgetsBindingObserver {
   PermissionState? _state;
   bool _loading = true;
+  bool _readyCallbackScheduled = false;
 
   @override
   void initState() {
@@ -69,6 +71,14 @@ class _PermissionGateState extends State<PermissionGate>
         initialState: _state,
         onPermissionsResolved: _refreshPermissionState,
       );
+    }
+
+    if (!_readyCallbackScheduled && widget.onReady != null) {
+      _readyCallbackScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(widget.onReady!());
+      });
     }
 
     return widget.child;

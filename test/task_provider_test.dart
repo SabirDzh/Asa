@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asa/features/tasks/models/task_info_block.dart';
 import 'package:asa/features/tasks/models/task_model.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
+import 'package:asa/core/calendar_service.dart';
 import 'package:asa/core/task_attachment_service.dart';
 
 void main() {
@@ -31,6 +33,8 @@ void main() {
               return null;
             },
           );
+      CalendarService.createOrUpdateEventOverride = null;
+      CalendarService.deleteEventOverride = null;
       provider = TaskProvider();
     });
 
@@ -40,6 +44,8 @@ void main() {
             const MethodChannel('plugins.flutter.io/path_provider'),
             null,
           );
+      CalendarService.createOrUpdateEventOverride = null;
+      CalendarService.deleteEventOverride = null;
       if (await documentsDirectory.exists()) {
         await documentsDirectory.delete(recursive: true);
       }
@@ -615,6 +621,84 @@ void main() {
       );
 
       expect(provider.tasks.first.expectedDuration, 90);
+    });
+
+    test('serializes calendar updates for the same task', () async {
+      final firstCall = Completer<void>();
+      var calls = 0;
+      CalendarService.createOrUpdateEventOverride = ({
+        required String calendarId,
+        required String title,
+        required DateTime date,
+        DateTime? endTime,
+        String? eventId,
+        String? description,
+      }) async {
+        calls++;
+        if (calls == 1) await firstCall.future;
+        return eventId ?? 'event-1';
+      };
+      provider.addTaskRaw(
+        TaskItem(
+          id: 'calendar-task',
+          title: 'Calendar task',
+          dueDate: DateTime(2025, 1, 1),
+          calendarId: 'calendar-1',
+          calendarEventId: 'event-1',
+        ),
+      );
+
+      final first = provider.syncTaskCalendarEvent('calendar-task');
+      final second = provider.syncTaskCalendarEvent('calendar-task');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(calls, 1);
+      firstCall.complete();
+      await Future.wait([first, second]);
+      expect(calls, 2);
+    });
+
+    test('bulk calendar cleanup waits for an earlier task update', () async {
+      final updateStarted = Completer<void>();
+      final releaseUpdate = Completer<void>();
+      var deleteCalls = 0;
+      CalendarService.createOrUpdateEventOverride = ({
+        required String calendarId,
+        required String title,
+        required DateTime date,
+        DateTime? endTime,
+        String? eventId,
+        String? description,
+      }) async {
+        updateStarted.complete();
+        await releaseUpdate.future;
+        return eventId ?? 'event-1';
+      };
+      CalendarService.deleteEventOverride = (calendarId, eventId) async {
+        deleteCalls++;
+        return true;
+      };
+      provider.addTaskRaw(
+        TaskItem(
+          id: 'calendar-cleanup-task',
+          title: 'Calendar cleanup task',
+          dueDate: DateTime(2025, 1, 1),
+          calendarId: 'calendar-1',
+          calendarEventId: 'event-1',
+        ),
+      );
+
+      final update = provider.syncTaskCalendarEvent('calendar-cleanup-task');
+      await updateStarted.future;
+      final clear = provider.clearAllTasks();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(deleteCalls, 0);
+      releaseUpdate.complete();
+      await update;
+      await clear;
+      expect(deleteCalls, 1);
+      expect(provider.tasks, isEmpty);
     });
 
     test('setFilter changes filter', () {

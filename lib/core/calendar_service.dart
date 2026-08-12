@@ -29,6 +29,21 @@ class CalendarService {
   @visibleForTesting
   static Future<void> Function()? openAppSettingsOverride;
 
+  @visibleForTesting
+  static Future<String?> Function({
+    required String calendarId,
+    required String title,
+    required DateTime date,
+    DateTime? endTime,
+    String? eventId,
+    String? description,
+  })?
+  createOrUpdateEventOverride;
+
+  @visibleForTesting
+  static Future<bool> Function(String calendarId, String eventId)?
+  deleteEventOverride;
+
   static Future<void>? _fallbackCreationFuture;
   static const _fallbackCalendarIdKey = 'asa_calendar_fallback_id';
 
@@ -157,6 +172,17 @@ class CalendarService {
     String? eventId,
     String? description,
   }) async {
+    final override = createOrUpdateEventOverride;
+    if (override != null) {
+      return override(
+        calendarId: calendarId,
+        title: title,
+        date: date,
+        endTime: endTime,
+        eventId: eventId,
+        description: description,
+      );
+    }
     if (!await requestPermission()) return null;
 
     final start = tz.TZDateTime.from(date, tz.local);
@@ -182,6 +208,8 @@ class CalendarService {
   /// false when permission/provider access is unavailable so callers can queue
   /// a retry instead of silently losing the cleanup operation.
   static Future<bool> deleteEvent(String calendarId, String eventId) async {
+    final override = deleteEventOverride;
+    if (override != null) return override(calendarId, eventId);
     if (!await requestPermission()) return false;
     final result = await _plugin.deleteEvent(calendarId, eventId);
     return result.isSuccess;

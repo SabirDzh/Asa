@@ -50,6 +50,8 @@ class TaskProvider with ChangeNotifier {
   Completer<void>? _pendingSaveCompleter;
   Future<void>? _flushFuture;
   Future<void> _calendarCleanupOperation = Future<void>.value();
+  final Map<String, Future<void>> _calendarOperations =
+      <String, Future<void>>{};
   int _persistenceWriteCount = 0;
 
   static const _persistenceDebounce = Duration(milliseconds: 300);
@@ -1013,13 +1015,13 @@ class TaskProvider with ChangeNotifier {
     if (index == -1) {
       _tasks.add(normalizedTask);
       _notifyTasksChanged();
-      _saveToPrefs(waitForReady: false);
+      _saveToPrefs();
       return true;
     }
     if (normalizedTask.updatedAt.isAfter(_tasks[index].updatedAt)) {
       _tasks[index] = normalizedTask;
       _notifyTasksChanged();
-      _saveToPrefs(waitForReady: false);
+      _saveToPrefs();
       return true;
     }
     return false;
@@ -1094,7 +1096,39 @@ class TaskProvider with ChangeNotifier {
     final calendarId = task.calendarId;
     final eventId = task.calendarEventId;
     if (calendarId == null || eventId == null) return;
-    unawaited(_deleteTaskCalendarEvent(calendarId, eventId));
+    unawaited(
+      _enqueueCalendarOperation(
+        task.id,
+        () => _deleteTaskCalendarEvent(calendarId, eventId),
+      ).catchError((_) {}),
+    );
+  }
+
+  /// Serializes calendar mutations per task. Native calendar providers can
+  /// complete requests out of order, so a task's second update must not race
+  /// its first update or deletion.
+  Future<void> _enqueueCalendarOperation(
+    String taskId,
+    Future<void> Function() operation,
+  ) {
+    final previous = _calendarOperations[taskId] ?? Future<void>.value();
+    final next = previous.then((_) => operation());
+    final guarded = next.catchError((Object error, StackTrace stackTrace) {
+      LoggerService.instance.w(
+        'Queued calendar operation failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    });
+    _calendarOperations[taskId] = guarded;
+    unawaited(
+      guarded.then((_) {
+        if (identical(_calendarOperations[taskId], guarded)) {
+          _calendarOperations.remove(taskId);
+        }
+      }),
+    );
+    return next;
   }
 
   Future<void> _deleteTaskCalendarEvent(
@@ -1225,12 +1259,19 @@ class TaskProvider with ChangeNotifier {
   }
 
   Future<void> _deleteCalendarEventsForTasks(Iterable<TaskItem> tasks) async {
+    final cleanupOperations = <Future<void>>[];
     for (final task in tasks) {
       final calendarId = task.calendarId;
       final eventId = task.calendarEventId;
       if (calendarId == null || eventId == null) continue;
-      await _deleteTaskCalendarEvent(calendarId, eventId);
+      cleanupOperations.add(
+        _enqueueCalendarOperation(
+          task.id,
+          () => _deleteTaskCalendarEvent(calendarId, eventId),
+        ),
+      );
     }
+    await Future.wait(cleanupOperations);
   }
 
   void updateTask(
@@ -1394,62 +1435,67 @@ class TaskProvider with ChangeNotifier {
 
   /// Links the task to a calendar event on [calendarId] at [date].
   /// Updates the existing event if [task.calendarEventId] is already set.
-  Future<void> linkTaskToCalendar(
-    String id,
-    String calendarId,
-    DateTime date,
-  ) async {
-    final index = _tasks.indexWhere((t) => t.id == id);
-    if (index == -1) return;
+  Future<void> linkTaskToCalendar(String id, String calendarId, DateTime date) {
+    return _enqueueCalendarOperation(id, () async {
+      final index = _tasks.indexWhere((t) => t.id == id);
+      if (index == -1 || _tasks[index].isDeleted) return;
 
-    final task = _tasks[index];
-    final eventId = await CalendarService.createOrUpdateEvent(
-      calendarId: calendarId,
-      title: task.title,
-      date: date,
-      eventId: task.calendarEventId,
-      description: 'Task from Asa',
-    );
-
-    if (eventId != null) {
-      _tasks[index] = task.copyWith(
-        dueDate: date,
+      final task = _tasks[index];
+      final eventId = await CalendarService.createOrUpdateEvent(
         calendarId: calendarId,
-        calendarEventId: eventId,
+        title: task.title,
+        date: date,
+        eventId: task.calendarEventId,
+        description: 'Task from Asa',
+      );
+
+      final currentIndex = _tasks.indexWhere((t) => t.id == id);
+      if (eventId != null &&
+          currentIndex != -1 &&
+          !_tasks[currentIndex].isDeleted) {
+        _tasks[currentIndex] = _tasks[currentIndex].copyWith(
+          dueDate: date,
+          calendarId: calendarId,
+          calendarEventId: eventId,
+          updatedAt: DateTime.now(),
+        );
+        _notifyTasksChanged();
+        _saveToPrefs();
+      }
+    });
+  }
+
+  /// Unlinks the task from its calendar event without deleting the task.
+  Future<void> unlinkTaskFromCalendar(String id) {
+    return _enqueueCalendarOperation(id, () async {
+      final index = _tasks.indexWhere((t) => t.id == id);
+      if (index == -1) return;
+
+      final task = _tasks[index];
+      if (task.calendarId != null && task.calendarEventId != null) {
+        final deleted = await CalendarService.deleteEvent(
+          task.calendarId!,
+          task.calendarEventId!,
+        );
+        if (!deleted) {
+          await _queuePendingCalendarCleanup(
+            task.calendarId!,
+            task.calendarEventId!,
+          );
+          return;
+        }
+      }
+
+      final currentIndex = _tasks.indexWhere((t) => t.id == id);
+      if (currentIndex == -1) return;
+      _tasks[currentIndex] = _tasks[currentIndex].copyWith(
+        calendarId: null,
+        calendarEventId: null,
         updatedAt: DateTime.now(),
       );
       _notifyTasksChanged();
       _saveToPrefs();
-    }
-  }
-
-  /// Unlinks the task from its calendar event without deleting the task.
-  Future<void> unlinkTaskFromCalendar(String id) async {
-    final index = _tasks.indexWhere((t) => t.id == id);
-    if (index == -1) return;
-
-    final task = _tasks[index];
-    if (task.calendarId != null && task.calendarEventId != null) {
-      final deleted = await CalendarService.deleteEvent(
-        task.calendarId!,
-        task.calendarEventId!,
-      );
-      if (!deleted) {
-        await _queuePendingCalendarCleanup(
-          task.calendarId!,
-          task.calendarEventId!,
-        );
-        return;
-      }
-    }
-
-    _tasks[index] = task.copyWith(
-      calendarId: null,
-      calendarEventId: null,
-      updatedAt: DateTime.now(),
-    );
-    _notifyTasksChanged();
-    _saveToPrefs();
+    });
   }
 
   /// Updates the time fields of a task. Pass null to clear a field.
@@ -1475,7 +1521,11 @@ class TaskProvider with ChangeNotifier {
   /// Updates the linked calendar event to reflect the current task title,
   /// due date and time period. The date part is taken from [dueDate], while
   /// the time part is taken from [startTime] / [endTime] when present.
-  Future<void> syncTaskCalendarEvent(String id) async {
+  Future<void> syncTaskCalendarEvent(String id) {
+    return _enqueueCalendarOperation(id, () => _syncTaskCalendarEvent(id));
+  }
+
+  Future<void> _syncTaskCalendarEvent(String id) async {
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index == -1) return;
 

@@ -25,6 +25,7 @@ import '../screens/task_file_viewer_screen.dart';
 import '../providers/task_provider.dart';
 import 'attachment_action_menu.dart';
 import 'attachment_mention_overlay.dart';
+import 'description_editor.dart';
 
 /// Lets tests or platform-specific integrations provide an attachment picker
 /// without making the editor depend on a platform channel.
@@ -210,8 +211,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   final _selectedAttachmentActions = <String, AttachmentAction>{};
   final _mentionSuggestions = <String, List<TaskAttachment>>{};
   final _mentionTriggers = <String, MentionTrigger?>{};
-  final _mentionLayerLinks = <String, LayerLink>{};
-  final _mentionOverlayEntries = <String, OverlayEntry>{};
   late List<TaskInfoBlock> _blocks;
   String? _submitError;
 
@@ -250,9 +249,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       ..._descriptionControllers.values,
     ]) {
       controller.dispose();
-    }
-    for (final blockId in _mentionOverlayEntries.keys.toList()) {
-      _dismissMentionOverlay(blockId);
     }
     for (final focusNode in _descriptionFocusNodes.values) {
       focusNode.dispose();
@@ -303,7 +299,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       controller.addListener(() => _updateMentionSuggestions(block.id));
       _descriptionControllers[block.id] = controller;
       _descriptionFocusNodes[block.id] = FocusNode();
-      _mentionLayerLinks[block.id] = LayerLink();
     }
   }
 
@@ -337,10 +332,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     });
   }
 
-  void _dismissMentionOverlay(String blockId) {
-    _mentionOverlayEntries.remove(blockId)?.remove();
-  }
-
   void _selectMention(String blockId, TaskAttachment attachment) {
     final controller = _descriptionControllers[blockId];
     final trigger = _mentionTriggers[blockId];
@@ -367,10 +358,8 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   }
 
   void _disposeControllers(String id, TaskInfoBlockType type) {
-    _dismissMentionOverlay(id);
     _mentionSuggestions.remove(id);
     _mentionTriggers.remove(id);
-    _mentionLayerLinks.remove(id);
     _selectedAttachmentActions.remove(id);
     if (type == TaskInfoBlockType.quantity) {
       for (final map in <Map<String, TextEditingController>>[
@@ -994,21 +983,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 ),
               ),
             ] else ...[
-              TextFormField(
-                key: _fieldKey('description-text-input', block.id),
-                controller: _descriptionControllers[block.id],
-                focusNode: _descriptionFocusNodes[block.id],
-                maxLength: kMaxTaskDescriptionLength,
-                maxLines: 5,
-                minLines: 3,
-                inputFormatters: [
-                  textInputFormatter(maxLength: kMaxTaskDescriptionLength),
-                ],
-                decoration: InputDecoration(
-                  labelText: _settings.tr('description_text'),
-                  alignLabelWithHint: true,
-                ),
-              ),
               if (_mentionSuggestions[block.id]?.isNotEmpty == true) ...[
                 const SizedBox(height: 4),
                 AttachmentMentionSuggestions(
@@ -1020,6 +994,15 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                       (attachment) => _selectMention(block.id, attachment),
                 ),
               ],
+              DescriptionEditor(
+                fieldKey: _fieldKey('description-text-input', block.id),
+                controller: _descriptionControllers[block.id]!,
+                focusNode: _descriptionFocusNodes[block.id],
+                attachments: block.attachments,
+                maxLength: kMaxTaskDescriptionLength,
+                onChanged: (_) => _updateMentionSuggestions(block.id),
+                labelText: _settings.tr('description_text'),
+              ),
               const SizedBox(height: 8),
               AttachmentActionMenu(
                 selectedAction:

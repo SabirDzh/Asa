@@ -19,6 +19,7 @@ class AsaWidgetConfigActivity : Activity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var options: List<FolderOption> = emptyList()
+    private var finishing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +36,7 @@ class AsaWidgetConfigActivity : Activity() {
 
         options = loadFolderOptions()
         val names = options.map { it.name }
-        val selectedId = AsaWidgetData.selectedFolderId(this, appWidgetId)
+        val selectedId = AsaWidgetData.selectedFolderId(applicationContext, appWidgetId)
         val selectedIndex = options.indexOfFirst { it.id == selectedId }.coerceAtLeast(0)
 
         val content = LinearLayout(this).apply {
@@ -66,8 +67,11 @@ class AsaWidgetConfigActivity : Activity() {
         content.addView(Button(this).apply {
             text = getString(R.string.widget_save_folder)
             setOnClickListener {
+                if (finishing) return@setOnClickListener
+                finishing = true
+                isEnabled = false
                 val selected = options.getOrNull(spinner.selectedItemPosition)
-                AsaWidgetData.setSelectedFolderId(this@AsaWidgetConfigActivity, appWidgetId, selected?.id)
+                AsaWidgetData.setSelectedFolderId(applicationContext, appWidgetId, selected?.id)
                 requestWidgetUpdate()
                 setResult(
                     RESULT_OK,
@@ -81,7 +85,7 @@ class AsaWidgetConfigActivity : Activity() {
 
     private fun loadFolderOptions(): List<FolderOption> {
         val result = mutableListOf(FolderOption(null, getString(R.string.widget_all_tasks)))
-        val raw = AsaWidgetData.preferences(this)
+        val raw = AsaWidgetData.preferences(applicationContext)
             .getString(AsaWidgetData.FOLDERS_JSON, "[]")
             ?: "[]"
         val folders = runCatching { JSONArray(raw) }.getOrNull() ?: JSONArray()
@@ -96,9 +100,10 @@ class AsaWidgetConfigActivity : Activity() {
     }
 
     private fun requestWidgetUpdate() {
-        val manager = AppWidgetManager.getInstance(this)
+        val appContext = applicationContext
+        val manager = AppWidgetManager.getInstance(appContext)
         val provider = manager.getAppWidgetInfo(appWidgetId)?.provider ?: return
-        sendBroadcast(
+        appContext.sendBroadcast(
             Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
                 setComponent(provider)
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(appWidgetId))

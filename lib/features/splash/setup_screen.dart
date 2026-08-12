@@ -149,6 +149,19 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                         settings.tr('setup_title'),
                         style: TextStyle(color: secondary, fontSize: 16),
                       ),
+                      if (_state.permissionCheckFailed) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          settings.tr('setup_permission_check_failed'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: secondary, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: _checkPermissions,
+                          child: Text(settings.tr('retry')),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       _permissionTile(
                         icon: Icons.notifications_outlined,

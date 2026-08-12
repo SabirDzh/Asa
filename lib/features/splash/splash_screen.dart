@@ -57,6 +57,13 @@ class _SplashScreenState extends State<SplashScreen> {
   ) async {
     await _readyFuture;
     if (!settings.syncEnabled) return;
+    if (settings.syncSecret == null || settings.syncSecret!.isEmpty) {
+      await settings.setSyncEnabled(false);
+      LoggerService.instance.w(
+        'Sync was disabled at startup because no shared secret is configured',
+      );
+      return;
+    }
 
     final localNetworkGranted =
         await DevicePermissions.requestLocalNetworkPermission();

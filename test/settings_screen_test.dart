@@ -49,7 +49,10 @@ void main() {
     timeDilation = 1.0;
     // Keep this widget suite independent from SettingsProvider's production
     // fast-animation default and Flutter's global timeDilation guard.
-    SharedPreferences.setMockInitialValues({'animationSpeed': 1.0});
+    SharedPreferences.setMockInitialValues({
+      'animationSpeed': 1.0,
+      'syncSecret': 'test-secret',
+    });
     HomeWidgetService.instance.debounceDelay = Duration.zero;
     installHomeWidgetChannelMock();
     NotificationService.initializedOverride = null;
@@ -267,6 +270,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'animationSpeed': 1.0,
         'notificationsEnabled': false,
+        'syncSecret': 'test-secret',
       });
       NotificationService.initializedOverride = true;
       NotificationService.requestPermissionOverride =

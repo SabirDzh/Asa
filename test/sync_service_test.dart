@@ -57,6 +57,7 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
       provider = TaskProvider();
+      SyncService.instance.setSecret('test-secret');
       // Keep the pure-Dart PBKDF2 derivation fast in tests.
       ExportImportService.syncPbkdf2Iterations = 1000;
     });

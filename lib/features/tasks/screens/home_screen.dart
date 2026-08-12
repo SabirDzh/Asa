@@ -12,6 +12,7 @@ import '../../../core/responsive_center.dart';
 import '../../../core/scroll_hide_mixin.dart';
 import '../providers/task_provider.dart';
 import '../widgets/folder_card.dart';
+import '../widgets/task_card.dart';
 import 'knowledge_search_screen.dart';
 import '../widgets/task_detail_sheet.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -392,21 +393,23 @@ class _HomeFolderList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Select only the inputs that can change this derived folder list. Reading
-    // the provider afterward avoids subscribing the whole list to every task
-    // mutation (for example, a timer or task title update).
-    context.select<TaskProvider, (int, String, TaskFilter)>(
+    // Root-level tasks are first-class records. They must be included in the
+    // same derived list as folders so widget-created/imported tasks cannot
+    // become invisible, while folder reordering keeps its existing contract.
+    context.select<TaskProvider, (int, int, String, TaskFilter)>(
       (provider) => (
+        provider.tasksVersion,
         provider.foldersVersion,
         provider.searchQuery,
         provider.filter,
       ),
     );
     final provider = context.read<TaskProvider>();
+    final rootTasks = provider.filteredRootTasks;
     final folders = provider.filteredFolders;
     final searchQuery = provider.searchQuery;
 
-    if (folders.isEmpty) {
+    if (rootTasks.isEmpty && folders.isEmpty) {
       final emptyText = context.select<SettingsProvider, String>(
         (s) =>
             searchQuery.isNotEmpty ? s.tr('nothing_found') : s.tr('empty_list'),
@@ -426,6 +429,7 @@ class _HomeFolderList extends StatelessWidget {
     }
 
     final canReorder = searchQuery.isEmpty && provider.filter == TaskFilter.all;
+    final rootTaskCount = rootTasks.length;
 
     return ReorderableListView.builder(
       buildDefaultDragHandles: false,
@@ -434,12 +438,20 @@ class _HomeFolderList extends StatelessWidget {
         horizontal: AppTheme.screenPad,
         vertical: 4,
       ),
-      itemCount: folders.length,
+      itemCount: rootTaskCount + folders.length,
       onReorderItem: (oldIndex, newIndex) {
         if (!canReorder) return;
         if (oldIndex < newIndex) newIndex -= 1;
-        if (oldIndex == 0 || newIndex == 0) return;
-        context.read<TaskProvider>().reorderRootFolders(oldIndex, newIndex);
+        // Root tasks are not reorderable with folders. A folder can still be
+        // reordered relative to other folders after the root-task prefix.
+        if (oldIndex < rootTaskCount || newIndex < rootTaskCount) return;
+        final oldFolderIndex = oldIndex - rootTaskCount;
+        final newFolderIndex = newIndex - rootTaskCount;
+        if (oldFolderIndex == 0 || newFolderIndex == 0) return;
+        context.read<TaskProvider>().reorderRootFolders(
+          oldFolderIndex,
+          newFolderIndex,
+        );
       },
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
@@ -450,14 +462,22 @@ class _HomeFolderList extends StatelessWidget {
         );
       },
       itemBuilder: (context, index) {
-        final f = folders[index];
+        if (index < rootTaskCount) {
+          final task = rootTasks[index];
+          return Padding(
+            key: ValueKey(task.id),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TaskRow(task: task, enableDrag: false),
+          );
+        }
+        final folder = folders[index - rootTaskCount];
         return Padding(
-          key: ValueKey(f.id),
+          key: ValueKey(folder.id),
           padding: const EdgeInsets.only(bottom: 8),
           child: FolderRow(
-            folder: f,
-            reorderIndex: index,
-            showReorderHandle: canReorder && !f.isSystemStreak,
+            folder: folder,
+            reorderIndex: index - rootTaskCount,
+            showReorderHandle: canReorder && !folder.isSystemStreak,
           ),
         );
       },

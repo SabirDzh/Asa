@@ -82,6 +82,18 @@ void main() {
         expect(state.isComplete, isFalse);
       },
     );
+
+    test('isComplete is false when auto-start capability probing failed', () {
+      const state = PermissionState(
+        notificationsGranted: true,
+        exactAlarmGranted: true,
+        batteryOptimizationDisabled: true,
+        autoStartGranted: false,
+        autoStartSupported: false,
+        autoStartCheckFailed: true,
+      );
+      expect(state.isComplete, isFalse);
+    });
   });
 
   group('DevicePermissions.getPermissionState', () {

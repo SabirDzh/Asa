@@ -484,6 +484,44 @@ void main() {
       expect(provider.tr('nonexistent_key'), 'nonexistent_key');
     });
 
+    test('rejects enabling sync without a shared secret', () async {
+      await provider.ready;
+
+      final accepted = await provider.setSyncEnabled(true);
+
+      expect(accepted, isFalse);
+      expect(provider.syncEnabled, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('syncEnabled'), isFalse);
+    });
+
+    test('accepts enabling sync when a shared secret is configured', () async {
+      await provider.ready;
+      await provider.setSyncSecret('shared-secret');
+
+      final accepted = await provider.setSyncEnabled(true);
+
+      expect(accepted, isTrue);
+      expect(provider.syncEnabled, isTrue);
+    });
+
+    test(
+      'clearing the sync secret disables the persisted sync state',
+      () async {
+        await provider.ready;
+        await provider.setSyncSecret('shared-secret');
+        await provider.setSyncEnabled(true);
+
+        await provider.setSyncSecret(null);
+
+        expect(provider.syncEnabled, isFalse);
+        expect(provider.syncSecret, isNull);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('syncEnabled'), isFalse);
+        expect(prefs.getString('syncSecret'), isNull);
+      },
+    );
+
     test('ensureSyncDeviceId persists and reuses the same ID', () async {
       await provider.ready;
       final id = await provider.ensureSyncDeviceId();

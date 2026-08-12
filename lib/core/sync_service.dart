@@ -121,6 +121,13 @@ class SyncService {
   }
 
   Future<bool> _startInternal() async {
+    if (_secret == null) {
+      LoggerService.instance.w(
+        'Sync start rejected: shared secret is required',
+      );
+      _statusController.add('failed:missing_secret');
+      return false;
+    }
     final generation = ++_lifecycleGeneration;
     _running = true;
     final serverStarted = await _startServer();

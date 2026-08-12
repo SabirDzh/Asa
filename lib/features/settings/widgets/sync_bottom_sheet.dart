@@ -229,6 +229,14 @@ class _SyncBottomSheetState extends State<_SyncBottomSheet> {
   }
 
   Future<void> _refresh() async {
+    if (widget.settings.syncSecret == null ||
+        widget.settings.syncSecret!.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.settings.tr('sync_secret_required'))),
+      );
+      return;
+    }
     final localNetworkGranted =
         await DevicePermissions.requestLocalNetworkPermission();
     if (!localNetworkGranted) {

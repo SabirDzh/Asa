@@ -12,18 +12,31 @@ class PermissionState {
   final bool autoStartGranted;
   final bool autoStartSupported;
 
+  /// True when the platform could not reliably read the permission state.
+  /// A failed check is deliberately not treated as granted.
+  final bool permissionCheckFailed;
+
+  /// True when the OEM auto-start capability probe failed. This is separate
+  /// from `autoStartSupported == false`, which means the probe completed and
+  /// the device genuinely does not expose that setting.
+  final bool autoStartCheckFailed;
+
   const PermissionState({
     required this.notificationsGranted,
     required this.exactAlarmGranted,
     required this.batteryOptimizationDisabled,
     required this.autoStartGranted,
     required this.autoStartSupported,
+    this.permissionCheckFailed = false,
+    this.autoStartCheckFailed = false,
   });
 
   /// True when all required permissions and settings are satisfied.
   /// OEM Auto-Start is required ONLY if the device supports it.
   bool get isComplete {
-    return notificationsGranted &&
+    return !permissionCheckFailed &&
+        !autoStartCheckFailed &&
+        notificationsGranted &&
         exactAlarmGranted &&
         batteryOptimizationDisabled &&
         (!autoStartSupported || autoStartGranted);
@@ -113,22 +126,36 @@ class DevicePermissions {
       final notifications = await areNotificationsGranted();
       final exactAlarm = await isExactAlarmGranted();
       final battery = await isIgnoringBatteryOptimizations();
-      final autoStartSupported = await isAutoStartAvailable();
+      final autoStartProbe = await _probeAutoStartAvailability();
+      if (autoStartProbe == null) {
+        return const PermissionState(
+          notificationsGranted: false,
+          exactAlarmGranted: false,
+          batteryOptimizationDisabled: false,
+          autoStartGranted: false,
+          autoStartSupported: false,
+          permissionCheckFailed: true,
+          autoStartCheckFailed: true,
+        );
+      }
 
       return PermissionState(
         notificationsGranted: notifications,
         exactAlarmGranted: exactAlarm,
         batteryOptimizationDisabled: battery,
         autoStartGranted: autoStartDone,
-        autoStartSupported: autoStartSupported,
+        autoStartSupported: autoStartProbe,
       );
     } on Object {
+      // A failed platform/preference read is an unknown state, never a grant.
+      // Keep the setup gate visible so the user can retry or inspect settings.
       return const PermissionState(
-        notificationsGranted: true,
-        exactAlarmGranted: true,
-        batteryOptimizationDisabled: true,
-        autoStartGranted: true,
+        notificationsGranted: false,
+        exactAlarmGranted: false,
+        batteryOptimizationDisabled: false,
+        autoStartGranted: false,
         autoStartSupported: false,
+        permissionCheckFailed: true,
       );
     }
   }
@@ -139,9 +166,11 @@ class DevicePermissions {
     if (kIsWeb || !Platform.isAndroid) return true;
     try {
       return (await _channel.invokeMethod<bool>('isNotificationGranted')) ??
-          true;
+          false;
     } on MissingPluginException {
-      return true;
+      return false;
+    } on Object {
+      return false;
     }
   }
 
@@ -150,9 +179,12 @@ class DevicePermissions {
   static Future<bool> isExactAlarmGranted() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     try {
-      return (await _channel.invokeMethod<bool>('isExactAlarmGranted')) ?? true;
+      return (await _channel.invokeMethod<bool>('isExactAlarmGranted')) ??
+          false;
     } on MissingPluginException {
-      return true;
+      return false;
+    } on Object {
+      return false;
     }
   }
 
@@ -173,9 +205,11 @@ class DevicePermissions {
       return (await _channel.invokeMethod<bool>(
             'isIgnoringBatteryOptimizations',
           )) ??
-          true;
+          false;
     } on MissingPluginException {
-      return true;
+      return false;
+    } on Object {
+      return false;
     }
   }
 
@@ -201,14 +235,19 @@ class DevicePermissions {
 
   /// True when the OEM exposes an auto-start management page (Xiaomi/HyperOS,
   /// Huawei, Oppo, Vivo, etc.).
-  static Future<bool> isAutoStartAvailable() async {
+  static Future<bool?> _probeAutoStartAvailability() async {
     if (kIsWeb || !Platform.isAndroid) return false;
     try {
-      return (await _channel.invokeMethod<bool>('isAutoStartAvailable')) ??
-          false;
-    } on MissingPluginException {
-      return false;
+      final result = await _channel.invokeMethod<bool>('isAutoStartAvailable');
+      return result;
+    } on Object {
+      // A probe failure is unknown, not proof that the OEM setting is absent.
+      return null;
     }
+  }
+
+  static Future<bool> isAutoStartAvailable() async {
+    return (await _probeAutoStartAvailability()) ?? false;
   }
 
   /// Opens the OEM auto-start settings page without claiming that the user

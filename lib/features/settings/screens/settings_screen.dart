@@ -78,6 +78,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       final tasks = context.read<TaskProvider>();
 
       if (value) {
+        if (settings.syncSecret == null || settings.syncSecret!.isEmpty) {
+          await settings.setSyncEnabled(false);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(settings.tr('sync_secret_required'))),
+          );
+          return;
+        }
         final localNetworkGranted =
             await DevicePermissions.requestLocalNetworkPermission();
         if (!localNetworkGranted) {
@@ -256,11 +264,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                   icon: Iconsax.profile_2user,
                   label:
                       '${settings.tr('sync_device_name')}: ${settings.syncDeviceName}',
-                  onTap:
-                      settings.syncEnabled
-                          ? () => showSyncBottomSheet(context)
-                          : null,
-                  enabled: settings.syncEnabled,
+                  onTap: () => showSyncBottomSheet(context),
+                  // The setup sheet is also where a shared secret is entered
+                  // before the transport can be enabled.
+                  enabled: true,
                   trailing: Icon(
                     Icons.chevron_right,
                     color: textSecondary,

@@ -96,7 +96,7 @@ void main() {
   });
 
   testWidgets(
-    'swiping a task in a root-level folder is denied and shows a notice',
+    'swiping a task in a root-level folder moves it to the visible root',
     (tester) async {
       final provider = TaskProvider();
       provider.addFolder('Root folder');
@@ -111,17 +111,13 @@ void main() {
       await tester.drag(find.text('Root-level task'), const Offset(-350, 0));
       await tester.pumpAndSettle();
 
-      // The task must stay in its folder (no move to the root) and the user
-      // must be told why the swipe was rejected.
       expect(
         find.text('Задачу нельзя перенести на главный экран'),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(
-        provider.getFolderTasks(rootFolder.id).single.title,
-        'Root-level task',
-      );
-      expect(provider.allTasks.single.folderId, rootFolder.id);
+      expect(provider.getFolderTasks(rootFolder.id), isEmpty);
+      expect(provider.filteredRootTasks.single.title, 'Root-level task');
+      expect(provider.allTasks.single.folderId, isNull);
     },
   );
 

@@ -75,7 +75,7 @@ android {
             }
         } else {
             logger.warn(
-                "Release signing is not configured. The release artifact will be unsigned; " +
+                "Release signing is not configured. Release packaging tasks will fail; " +
                     "configure android/key.properties or ANDROID_* environment variables for distribution.",
             )
         }
@@ -92,7 +92,25 @@ android {
             if (releaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                // Do not fail project configuration: debug resource/Kotlin tasks
+                // must remain usable on developer machines. Fail only when a
+                // release artifact is actually requested.
+                tasks.configureEach {
+                    if (
+                        name == "assembleRelease" ||
+                        name == "bundleRelease" ||
+                        name == "packageRelease" ||
+                        name == "signReleaseBundle" ||
+                        name == "signReleaseApk"
+                    ) {
+                        doFirst {
+                            throw GradleException(
+                                "Release signing is not configured. Set android/key.properties " +
+                                    "or ANDROID_* environment variables before building a release artifact.",
+                            )
+                        }
+                    }
+                }
             }
         }
     }

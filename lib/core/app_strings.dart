@@ -234,7 +234,8 @@ class AppStrings {
       'sync': 'Синхронизация',
       'sync_device_name': 'Имя устройства',
       'sync_secret': 'PIN / Общий секрет',
-      'sync_secret_hint': 'Оставьте пустым для открытой сети',
+      'sync_secret_hint': 'Укажите общий секрет перед включением',
+      'sync_secret_required': 'Для синхронизации укажите общий секрет',
       'sync_send_success': 'Отправлено на',
       'sync_send_failed': 'Отправка не удалась',
       'sync_start_failed': 'Не удалось запустить синхронизацию',
@@ -346,6 +347,8 @@ class AppStrings {
       'setup_exact_alarm_subtitle':
           'Разрешение на срабатывание уведомлений секунда в секунду (Android 12+)',
       'setup_grant_all': 'Выдайте все разрешения для продолжения',
+      'setup_permission_check_failed':
+          'Не удалось проверить разрешения. Повторите попытку или откройте настройки приложения.',
       'setup_notification_denied':
           'Разрешение на уведомления не выдано — повторите попытку',
       'setup_notification_permanently_denied':
@@ -582,7 +585,8 @@ class AppStrings {
       'sync': 'Sync',
       'sync_device_name': 'Device name',
       'sync_secret': 'PIN / Shared secret',
-      'sync_secret_hint': 'Leave empty for open network',
+      'sync_secret_hint': 'Enter a shared secret before enabling sync',
+      'sync_secret_required': 'Enter a shared secret to enable sync',
       'sync_send_success': 'Sent to',
       'sync_send_failed': 'Send failed',
       'sync_start_failed': 'Could not start sync',
@@ -693,6 +697,8 @@ class AppStrings {
       'setup_exact_alarm_subtitle':
           'Permission for notifications to trigger down to the second (Android 12+)',
       'setup_grant_all': 'Grant all permissions to continue',
+      'setup_permission_check_failed':
+          'Could not verify permissions. Retry or open the app settings.',
       'setup_notification_denied':
           'Notification permission was not granted — please try again',
       'setup_notification_permanently_denied':

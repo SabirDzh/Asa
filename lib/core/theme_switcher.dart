@@ -9,10 +9,10 @@ class ThemeSwitcher {
     required BuildContext context,
     required VoidCallback onToggle,
   }) async {
+    final renderObject = boundaryKey.currentContext?.findRenderObject();
     final boundary =
-        boundaryKey.currentContext?.findRenderObject()
-            as RenderRepaintBoundary?;
-    if (boundary == null) {
+        renderObject is RenderRepaintBoundary ? renderObject : null;
+    if (boundary == null || !boundary.attached || !boundary.hasSize) {
       onToggle();
       return;
     }
@@ -21,7 +21,9 @@ class ThemeSwitcher {
     final captureRatio = pixelRatio > 2.0 ? 2.0 : pixelRatio;
     final overlayState = Overlay.of(context);
 
-    // Capture the current screen state as an image.
+    // Capture the current screen state as an image. Capture all geometry and
+    // overlay references before awaiting so closing the settings sheet cannot
+    // make a later context lookup stale.
     final image = await boundary.toImage(pixelRatio: captureRatio);
 
     late OverlayEntry overlayEntry;

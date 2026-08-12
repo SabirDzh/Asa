@@ -44,13 +44,18 @@ Future<T?> showAnchoredPopupMenu<T>({
 }) {
   final navigator = Navigator.of(anchorContext);
   final overlay = navigator.overlay;
-  final anchor = anchorContext.findRenderObject() as RenderBox?;
-  final overlayBox = overlay?.context.findRenderObject() as RenderBox?;
+  final anchorRenderObject = anchorContext.findRenderObject();
+  final overlayRenderObject = overlay?.context.findRenderObject();
+  final anchor = anchorRenderObject is RenderBox ? anchorRenderObject : null;
+  final overlayBox =
+      overlayRenderObject is RenderBox ? overlayRenderObject : null;
 
   if (overlay == null ||
       anchor == null ||
       overlayBox == null ||
-      !anchor.hasSize) {
+      !anchor.hasSize ||
+      !anchor.attached ||
+      !overlayBox.attached) {
     return Future<T?>.value(null);
   }
 
@@ -142,10 +147,10 @@ class _AnchoredPopupMenuRoute<T> extends PopupRoute<T> {
       animation: _anchorGeometry,
       builder: (context, child) {
         final mediaQuery = MediaQuery.of(context);
+        final anchorRenderObject =
+            anchorContext.mounted ? anchorContext.findRenderObject() : null;
         final anchor =
-            anchorContext.mounted
-                ? anchorContext.findRenderObject() as RenderBox?
-                : null;
+            anchorRenderObject is RenderBox ? anchorRenderObject : null;
         var currentAnchorRect = anchorRect;
         if (anchorContext.mounted &&
             overlayBox.attached &&

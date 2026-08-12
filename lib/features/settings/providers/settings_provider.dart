@@ -12,6 +12,7 @@ import '../../../core/home_widget_service.dart';
 import '../../../core/logger_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/scale_utils.dart';
+import '../../../core/sync_service.dart';
 import '../../../core/theme.dart';
 
 enum WidgetDisplayMode { activeTasks, lastFolder }
@@ -195,18 +196,17 @@ class SettingsProvider with ChangeNotifier {
         // Previous 'lastFolder' (2)
         _widgetDisplayMode = WidgetDisplayMode.lastFolder;
       }
-      prefs.setInt('widgetDisplayMode', _widgetDisplayMode.index);
+      await prefs.setInt('widgetDisplayMode', _widgetDisplayMode.index);
       _syncEnabled = prefs.getBool('syncEnabled') ?? false;
       final savedName = prefs.getString('syncDeviceName');
       _syncDeviceName =
           savedName != null && savedName.trim().isNotEmpty
               ? savedName.trim()
               : await _deviceNameProvider();
-      _syncSecret = prefs.getString('syncSecret');
+      final savedSecret = prefs.getString('syncSecret')?.trim();
+      _syncSecret =
+          savedSecret == null || savedSecret.isEmpty ? null : savedSecret;
       LoggerService.instance.registerSecret(_syncSecret);
-      if (_syncSecret != null && _syncSecret!.trim().isEmpty) {
-        _syncSecret = null;
-      }
       timeDilation = _animationSpeed;
       // Ensure a stable device ID exists for sync. This is a local only
       // SharedPreferences read/write and completes quickly.
@@ -216,6 +216,16 @@ class SettingsProvider with ChangeNotifier {
       // Defer the notification so it only fires after the provider is attached
       // to the widget tree, avoiding exceptions or unnecessary early rebuilds.
       Future.microtask(() => notifyListeners());
+    } on Object catch (error, stackTrace) {
+      // A local preference failure must not tear down the provider/widget tree.
+      // Keep safe defaults, expose the failure to diagnostics, and let the
+      // app remain usable so the user can retry from settings.
+      LoggerService.instance.e(
+        'Settings load failed; using safe defaults',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _initialized = false;
     } finally {
       if (!_initCompleter.isCompleted) {
         _initCompleter.complete();
@@ -502,11 +512,22 @@ class SettingsProvider with ChangeNotifier {
     _syncWidgetSettings();
   }
 
-  Future<void> setSyncEnabled(bool value) async {
+  /// Sets the sync switch and returns whether the requested state was
+  /// accepted. Enabling without a shared secret is rejected and persisted as
+  /// disabled rather than silently reporting success to another caller.
+  Future<bool> setSyncEnabled(bool value) async {
+    if (value && (_syncSecret == null || _syncSecret!.isEmpty)) {
+      _syncEnabled = false;
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('syncEnabled', false);
+      return false;
+    }
     _syncEnabled = value;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('syncEnabled', value);
+    return true;
   }
 
   Future<void> setSyncDeviceName(String name) async {
@@ -549,10 +570,17 @@ class SettingsProvider with ChangeNotifier {
     final trimmed = secret?.trim();
     LoggerService.instance.registerSecret(trimmed);
     _syncSecret = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    if (_syncSecret == null && _syncEnabled) {
+      // Removing credentials must revoke the running transport immediately;
+      // otherwise the old in-memory secret would keep accepting/sending data.
+      await SyncService.instance.stop();
+      _syncEnabled = false;
+    }
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     if (_syncSecret == null) {
       await prefs.remove('syncSecret');
+      await prefs.setBool('syncEnabled', false);
     } else {
       await prefs.setString('syncSecret', _syncSecret!);
     }

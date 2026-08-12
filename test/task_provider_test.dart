@@ -633,6 +633,16 @@ void main() {
       expect(provider.filteredFolders[0].name, 'Work Projects');
     });
 
+    test('exposes root tasks to the normal home data source', () async {
+      await provider.ready;
+      provider.addTask('Widget-created root task');
+
+      expect(provider.filteredRootTasks.map((task) => task.title), [
+        'Widget-created root task',
+      ]);
+      expect(provider.filteredFolders, isNotEmpty);
+    });
+
     test('searches descriptions and exposes backlinks', () async {
       await provider.ready;
       provider.addFolder('Projects');
@@ -858,13 +868,16 @@ void main() {
       expect(provider.allTasks.single.folderId, isNot('system_streak_folder'));
     });
 
-    test('moveTaskToFolder rejects moving a task to the root', () {
-      final taskId = addTaskForTest('Task for root');
+    test('moveTaskToFolder supports moving a task to the visible root', () {
+      provider.addFolder('Work');
+      final folderId = provider.filteredFolders.first.id;
+      final taskId = addTaskForTest('Task for root', folderId: folderId);
 
       final moved = provider.moveTaskToFolder(taskId, null);
 
-      expect(moved, false);
+      expect(moved, true);
       expect(provider.allTasks.single.folderId, isNull);
+      expect(provider.filteredRootTasks.single.id, taskId);
     });
 
     test('moveTaskToFolder reports false for an unknown task', () {
@@ -886,23 +899,18 @@ void main() {
       expect(provider.getFolderTasks(parentId).single.id, taskId);
     });
 
-    test(
-      'moveTaskToParentFolder rejects moving a root-folder task to the root',
-      () {
-        provider.addFolder('Root folder');
-        final folderId =
-            provider.folders.firstWhere((f) => f.name == 'Root folder').id;
-        final taskId = addTaskForTest(
-          'Task in root folder',
-          folderId: folderId,
-        );
+    test('moveTaskToParentFolder supports moving to the visible root', () {
+      provider.addFolder('Root folder');
+      final folderId =
+          provider.folders.firstWhere((f) => f.name == 'Root folder').id;
+      final taskId = addTaskForTest('Task in root folder', folderId: folderId);
 
-        final moved = provider.moveTaskToParentFolder(taskId);
+      final moved = provider.moveTaskToParentFolder(taskId);
 
-        expect(moved, false);
-        expect(provider.allTasks.first.folderId, folderId);
-      },
-    );
+      expect(moved, true);
+      expect(provider.allTasks.first.folderId, isNull);
+      expect(provider.filteredRootTasks.single.id, taskId);
+    });
 
     test('canMoveTaskToParent reflects where a task would land', () {
       provider.addFolder('Root folder');
@@ -918,7 +926,7 @@ void main() {
       final rootTaskId = addTaskForTest('At root');
 
       expect(provider.canMoveTaskToParent(nestedTaskId), isTrue);
-      expect(provider.canMoveTaskToParent(rootFolderTaskId), isFalse);
+      expect(provider.canMoveTaskToParent(rootFolderTaskId), isTrue);
       expect(provider.canMoveTaskToParent(rootTaskId), isFalse);
       expect(provider.canMoveTaskToParent('missing'), isFalse);
     });
@@ -1059,6 +1067,73 @@ void main() {
         isEmpty,
       );
     });
+
+    test(
+      'recovers valid tasks from the previous persistence snapshot',
+      () async {
+        final validTask = TaskItem(
+          id: 'recovered-task',
+          title: 'Recovered task',
+        );
+        SharedPreferences.setMockInitialValues({
+          'saved_tasks': '{malformed-json',
+          'saved_tasks_backup': jsonEncode([validTask.toJson()]),
+        });
+
+        final restored = TaskProvider();
+        await restored.ready;
+
+        expect(
+          restored.tasks.map((task) => task.id),
+          contains('recovered-task'),
+        );
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('saved_tasks'), contains('recovered-task'));
+        expect(
+          prefs.getString('saved_tasks_backup'),
+          contains('recovered-task'),
+        );
+      },
+    );
+
+    test(
+      'restores the versioned snapshot instead of mixing legacy task and folder keys',
+      () async {
+        final versionedTask = TaskItem(
+          id: 'versioned-task',
+          title: 'Versioned task',
+        );
+        final versionedFolder = FolderItem(
+          id: 'versioned-folder',
+          name: 'Versioned folder',
+        );
+        final legacyTask = TaskItem(id: 'legacy-task', title: 'Legacy task');
+        final legacyFolder = FolderItem(
+          id: 'legacy-folder',
+          name: 'Legacy folder',
+        );
+        SharedPreferences.setMockInitialValues({
+          'saved_state_v2': jsonEncode({
+            'version': 2,
+            'tasks': [versionedTask.toJson()],
+            'folders': [versionedFolder.toJson()],
+          }),
+          'saved_tasks': jsonEncode([legacyTask.toJson()]),
+          'saved_folders': jsonEncode([legacyFolder.toJson()]),
+        });
+
+        final restored = TaskProvider();
+        await restored.ready;
+
+        expect(restored.allTasks.map((task) => task.id), ['versioned-task']);
+        expect(
+          restored.folders
+              .where((folder) => !folder.isSystemStreak)
+              .map((folder) => folder.id),
+          ['versioned-folder'],
+        );
+      },
+    );
 
     test('skips malformed persisted tasks and preserves valid ones', () async {
       final validTask = TaskItem(id: 'valid-task', title: 'Valid task');

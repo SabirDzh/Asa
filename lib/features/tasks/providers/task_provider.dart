@@ -49,9 +49,16 @@ class TaskProvider with ChangeNotifier {
   bool _pendingSaveWaitsForReady = false;
   Completer<void>? _pendingSaveCompleter;
   Future<void>? _flushFuture;
+  Future<void> _calendarCleanupOperation = Future<void>.value();
   int _persistenceWriteCount = 0;
 
   static const _persistenceDebounce = Duration(milliseconds: 300);
+  static const _stateStorageKey = 'saved_state_v2';
+  static const _tasksStorageKey = 'saved_tasks';
+  static const _foldersStorageKey = 'saved_folders';
+  static const _tasksBackupStorageKey = 'saved_tasks_backup';
+  static const _foldersBackupStorageKey = 'saved_folders_backup';
+  static const _pendingCalendarCleanupKey = 'pending_calendar_cleanup';
 
   @visibleForTesting
   int get persistenceWriteCount => _persistenceWriteCount;
@@ -101,6 +108,7 @@ class TaskProvider with ChangeNotifier {
       // The in-memory removal runs synchronously; only attachment file
       // deletion is deferred, so startup is never blocked by cleanup.
       unawaited(_purgeSoftDeletedItems());
+      unawaited(_retryPendingCalendarCleanup());
     } finally {
       if (!_initCompleter.isCompleted) {
         _initCompleter.complete();
@@ -271,8 +279,32 @@ class TaskProvider with ChangeNotifier {
     try {
       _persistenceWriteCount++;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_tasks', snapshot.tasksJson);
-      await prefs.setString('saved_folders', snapshot.foldersJson);
+      // Keep the last structurally valid pair as a recovery snapshot. A
+      // partially written/corrupted current value must never overwrite the
+      // only known-good backup during the next startup.
+      final previousTasks = prefs.getString(_tasksStorageKey);
+      if (_isValidPersistedList(previousTasks)) {
+        await prefs.setString(_tasksBackupStorageKey, previousTasks!);
+      }
+      final previousFolders = prefs.getString(_foldersStorageKey);
+      if (_isValidPersistedList(previousFolders)) {
+        await prefs.setString(_foldersBackupStorageKey, previousFolders!);
+      }
+
+      // Keep tasks and folders in one versioned envelope as the authoritative
+      // snapshot. SharedPreferences writes are per-key, so a paired envelope
+      // prevents a crash between the legacy task/folder writes from producing
+      // a mixed generation on the next startup.
+      await prefs.setString(
+        _stateStorageKey,
+        jsonEncode({
+          'version': 2,
+          'tasks': jsonDecode(snapshot.tasksJson),
+          'folders': jsonDecode(snapshot.foldersJson),
+        }),
+      );
+      await prefs.setString(_tasksStorageKey, snapshot.tasksJson);
+      await prefs.setString(_foldersStorageKey, snapshot.foldersJson);
       HomeWidgetService.updateData(this);
       try {
         await NotificationService.syncTasks(snapshot.tasks);
@@ -296,55 +328,169 @@ class TaskProvider with ChangeNotifier {
   Future<void> _loadFromPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final tasksStr = prefs.getString('saved_tasks');
-      final foldersStr = prefs.getString('saved_folders');
-
-      if (tasksStr != null && tasksStr.isNotEmpty) {
-        final List decoded = jsonDecode(tasksStr);
-        for (final entry in decoded) {
-          try {
-            final task = TaskItem.fromJson(entry);
-            final normalizedTask = _normalizeImportedTask(task);
-            if (!_tasks.any((existing) => existing.id == normalizedTask.id)) {
-              _tasks.add(normalizedTask);
-            }
-          } catch (error, stackTrace) {
-            LoggerService.instance.w(
-              'Skipping malformed persisted task',
-              error: error,
-              stackTrace: stackTrace,
-            );
+      final versionedSnapshot = _readVersionedSnapshot(prefs);
+      final currentTasks = prefs.getString(_tasksStorageKey);
+      final backupTasks = prefs.getString(_tasksBackupStorageKey);
+      final tasks =
+          versionedSnapshot == null
+              ? _readPersistedList(
+                prefs,
+                _tasksStorageKey,
+                _tasksBackupStorageKey,
+                'tasks',
+              )
+              : _decodePersistedList(versionedSnapshot.tasksJson, 'tasks');
+      if (versionedSnapshot == null &&
+          !_isValidPersistedList(currentTasks) &&
+          _isValidPersistedList(backupTasks)) {
+        // Repair immediately instead of waiting for the debounced mutation
+        // flush triggered later by startup housekeeping.
+        await prefs.setString(_tasksStorageKey, backupTasks!);
+      }
+      for (final entry in tasks) {
+        try {
+          final task = TaskItem.fromJson(entry);
+          final normalizedTask = _normalizeImportedTask(task);
+          if (!_tasks.any((existing) => existing.id == normalizedTask.id)) {
+            _tasks.add(normalizedTask);
           }
+        } catch (error, stackTrace) {
+          LoggerService.instance.w(
+            'Skipping malformed persisted task',
+            error: error,
+            stackTrace: stackTrace,
+          );
         }
       }
 
-      if (foldersStr != null && foldersStr.isNotEmpty) {
-        final List decoded = jsonDecode(foldersStr);
-        for (final entry in decoded) {
-          try {
-            final folder = FolderItem.fromJson(entry);
-            // The streak folder is an app-owned invariant, not user data. Drop
-            // persisted copies so checkDailyStreak() recreates one canonical
-            // record, and detach any user folder that referenced it.
-            if (folder.id == 'system_streak_folder' || folder.isSystemStreak) {
-              continue;
-            }
-            if (folder.parentFolderId == 'system_streak_folder') {
-              folder.parentFolderId = null;
-            }
-            if (!_folders.any((existing) => existing.id == folder.id)) {
-              _folders.add(folder);
-            }
-          } catch (error, stackTrace) {
-            LoggerService.instance.w(
-              'Skipping malformed persisted folder',
-              error: error,
-              stackTrace: stackTrace,
-            );
+      final currentFolders = prefs.getString(_foldersStorageKey);
+      final backupFolders = prefs.getString(_foldersBackupStorageKey);
+      final folders =
+          versionedSnapshot == null
+              ? _readPersistedList(
+                prefs,
+                _foldersStorageKey,
+                _foldersBackupStorageKey,
+                'folders',
+              )
+              : _decodePersistedList(versionedSnapshot.foldersJson, 'folders');
+      if (versionedSnapshot == null &&
+          !_isValidPersistedList(currentFolders) &&
+          _isValidPersistedList(backupFolders)) {
+        await prefs.setString(_foldersStorageKey, backupFolders!);
+      }
+      for (final entry in folders) {
+        try {
+          final folder = FolderItem.fromJson(entry);
+          // The streak folder is an app-owned invariant, not user data. Drop
+          // persisted copies so checkDailyStreak() recreates one canonical
+          // record, and detach any user folder that referenced it.
+          if (folder.id == 'system_streak_folder' || folder.isSystemStreak) {
+            continue;
           }
+          if (folder.parentFolderId == 'system_streak_folder') {
+            folder.parentFolderId = null;
+          }
+          if (!_folders.any((existing) => existing.id == folder.id)) {
+            _folders.add(folder);
+          }
+        } catch (error, stackTrace) {
+          LoggerService.instance.w(
+            'Skipping malformed persisted folder',
+            error: error,
+            stackTrace: stackTrace,
+          );
         }
       }
-    } catch (_) {}
+    } on Object catch (error, stackTrace) {
+      // Preferences are local storage, not a reason to crash the app. Keep the
+      // in-memory store usable and make the failure visible in diagnostics.
+      LoggerService.instance.e(
+        'Task persistence load failed; starting with empty local state',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  _PersistenceSnapshot? _readVersionedSnapshot(SharedPreferences prefs) {
+    final encoded = prefs.getString(_stateStorageKey);
+    if (encoded == null || encoded.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(encoded);
+      if (decoded is! Map || decoded['version'] != 2) {
+        throw const FormatException('Unsupported persisted state version');
+      }
+      final tasks = decoded['tasks'];
+      final folders = decoded['folders'];
+      if (tasks is! List || folders is! List) {
+        throw const FormatException('Persisted state lists are invalid');
+      }
+      return _PersistenceSnapshot(
+        tasksJson: jsonEncode(tasks),
+        foldersJson: jsonEncode(folders),
+        tasks: const <TaskItem>[],
+      );
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Versioned task persistence snapshot is invalid; using legacy recovery',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  List<dynamic> _readPersistedList(
+    SharedPreferences prefs,
+    String key,
+    String backupKey,
+    String kind,
+  ) {
+    final current = prefs.getString(key);
+    try {
+      return _decodePersistedList(current, kind);
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Corrupted persisted $kind; trying recovery snapshot',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final backup = prefs.getString(backupKey);
+    try {
+      final recovered = _decodePersistedList(backup, kind);
+      LoggerService.instance.i('Recovered persisted $kind from backup');
+      return recovered;
+    } on Object catch (error, stackTrace) {
+      if (backup != null) {
+        LoggerService.instance.e(
+          'Persisted $kind recovery snapshot is also invalid',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+      return const <dynamic>[];
+    }
+  }
+
+  List<dynamic> _decodePersistedList(String? encoded, String kind) {
+    if (encoded == null || encoded.isEmpty) return const <dynamic>[];
+    final decoded = jsonDecode(encoded);
+    if (decoded is! List) {
+      throw FormatException('Persisted $kind must be a JSON list');
+    }
+    return decoded;
+  }
+
+  bool _isValidPersistedList(String? encoded) {
+    if (encoded == null || encoded.isEmpty) return false;
+    try {
+      return jsonDecode(encoded) is List;
+    } on Object {
+      return false;
+    }
   }
 
   /// Permanently removes soft-deleted tasks and folders older than
@@ -478,6 +624,23 @@ class TaskProvider with ChangeNotifier {
     }).toList();
   }
 
+  List<TaskItem> get filteredRootTasks {
+    if (_filter == TaskFilter.foldersOnly) return [];
+    final matchingIds =
+        _searchQuery.isEmpty
+            ? null
+            : _descriptionIndex
+                .search(_searchQuery)
+                .map((result) => result.task.id)
+                .toSet();
+    return _tasks.where((task) {
+      if (task.isDeleted || task.folderId != null) return false;
+      if (_filter == TaskFilter.active && task.isCompleted) return false;
+      if (_filter == TaskFilter.completed && !task.isCompleted) return false;
+      return matchingIds == null || matchingIds.contains(task.id);
+    }).toList();
+  }
+
   List<TaskItem> get filteredInProgressTasks {
     if (_filter == TaskFilter.completed || _filter == TaskFilter.foldersOnly) {
       return [];
@@ -581,13 +744,9 @@ class TaskProvider with ChangeNotifier {
   }
 
   // ── Drag & Move methods ─────────────────────────────────────
-  /// Moves a task into [targetFolderId]. Returns false when the task is not
-  /// found, the target is the root level (null), or the target is the
-  /// protected streak folder, so callers can avoid reporting a successful
-  /// move that never happened. Tasks are never moved to the root: root tasks
-  /// are not shown anywhere in the UI, so a move there would hide the task.
+  /// Moves a task into [targetFolderId]. A null target places it in the
+  /// visible root task list. The protected streak folder is never a target.
   bool moveTaskToFolder(String taskId, String? targetFolderId) {
-    if (targetFolderId == null) return false;
     if (targetFolderId == 'system_streak_folder') return false;
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index == -1) return false;
@@ -629,9 +788,8 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Moves a task out of its current folder into that folder's parent.
-  /// Tasks already at the root, whose current folder no longer exists, or
-  /// whose folder lives at the root level (the move would land the task at
-  /// the root) are left untouched and false is returned.
+  /// Tasks already at the root or whose current folder no longer exists are
+  /// left untouched and false is returned.
   bool moveTaskToParentFolder(String taskId) {
     final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
     if (taskIndex == -1) return false;
@@ -647,9 +805,8 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Whether [taskId] can be moved one level up via swipe-to-parent.
-  /// False when the task is unknown, already at the root, or its current
-  /// folder has no parent (moving up would drop the task at the root, which
-  /// is not allowed).
+  /// Root-level tasks cannot move up; tasks in any valid folder can move to
+  /// that folder's parent, including the visible root.
   bool canMoveTaskToParent(String taskId) {
     final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
     if (taskIndex == -1) return false;
@@ -661,7 +818,7 @@ class TaskProvider with ChangeNotifier {
     );
     if (folderIndex == -1) return false;
 
-    return _folders[folderIndex].parentFolderId != null;
+    return true;
   }
 
   /// Moves a nested folder into its current parent's parent. Root folders are
@@ -934,11 +1091,145 @@ class TaskProvider with ChangeNotifier {
   }
 
   void _removeTaskCalendarEvent(TaskItem task) {
-    if (task.calendarId != null && task.calendarEventId != null) {
-      CalendarService.deleteEvent(
-        task.calendarId!,
-        task.calendarEventId!,
-      ).catchError((_) {});
+    final calendarId = task.calendarId;
+    final eventId = task.calendarEventId;
+    if (calendarId == null || eventId == null) return;
+    unawaited(_deleteTaskCalendarEvent(calendarId, eventId));
+  }
+
+  Future<void> _deleteTaskCalendarEvent(
+    String calendarId,
+    String eventId,
+  ) async {
+    try {
+      final deleted = await CalendarService.deleteEvent(calendarId, eventId);
+      if (!deleted) {
+        await _queuePendingCalendarCleanup(calendarId, eventId);
+      }
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Failed to remove linked calendar event',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      await _queuePendingCalendarCleanup(calendarId, eventId);
+    }
+  }
+
+  Future<void> _queuePendingCalendarCleanup(String calendarId, String eventId) {
+    final next = _calendarCleanupOperation.then(
+      (_) => _queuePendingCalendarCleanupUnlocked(calendarId, eventId),
+    );
+    _calendarCleanupOperation = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _queuePendingCalendarCleanupUnlocked(
+    String calendarId,
+    String eventId,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pending = <Map<String, dynamic>>[];
+      final raw = prefs.getString(_pendingCalendarCleanupKey);
+      if (raw != null) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) {
+            for (final entry in decoded) {
+              if (entry is Map &&
+                  entry['calendarId'] is String &&
+                  entry['eventId'] is String) {
+                pending.add({
+                  'calendarId': entry['calendarId'],
+                  'eventId': entry['eventId'],
+                });
+              }
+            }
+          }
+        } on Object {
+          // Replace a corrupt retry queue with the current known item.
+        }
+      }
+      if (!pending.any(
+        (entry) =>
+            entry['calendarId'] == calendarId && entry['eventId'] == eventId,
+      )) {
+        pending.add({'calendarId': calendarId, 'eventId': eventId});
+      }
+      await prefs.setString(_pendingCalendarCleanupKey, jsonEncode(pending));
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Failed to persist pending calendar cleanup',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _retryPendingCalendarCleanup() {
+    final next = _calendarCleanupOperation.then(
+      (_) => _retryPendingCalendarCleanupUnlocked(),
+    );
+    _calendarCleanupOperation = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _retryPendingCalendarCleanupUnlocked() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_pendingCalendarCleanupKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        await prefs.remove(_pendingCalendarCleanupKey);
+        return;
+      }
+      final remaining = <Map<String, dynamic>>[];
+      for (final entry in decoded) {
+        if (entry is! Map ||
+            entry['calendarId'] is! String ||
+            entry['eventId'] is! String) {
+          continue;
+        }
+        final calendarId = entry['calendarId'] as String;
+        final eventId = entry['eventId'] as String;
+        try {
+          if (!await CalendarService.deleteEvent(calendarId, eventId)) {
+            remaining.add({'calendarId': calendarId, 'eventId': eventId});
+          }
+        } on Object catch (error, stackTrace) {
+          remaining.add({'calendarId': calendarId, 'eventId': eventId});
+          LoggerService.instance.w(
+            'Pending calendar cleanup retry failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      }
+      if (remaining.isEmpty) {
+        await prefs.remove(_pendingCalendarCleanupKey);
+      } else {
+        await prefs.setString(
+          _pendingCalendarCleanupKey,
+          jsonEncode(remaining),
+        );
+      }
+    } on Object catch (error, stackTrace) {
+      LoggerService.instance.w(
+        'Failed to process pending calendar cleanup queue',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _deleteCalendarEventsForTasks(Iterable<TaskItem> tasks) async {
+    for (final task in tasks) {
+      final calendarId = task.calendarId;
+      final eventId = task.calendarEventId;
+      if (calendarId == null || eventId == null) continue;
+      await _deleteTaskCalendarEvent(calendarId, eventId);
     }
   }
 
@@ -1139,10 +1430,17 @@ class TaskProvider with ChangeNotifier {
 
     final task = _tasks[index];
     if (task.calendarId != null && task.calendarEventId != null) {
-      await CalendarService.deleteEvent(
+      final deleted = await CalendarService.deleteEvent(
         task.calendarId!,
         task.calendarEventId!,
       );
+      if (!deleted) {
+        await _queuePendingCalendarCleanup(
+          task.calendarId!,
+          task.calendarEventId!,
+        );
+        return;
+      }
     }
 
     _tasks[index] = task.copyWith(
@@ -1366,6 +1664,7 @@ class TaskProvider with ChangeNotifier {
   Future<void> clearAllTasks() async {
     final tasksToClear = List<TaskItem>.of(_tasks);
     await _deleteAttachmentsForTasks(tasksToClear);
+    await _deleteCalendarEventsForTasks(tasksToClear);
 
     final now = DateTime.now();
     for (var i = 0; i < _tasks.length; i++) {
@@ -1376,8 +1675,11 @@ class TaskProvider with ChangeNotifier {
   }
 
   Future<void> clearAllFolders() async {
-    final tasksToClear = _tasks.where((task) => task.folderId != null);
+    final tasksToClear = _tasks
+        .where((task) => task.folderId != null)
+        .toList(growable: false);
     await _deleteAttachmentsForTasks(tasksToClear);
+    await _deleteCalendarEventsForTasks(tasksToClear);
 
     final now = DateTime.now();
     for (var i = 0; i < _folders.length; i++) {
@@ -1389,7 +1691,6 @@ class TaskProvider with ChangeNotifier {
       if (_tasks[i].folderId != null && !_tasks[i].isDeleted) {
         final task = _tasks[i];
         _tasks[i] = task.copyWith(isDeleted: true, updatedAt: now);
-        _removeTaskCalendarEvent(task);
       }
     }
     _notifyTasksAndFoldersChanged();
@@ -1399,6 +1700,7 @@ class TaskProvider with ChangeNotifier {
   Future<void> clearAllData() async {
     final tasksToClear = List<TaskItem>.of(_tasks);
     await _deleteAttachmentsForTasks(tasksToClear);
+    await _deleteCalendarEventsForTasks(tasksToClear);
     await deleteAllStoredTaskAttachments();
 
     final now = DateTime.now();

@@ -178,9 +178,12 @@ class CalendarService {
     return result?.data;
   }
 
-  /// Deletes the calendar event with [eventId] from [calendarId].
-  static Future<void> deleteEvent(String calendarId, String eventId) async {
-    if (!await requestPermission()) return;
-    await _plugin.deleteEvent(calendarId, eventId);
+  /// Deletes the calendar event with [eventId] from [calendarId]. Returns
+  /// false when permission/provider access is unavailable so callers can queue
+  /// a retry instead of silently losing the cleanup operation.
+  static Future<bool> deleteEvent(String calendarId, String eventId) async {
+    if (!await requestPermission()) return false;
+    final result = await _plugin.deleteEvent(calendarId, eventId);
+    return result.isSuccess;
   }
 }

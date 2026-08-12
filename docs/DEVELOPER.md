@@ -13,7 +13,7 @@ ASA is a cross-platform Flutter task manager. It supports folders, drag-and-drop
 Key product decisions you should know before reading the code:
 
 * **Offline-first.** All task/folder data lives in `SharedPreferences` as JSON. Sync/export are optional add-ons.
-* **Soft-delete.** Deleting a task or folder sets `isDeleted = true`; nothing is truly removed from the local list.
+* **Soft-delete.** Deleting a task or folder sets `isDeleted = true`. Soft-deleted records older than 7 days (`kDeletedItemRetention`) are permanently purged during startup and after every import/sync merge; nothing else is truly removed from the local list.
 * **Daily streak folder.** A special `system_streak_folder` is recreated every day and named “День N”.
 * **UI scale.** The entire interface is scaled via a custom `MediaQuery` transform, allowing users to adjust text and widget sizes.
 * **Animations.** Most animations have a fixed logical duration, but they respect the user’s `animationSpeed` through Flutter’s `timeDilation`.
@@ -154,6 +154,7 @@ Both providers start async init in their constructors:
 
 * `TaskProvider._saveToPrefs()` encodes `_tasks` and `_folders` as JSON strings in `SharedPreferences` and serializes/coalesces writes so stale asynchronous writes cannot overwrite newer state.
 * Keys: `saved_tasks`, `saved_folders`.
+* **Retention cleanup.** `TaskProvider` permanently purges soft-deleted tasks and folders whose `updatedAt` is older than `kDeletedItemRetention` (7 days). The purge runs at startup (`initData`) and inside `persist()` after import/sync merges, and deletes the attachment files of purged tasks. Legacy records without a persisted `updatedAt` are kept so old data is never accidentally purged; the system streak folder is exempt.
 * Settings are persisted per-field under their own keys (see `SettingsProvider`).
 * **Security limitation:** `SharedPreferences` is not encrypted storage. The optional `syncSecret` currently survives restarts in plaintext application preferences. Treat it as a local convenience secret, not a high-value credential; migrate sensitive keys to platform secure storage (for example, `flutter_secure_storage`) before relying on it for stronger at-rest protection.
 
@@ -222,6 +223,7 @@ Holds all user preferences and exposes `tr(key)` for localized strings. Custom a
 Wraps `device_calendar`:
 
 * `requestPermission()` — asks for calendar access.
+* `openAppSettings()` — opens app settings after calendar access is denied.
 * `getCalendars()` — writable calendars only.
 * `createOrUpdateEvent(...)` — creates or updates a native calendar event.
 * `deleteEvent(...)` — removes a linked event.
@@ -286,6 +288,7 @@ Local-network P2P over mDNS + TCP sockets:
 * Sends JSON payload length-prefixed (`[4 bytes length][payload]`).
 * Receives data, validates sync secret, and merges via `ExportImportService`.
 * Incoming TCP frames are length-prefixed, bounded to 10 MB, timeout-protected, and closed after one frame. When a secret is configured, the payload must pass HMAC validation; malformed or unauthenticated frames are rejected.
+* On Android, sync requests local-network access only when enabled: `NEARBY_WIFI_DEVICES` on Android 13+ and `ACCESS_FINE_LOCATION` through Android 12. A denial leaves sync disabled; this permission is intentionally not part of the mandatory startup setup.
 
 Lifecycle in `SplashScreen`:
 
@@ -418,7 +421,7 @@ Bottom sheets for theme, language, animation speed, app scale, widget mode, sync
 * Widget metadata declares resize bounds and target cell sizes. Layouts use `match_parent`, one-line ellipsized text, and a minimum resize height that keeps the content readable on compact launchers.
 * `HomeWidgetService` debounces writes and coalesces the three provider updates. It publishes the initial state even when values match native defaults and requests a refresh when the app resumes, because launchers may clear native widget state while the process is backgrounded.
 * ABI split is configured in `android/app/build.gradle.kts` for `arm64-v8a` release builds.
-* Calendar and notification permissions are declared in `AndroidManifest.xml`.
+* Calendar, notification, and local-network discovery permissions are declared in `AndroidManifest.xml`. Local-network permission is requested on demand when sync is enabled.
 * App name and launcher icon are managed in the usual Android resources.
 
 ### 11.2 iOS/macOS
@@ -587,7 +590,8 @@ When adding new providers or services, add matching tests and prefer injecting d
 | Update dialog never shows | `VersionService` rate-limited or GitHub API failed | Check network; review `SharedPreferences` key `update_last_prompted_at` |
 | Widget not updating | `HomeWidgetService` debounce or native provider issue | Verify `HomeWidget.saveWidgetData` keys and Android XML |
 | Sync sees own device | `deviceId` mismatch or missing TXT record | Ensure `SettingsProvider.ensureSyncDeviceId()` is called before `start()` |
-| Calendar action missing | Task is in `system_streak_folder` or permission denied | Check folder ID and runtime permissions |
+| Calendar action missing | Task is in `system_streak_folder` or permission denied | Check folder ID and runtime permissions; after denial use the explicit **Open settings** action |
+| Sync finds no devices | Local-network permission was denied or not requested | Enable sync again and grant Nearby Wi-Fi/Location access; verify both devices are on the same LAN |
 | Theme transition lag | High `timeDilation` + image capture | Reduce animation speed in settings or optimize tree depth |
 
 ---

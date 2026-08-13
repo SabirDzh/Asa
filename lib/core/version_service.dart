@@ -68,11 +68,6 @@ class VersionService {
   /// True when this platform can install an APK from a local file.
   static bool get canAutoInstall => canInstallApkLocally;
 
-  /// Fetches the latest [limit] published releases, newest first, with a
-  /// cached fallback when the network is unavailable.
-  static Future<List<UpdateInfo>> fetchReleaseHistory({int limit = 10}) =>
-      _defaultChecker.fetchReleaseHistory(limit: limit);
-
   /// Downloads the release APK to local storage. Returns the local path or
   /// null when the platform cannot install or the URL is unsafe.
   static Future<String?> downloadUpdate(
@@ -144,7 +139,6 @@ class UpdateChecker {
   static const String _cachedSha256Key = 'update_release_sha256';
   static const String installedAssetTimeKey =
       'update_installed_asset_updated_at';
-  static const String _historyKey = 'update_release_history';
   static const int _maxNotesLength = 20 * 1024;
 
   static const String _buildTimeRaw = String.fromEnvironment(
@@ -329,101 +323,6 @@ class UpdateChecker {
     'User-Agent': 'ASA-UpdateChecker',
   };
 
-  /// Fetches the latest [limit] published releases, newest first. Falls back
-  /// to the last successful cache when the network is unavailable.
-  @visibleForTesting
-  Future<List<UpdateInfo>> fetchReleaseHistory({
-    SharedPreferences? preferences,
-    int limit = 10,
-  }) async {
-    final prefs = preferences ?? await _preferencesProvider();
-    final uri = Uri.https('api.github.com', '/repos/$owner/$repo/releases', {
-      'per_page': '$limit',
-    });
-    try {
-      final response = await _client
-          .get(uri, headers: _releaseHeaders())
-          .timeout(requestTimeout);
-      if (response.statusCode != 200) {
-        throw StateError(
-          'Release history request failed with HTTP ${response.statusCode}',
-        );
-      }
-      final decoded = jsonDecode(response.body);
-      if (decoded is! List) {
-        throw const FormatException('Release history response is not a list');
-      }
-
-      final releases = <UpdateInfo>[];
-      for (final item in decoded) {
-        final info = UpdateInfo.fromJson(item);
-        if (info == null) continue;
-        if (!isSafeReleaseUrl(info.url, owner: owner, repo: repo)) continue;
-        if (info.assetUrl != null &&
-            !isSafeAssetUrl(info.assetUrl!, owner: owner, repo: repo)) {
-          // Keep the release but drop an unsafe asset reference.
-          releases.add(_withoutAsset(info));
-          continue;
-        }
-        releases.add(info);
-      }
-      if (decoded.isNotEmpty && releases.isEmpty) {
-        throw const FormatException(
-          'Release history contained no valid releases',
-        );
-      }
-      releases.sort((a, b) {
-        final aTime = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bTime.compareTo(aTime);
-      });
-      await _writeCachedHistory(prefs, releases);
-      return releases;
-    } on Object {
-      final cached = _readCachedHistory(prefs);
-      if (cached.isNotEmpty) return cached;
-      rethrow;
-    }
-  }
-
-  List<UpdateInfo> _readCachedHistory(SharedPreferences prefs) {
-    final raw = prefs.getString(_historyKey);
-    if (raw == null || raw.isEmpty) return const [];
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return const [];
-      final releases = <UpdateInfo>[];
-      for (final item in decoded) {
-        final info = UpdateInfo.fromCacheJson(item);
-        if (info == null ||
-            !isSafeReleaseUrl(info.url, owner: owner, repo: repo)) {
-          continue;
-        }
-        if (info.assetUrl != null &&
-            !isSafeAssetUrl(info.assetUrl!, owner: owner, repo: repo)) {
-          // Defense in depth: the cache is user-modifiable storage, so
-          // re-validate the asset URL on read and drop unsafe references.
-          releases.add(_withoutAsset(info));
-          continue;
-        }
-        releases.add(info);
-      }
-      return releases;
-    } on Object {
-      return const [];
-    }
-  }
-
-  Future<void> _writeCachedHistory(
-    SharedPreferences prefs,
-    List<UpdateInfo> releases,
-  ) async {
-    await prefs.setString(
-      _historyKey,
-      jsonEncode([for (final release in releases) release.toCacheJson()]),
-    );
-  }
-
   Future<_FetchResult> _fetchLatest(SharedPreferences prefs) async {
     final uri = Uri.https('api.github.com', '/repos/$owner/$repo/releases', {
       'per_page': '20',
@@ -540,15 +439,6 @@ class UpdateChecker {
         segments[3] == 'tag' &&
         segments[4].isNotEmpty;
   }
-
-  /// Returns a copy of [info] without its asset reference. Used whenever an
-  /// asset URL fails validation so the release itself is still shown.
-  static UpdateInfo _withoutAsset(UpdateInfo info) => UpdateInfo(
-    version: info.version,
-    url: info.url,
-    notes: info.notes,
-    publishedAt: info.publishedAt,
-  );
 
   static bool isSafeAssetUrl(
     String value, {
@@ -786,43 +676,6 @@ class UpdateInfo {
       assetUpdatedAt: asset?.updatedAt,
       isPrerelease: isPrerelease,
       sha256: asset?.sha256,
-    );
-  }
-
-  Map<String, Object?> toCacheJson() => {
-    'version': version,
-    'url': url,
-    'notes': notes,
-    'publishedAt': publishedAt?.toIso8601String(),
-    'assetUrl': assetUrl,
-    'assetName': assetName,
-    'assetUpdatedAt': assetUpdatedAt?.toIso8601String(),
-    'isPrerelease': isPrerelease,
-    'sha256': sha256,
-  };
-
-  static UpdateInfo? fromCacheJson(Object? value) {
-    if (value is! Map<String, dynamic>) return null;
-    final version = value['version'];
-    final url = value['url'];
-    if (version is! String || url is! String) return null;
-    if (SemanticVersion.tryParse(version) == null) return null;
-    final publishedRaw = value['publishedAt'];
-    final assetUpdatedRaw = value['assetUpdatedAt'];
-    return UpdateInfo(
-      version: version,
-      url: url,
-      notes: value['notes'] is String ? value['notes'] as String : '',
-      publishedAt:
-          publishedRaw is String ? DateTime.tryParse(publishedRaw) : null,
-      assetUrl:
-          value['assetUrl'] is String ? value['assetUrl'] as String : null,
-      assetName:
-          value['assetName'] is String ? value['assetName'] as String : null,
-      assetUpdatedAt:
-          assetUpdatedRaw is String ? DateTime.tryParse(assetUpdatedRaw) : null,
-      isPrerelease: value['isPrerelease'] == true,
-      sha256: value['sha256'] is String ? value['sha256'] as String : null,
     );
   }
 

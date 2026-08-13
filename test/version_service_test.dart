@@ -107,7 +107,6 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      await prefs.remove('update_release_history');
     });
 
     test('parses, validates and caches a release with its ETag', () async {
@@ -231,110 +230,6 @@ void main() {
       );
     });
 
-    test('fetchReleaseHistory returns newest first and caches', () async {
-      final checker = UpdateChecker(
-        owner: 'SabirDzh',
-        repo: 'Asa',
-        currentVersion: '1.1.0',
-        client: _FakeClient((uri, headers) async {
-          return http.Response(
-            jsonEncode([
-              {
-                'tag_name': 'v1.1.0',
-                'html_url':
-                    'https://github.com/SabirDzh/Asa/releases/tag/v1.1.0',
-                'published_at': '2026-07-20T10:00:00Z',
-                'body': 'Older',
-              },
-              {
-                'tag_name': 'v1.2.0',
-                'html_url':
-                    'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
-                'published_at': '2026-08-01T10:00:00Z',
-                'body': 'Newer',
-                'assets': [
-                  {
-                    'name': 'app-arm64-v8a-release.apk',
-                    'browser_download_url':
-                        'https://github.com/SabirDzh/Asa/releases/download/v1.2.0/app-arm64-v8a-release.apk',
-                  },
-                ],
-              },
-            ]),
-            200,
-          );
-        }),
-      );
-
-      final releases = await checker.fetchReleaseHistory(preferences: prefs);
-      expect(releases.map((r) => r.version).toList(), ['1.2.0', '1.1.0']);
-      expect(releases.first.assetUrl, isNotNull);
-      expect(prefs.getString('update_release_history'), isNotNull);
-    });
-
-    test(
-      'throws on network failure without cache and falls back when cache exists',
-      () async {
-        await prefs.remove('update_release_history');
-        expect(prefs.getString('update_release_history'), isNull);
-
-        final checker = UpdateChecker(
-          owner: 'SabirDzh',
-          repo: 'Asa',
-          currentVersion: '1.1.0',
-          client: _FakeClient((uri, headers) async {
-            return http.Response('boom', 500);
-          }),
-        );
-
-        await expectLater(
-          checker.fetchReleaseHistory(preferences: prefs),
-          throwsA(isA<StateError>()),
-        );
-
-        await prefs.setString(
-          'update_release_history',
-          jsonEncode([
-            {
-              'version': '1.2.0',
-              'url': 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
-              'notes': 'Cached',
-              'publishedAt': '2026-08-01T10:00:00.000Z',
-              'assetUrl': null,
-              'assetName': null,
-            },
-          ]),
-        );
-        final cached = await checker.fetchReleaseHistory(preferences: prefs);
-        expect(cached.map((r) => r.version).toList(), ['1.2.0']);
-        expect(cached.first.notes, 'Cached');
-      },
-    );
-
-    test('throws when a non-empty response has no valid releases', () async {
-      final checker = UpdateChecker(
-        owner: 'SabirDzh',
-        repo: 'Asa',
-        currentVersion: '1.1.0',
-        client: _FakeClient((uri, headers) async {
-          return http.Response(
-            jsonEncode([
-              {
-                'tag_name': 'not-a-version',
-                'html_url': 'https://example.com/release',
-              },
-            ]),
-            200,
-          );
-        }),
-      );
-
-      expect(
-        checker.fetchReleaseHistory(preferences: prefs),
-        throwsA(isA<FormatException>()),
-      );
-    });
-
     test('drops an unsafe cached asset but keeps the release', () async {
       await prefs.setString('update_release_etag', '"cached-unsafe"');
       await prefs.setString('update_release_version', '1.3.0');
@@ -445,12 +340,8 @@ void main() {
       },
     );
 
-    test('VersionService facade exposes history and install helpers', () async {
+    test('VersionService facade exposes install helpers', () async {
       expect(VersionService.canAutoInstall, isA<bool>());
-      expect(
-        VersionService.fetchReleaseHistory(limit: 3),
-        isA<Future<List<UpdateInfo>>>(),
-      );
       expect(
         VersionService.downloadUpdate(
           const UpdateInfo(
@@ -465,36 +356,6 @@ void main() {
         VersionService.installUpdate('/tmp/asa-update.apk'),
         isA<Future<bool>>(),
       );
-    });
-
-    test('history cache drops an unsafe cached asset on read', () async {
-      await prefs.setString(
-        'update_release_history',
-        jsonEncode([
-          {
-            'version': '1.2.0',
-            'url': 'https://github.com/SabirDzh/Asa/releases/tag/v1.2.0',
-            'notes': 'Cached',
-            'assetUrl': 'https://evil.example/app.apk',
-            'assetName': 'app.apk',
-          },
-        ]),
-      );
-
-      final checker = UpdateChecker(
-        owner: 'SabirDzh',
-        repo: 'Asa',
-        currentVersion: '1.1.0',
-        client: _FakeClient((uri, headers) async {
-          return http.Response('boom', 500);
-        }),
-      );
-
-      final cached = await checker.fetchReleaseHistory(preferences: prefs);
-      expect(cached, hasLength(1));
-      expect(cached.first.version, '1.2.0');
-      expect(cached.first.assetUrl, isNull);
-      expect(cached.first.assetName, isNull);
     });
 
     test('rejects releases with unsafe URLs or invalid JSON shape', () async {

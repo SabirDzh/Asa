@@ -230,9 +230,6 @@ void removeFolder(String id);
 void toggleTask(String id);
 void moveTaskToFolder(String taskId, String? targetFolderId);
 void moveFolderToFolder(String folderId, String? targetParentFolderId);
-void reorderRootFolders(int oldIndex, int newIndex);
-void reorderSubfolders(String parentFolderId, int oldIndex, int newIndex);
-void reorderFolderTasks(String folderId, int oldIndex, int newIndex);
 void setTaskTime(String id, {DateTime? startTime, DateTime? endTime});
 Future<void> linkTaskToCalendar(String id, String calendarId, DateTime date);
 Future<void> unlinkTaskFromCalendar(String id);
@@ -333,7 +330,7 @@ if (settings.syncEnabled) {
 
 [`lib/core/version_service.dart`](../lib/core/version_service.dart)
 
-Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, or every 24 hours after the user postpones. The update dialog (`lib/core/update_dialog.dart`) can download the release APK in-app and open the system package installer via `open_filex` on Android (`UpdateChecker.downloadUpdate` / `installUpdate`). Release history is available through `fetchReleaseHistory()` (GitHub `/releases` list with a `SharedPreferences` cache fallback). The displayed app version comes from `VersionService.currentVersion`, which reads the compile-time `--dart-define=APP_VERSION` (defaulting to the `pubspec.yaml` version) so it never drifts.
+Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, or every 24 hours after the user postpones. The update dialog (`lib/core/update_dialog.dart`) can download the release APK in-app and open the system package installer via `open_filex` on Android (`UpdateChecker.downloadUpdate` / `installUpdate`). The displayed app version comes from `VersionService.currentVersion`, which reads the compile-time `--dart-define=APP_VERSION` (defaulting to the `pubspec.yaml` version) so it never drifts.
 
 ### 7.9 LoggerService
 

@@ -432,39 +432,15 @@ class _HomeFolderList extends StatelessWidget {
       );
     }
 
-    final canReorder = searchQuery.isEmpty && provider.filter == TaskFilter.all;
     final rootTaskCount = rootTasks.length;
 
-    return ReorderableListView.builder(
-      buildDefaultDragHandles: false,
+    return ListView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(
         horizontal: AppTheme.screenPad,
         vertical: 4,
       ),
       itemCount: rootTaskCount + folders.length,
-      onReorderItem: (oldIndex, newIndex) {
-        if (!canReorder) return;
-        if (oldIndex < newIndex) newIndex -= 1;
-        // Root tasks are not reorderable with folders. A folder can still be
-        // reordered relative to other folders after the root-task prefix.
-        if (oldIndex < rootTaskCount || newIndex < rootTaskCount) return;
-        final oldFolderIndex = oldIndex - rootTaskCount;
-        final newFolderIndex = newIndex - rootTaskCount;
-        if (oldFolderIndex == 0 || newFolderIndex == 0) return;
-        context.read<TaskProvider>().reorderRootFolders(
-          oldFolderIndex,
-          newFolderIndex,
-        );
-      },
-      proxyDecorator: (child, index, animation) {
-        return AnimatedBuilder(
-          animation: animation,
-          builder:
-              (context, child) => Transform.scale(scale: 1.03, child: child),
-          child: child,
-        );
-      },
       itemBuilder: (context, index) {
         if (index < rootTaskCount) {
           final task = rootTasks[index];
@@ -478,11 +454,7 @@ class _HomeFolderList extends StatelessWidget {
         return Padding(
           key: ValueKey(folder.id),
           padding: const EdgeInsets.only(bottom: 8),
-          child: FolderRow(
-            folder: folder,
-            reorderIndex: index - rootTaskCount,
-            showReorderHandle: canReorder && !folder.isSystemStreak,
-          ),
+          child: FolderRow(folder: folder),
         );
       },
     );

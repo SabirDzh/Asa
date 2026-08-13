@@ -60,21 +60,6 @@ void main() {
     expect(find.byIcon(Iconsax.calendar_1), findsOneWidget);
   });
 
-  testWidgets('shows reorder handles for subfolders and tasks', (tester) async {
-    final provider = TaskProvider();
-    provider.addFolder('Work');
-    final folder = provider.folders.firstWhere((item) => item.name == 'Work');
-    provider.addFolder('Subfolder', parentFolderId: folder.id);
-    provider.addTask('First task', folderId: folder.id);
-    provider.addTask('Second task', folderId: folder.id);
-
-    await tester.pumpWidget(createTestApp(folder, provider: provider));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('folder-reorder-handle')), findsOneWidget);
-    expect(find.byKey(const ValueKey('task-reorder-handle')), findsNWidgets(2));
-  });
-
   testWidgets('swiping a nested task left moves it to the parent folder', (
     tester,
   ) async {

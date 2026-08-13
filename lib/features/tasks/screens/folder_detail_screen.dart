@@ -383,11 +383,8 @@ class _FolderContent extends StatelessWidget {
     final inProgress = folderTasks.where((t) => !t.isCompleted).toList();
     final completed = folderTasks.where((t) => t.isCompleted).toList();
 
-    final canReorder =
-        provider.searchQuery.isEmpty && provider.filter == TaskFilter.all;
-
     // Build task widgets. The first completed task carries the divider
-    // above it so the divider is not an independent reorderable child.
+    // above it so the divider is not an independent child.
     final completedWidgets = <Widget>[];
     for (var i = 0; i < completed.length; i++) {
       final t = completed[i];
@@ -400,8 +397,6 @@ class _FolderContent extends StatelessWidget {
                 : const EdgeInsets.only(bottom: 8),
         child: TaskRow(
           task: t,
-          reorderIndex: subfolders.length + inProgress.length + i,
-          showReorderHandle: canReorder,
           onSwipeToParent: () => _moveTaskToParent(context, t.id),
         ),
       );
@@ -436,8 +431,7 @@ class _FolderContent extends StatelessWidget {
       completedWidgets.add(taskWidget);
     }
 
-    return ReorderableListView(
-      buildDefaultDragHandles: false,
+    return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(
         AppTheme.screenPad,
@@ -445,50 +439,6 @@ class _FolderContent extends StatelessWidget {
         AppTheme.screenPad,
         80,
       ),
-      onReorderItem: (oldIndex, newIndex) {
-        if (!canReorder) return;
-        if (oldIndex < newIndex) newIndex -= 1;
-        final sc = subfolders.length;
-        final taskCount = inProgress.length + completed.length;
-        if (oldIndex < sc) {
-          if (sc == 0) return;
-          final targetIndex = newIndex.clamp(0, sc - 1).toInt();
-          context.read<TaskProvider>().reorderSubfolders(
-            folder.id,
-            oldIndex,
-            targetIndex,
-          );
-          return;
-        }
-        if (taskCount == 0) return;
-        final oldTaskIndex = oldIndex - sc;
-        final targetTaskIndex = (newIndex - sc).clamp(0, taskCount - 1).toInt();
-        final activeCount = inProgress.length;
-        final oldIsActive = oldTaskIndex < activeCount;
-        final targetIsActive = targetTaskIndex < activeCount;
-        if (oldIsActive != targetIsActive) return;
-
-        final orderedTaskIds = [
-          ...inProgress.map((task) => task.id),
-          ...completed.map((task) => task.id),
-        ];
-        final movedId = orderedTaskIds.removeAt(oldTaskIndex);
-        orderedTaskIds.insert(targetTaskIndex, movedId);
-        context.read<TaskProvider>().reorderFolderTasks(
-          folder.id,
-          oldTaskIndex,
-          targetTaskIndex,
-          orderedTaskIds: orderedTaskIds,
-        );
-      },
-      proxyDecorator: (child, index, animation) {
-        return AnimatedBuilder(
-          animation: animation,
-          builder:
-              (context, child) => Transform.scale(scale: 1.03, child: child),
-          child: child,
-        );
-      },
       children: [
         for (var i = 0; i < subfolders.length; i++)
           Padding(
@@ -496,8 +446,6 @@ class _FolderContent extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: FolderRow(
               folder: subfolders[i],
-              reorderIndex: i,
-              showReorderHandle: canReorder,
               onSwipeToParent:
                   () => _moveFolderToParent(context, subfolders[i].id),
             ),
@@ -508,8 +456,6 @@ class _FolderContent extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: TaskRow(
               task: inProgress[i],
-              reorderIndex: subfolders.length + i,
-              showReorderHandle: canReorder,
               onSwipeToParent:
                   () => _moveTaskToParent(context, inProgress[i].id),
             ),

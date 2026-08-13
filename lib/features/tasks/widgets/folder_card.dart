@@ -19,16 +19,12 @@ import '../../settings/providers/settings_provider.dart';
 class FolderRow extends StatefulWidget {
   final FolderItem folder;
   final bool enableDrag;
-  final int? reorderIndex;
-  final bool showReorderHandle;
   final VoidCallback? onSwipeToParent;
 
   const FolderRow({
     super.key,
     required this.folder,
     this.enableDrag = true,
-    this.reorderIndex,
-    this.showReorderHandle = false,
     this.onSwipeToParent,
   });
 
@@ -249,8 +245,6 @@ class _FolderRowState extends State<FolderRow> {
                   ),
                 ),
               ),
-              if (widget.showReorderHandle && widget.reorderIndex != null)
-                _reorderHandle(textSecondary),
               if (!widget.folder.isSystemStreak)
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -439,29 +433,6 @@ class _FolderRowState extends State<FolderRow> {
           const SizedBox(width: 8),
           Icon(Icons.reply, color: color, size: 22),
         ],
-      ),
-    );
-  }
-
-  Widget _reorderHandle(Color color) {
-    final settings = context.read<SettingsProvider>();
-    return ReorderableDragStartListener(
-      index: widget.reorderIndex!,
-      child: Semantics(
-        button: true,
-        label: settings.tr('reorder_item'),
-        child: Tooltip(
-          message: settings.tr('reorder_item'),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Icon(
-              Icons.drag_handle,
-              key: const ValueKey('folder-reorder-handle'),
-              color: color,
-              size: 24,
-            ),
-          ),
-        ),
       ),
     );
   }

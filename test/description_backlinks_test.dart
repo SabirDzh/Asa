@@ -294,4 +294,29 @@ void main() {
     expect(selected?.id, 'knowledge-task');
     provider.dispose();
   });
+
+  testWidgets('renders a backlink snippet as the subtitle', (tester) async {
+    final task = TaskItem(id: 't1', title: 'Read book');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: DescriptionBacklinks(
+              tags: const {},
+              backlinks: [task],
+              relatedTasks: const [],
+              onTagTap: (_) {},
+              onTaskTap: (_) {},
+              tagsLabel: 'Tags',
+              backlinksLabel: 'Backlinks',
+              relatedLabel: 'Related',
+              backlinkSnippet: (task) => 'Depends on [[Read book|the book]].',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('Depends on'), findsOneWidget);
+  });
 }

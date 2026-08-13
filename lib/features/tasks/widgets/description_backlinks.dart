@@ -13,6 +13,7 @@ class DescriptionBacklinks extends StatelessWidget {
   final String backlinksLabel;
   final String relatedLabel;
   final String Function(TaskItem task)? taskSubtitle;
+  final String Function(TaskItem task)? backlinkSnippet;
 
   const DescriptionBacklinks({
     super.key,
@@ -25,6 +26,7 @@ class DescriptionBacklinks extends StatelessWidget {
     required this.backlinksLabel,
     required this.relatedLabel,
     this.taskSubtitle,
+    this.backlinkSnippet,
   });
 
   @override
@@ -68,13 +70,27 @@ class DescriptionBacklinks extends StatelessWidget {
             if (tags.isNotEmpty) const SizedBox(height: 12),
             _sectionLabel(context, backlinksLabel),
             const SizedBox(height: 4),
-            _taskList(context, backlinks, keyPrefix: 'backlink'),
+            _taskList(
+              context,
+              backlinks,
+              keyPrefix: 'backlink',
+              subtitle:
+                  (task) =>
+                      backlinkSnippet?.call(task) ??
+                      (taskSubtitle?.call(task) ?? _defaultSubtitle(task)),
+            ),
           ],
           if (relatedTasks.isNotEmpty) ...[
             const SizedBox(height: 12),
             _sectionLabel(context, relatedLabel),
             const SizedBox(height: 4),
-            _taskList(context, relatedTasks, keyPrefix: 'related'),
+            _taskList(
+              context,
+              relatedTasks,
+              keyPrefix: 'related',
+              subtitle:
+                  (task) => taskSubtitle?.call(task) ?? _defaultSubtitle(task),
+            ),
           ],
         ],
       ),
@@ -93,6 +109,7 @@ class DescriptionBacklinks extends StatelessWidget {
     BuildContext context,
     List<TaskItem> tasks, {
     required String keyPrefix,
+    required String Function(TaskItem task) subtitle,
   }) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 224),
@@ -103,10 +120,13 @@ class DescriptionBacklinks extends StatelessWidget {
         itemCount: tasks.length,
         itemBuilder: (context, index) {
           final task = tasks[index];
-          final subtitle = taskSubtitle?.call(task) ?? _defaultSubtitle(task);
+          final taskSubtitle = subtitle(task);
           return Semantics(
             button: true,
-            label: subtitle.isEmpty ? task.title : '${task.title}, $subtitle',
+            label:
+                taskSubtitle.isEmpty
+                    ? task.title
+                    : '${task.title}, $taskSubtitle',
             child: ListTile(
               key: ValueKey('description-$keyPrefix-${task.id}'),
               contentPadding: EdgeInsets.zero,
@@ -122,10 +142,10 @@ class DescriptionBacklinks extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle:
-                  subtitle.isEmpty
+                  taskSubtitle.isEmpty
                       ? null
                       : Text(
-                        subtitle,
+                        taskSubtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),

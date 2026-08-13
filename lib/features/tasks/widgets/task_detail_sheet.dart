@@ -692,9 +692,11 @@ class _TaskDetailSheet extends StatelessWidget {
                 Builder(
                   builder: (context) {
                     final tags = taskProvider.tagsForTask(currentTask.id);
-                    final backlinks = taskProvider.backlinksForTask(
+                    final contexts = taskProvider.backlinkContextsForTask(
                       currentTask.id,
                     );
+                    final backlinks =
+                        contexts.map((context) => context.task).toList();
                     final related = _relatedTasks(taskProvider, currentTask);
                     if (tags.isEmpty && backlinks.isEmpty && related.isEmpty) {
                       return const SizedBox.shrink();
@@ -708,6 +710,13 @@ class _TaskDetailSheet extends StatelessWidget {
                       backlinksLabel: settings.tr('description_backlinks'),
                       relatedLabel: settings.tr('description_related'),
                       taskSubtitle: (task) => _taskSubtitle(context, task),
+                      backlinkSnippet:
+                          (task) =>
+                              contexts
+                                  .firstWhere(
+                                    (context) => context.task.id == task.id,
+                                  )
+                                  .snippet,
                       onTagTap:
                           (tag) => unawaited(
                             showKnowledgeSearchSheet(

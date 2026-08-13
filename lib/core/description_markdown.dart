@@ -23,6 +23,10 @@ const int kDescriptionPreviewLength = 150;
 const String kAttachmentMentionScheme = 'attachment';
 const String kDescriptionWikilinkScheme = 'asa-wikilink';
 const String kDescriptionTagScheme = 'asa-tag';
+const String kDescriptionBlockScheme = 'asa-block';
+const String kDescriptionEmbedScheme = 'asa-embed';
+const String kDescriptionBlockEmbedScheme = 'asa-embed-block';
+const int kMaxDescriptionEmbedDepth = 1;
 
 bool isSafeDescriptionHref(String href) {
   return normalizeTaskAttachmentLink(href) != null;
@@ -266,6 +270,25 @@ String _descriptionInternalHref(String scheme, String value) {
   return '$scheme://link?value=${Uri.encodeQueryComponent(value)}';
 }
 
+String _descriptionBlockHref(String target, String blockId) {
+  return '$kDescriptionBlockScheme://link?value=${Uri.encodeQueryComponent(target)}&block=${Uri.encodeQueryComponent(blockId)}';
+}
+
+String _descriptionBlockEmbedHref(String target, String blockId) {
+  return '$kDescriptionBlockEmbedScheme://link?value=${Uri.encodeQueryComponent(target)}&block=${Uri.encodeQueryComponent(blockId)}';
+}
+
+({String value, String? block}) _descriptionBlockValue(
+  String href,
+  String scheme,
+) {
+  final uri = Uri.tryParse(href);
+  if (uri == null || uri.scheme != scheme) return (value: '', block: null);
+  final value = uri.queryParameters['value']?.trim() ?? '';
+  final block = uri.queryParameters['block']?.trim();
+  return (value: value, block: (block == null || block.isEmpty) ? null : block);
+}
+
 TaskAttachment? _findDescriptionAttachment(
   String target,
   List<TaskAttachment> attachments,
@@ -300,25 +323,48 @@ String prepareDescriptionMarkdown(
               ? reference.alias!
               : reference.target,
         );
-        replacements.add((
-          start: reference.start,
-          end: reference.end,
-          value:
-              '[$label](${_descriptionInternalHref(kDescriptionWikilinkScheme, reference.target)})',
-        ));
+        if (reference.blockId != null) {
+          replacements.add((
+            start: reference.start,
+            end: reference.end,
+            value:
+                '[$label](${_descriptionBlockHref(reference.target, reference.blockId!)})',
+          ));
+        } else {
+          replacements.add((
+            start: reference.start,
+            end: reference.end,
+            value:
+                '[$label](${_descriptionInternalHref(kDescriptionWikilinkScheme, reference.target)})',
+          ));
+        }
       case DescriptionReferenceType.embed:
         final attachment = _findDescriptionAttachment(
           reference.target,
           attachments,
         );
-        replacements.add((
-          start: reference.start,
-          end: reference.end,
-          value:
-              attachment == null
-                  ? '[Missing attachment: ${_escapeMarkdownLabel(reference.target)}]'
-                  : attachmentEmbedMarkdown(attachment),
-        ));
+        final label = _escapeMarkdownLabel(reference.target);
+        if (attachment != null) {
+          replacements.add((
+            start: reference.start,
+            end: reference.end,
+            value: attachmentEmbedMarkdown(attachment),
+          ));
+        } else if (reference.blockId != null) {
+          replacements.add((
+            start: reference.start,
+            end: reference.end,
+            value:
+                '![$label](${_descriptionBlockEmbedHref(reference.target, reference.blockId!)})',
+          ));
+        } else {
+          replacements.add((
+            start: reference.start,
+            end: reference.end,
+            value:
+                '![$label](${_descriptionInternalHref(kDescriptionEmbedScheme, reference.target)})',
+          ));
+        }
       case DescriptionReferenceType.tag:
         final label = _escapeMarkdownLabel(reference.raw);
         replacements.add((
@@ -328,7 +374,12 @@ String prepareDescriptionMarkdown(
               '[$label](${_descriptionInternalHref(kDescriptionTagScheme, reference.target)})',
         ));
       case DescriptionReferenceType.blockReference:
-        break;
+        replacements.add((
+          start: reference.start,
+          end: reference.end,
+          value:
+              '[${_escapeMarkdownLabel(reference.raw)}](${_descriptionInternalHref(kDescriptionBlockScheme, reference.target)})',
+        ));
     }
   }
   var prepared = source;
@@ -431,6 +482,71 @@ class DescriptionLinkBuilder extends MarkdownElementBuilder {
     final href = element.attributes['href'];
     final label = element.textContent;
     if (href == null) return null;
+
+    final blockRef = _descriptionBlockValue(href, kDescriptionBlockScheme);
+    if (blockRef.block == null && blockRef.value.isNotEmpty) {
+      return _blockRefChip(
+        label,
+        blockRef.value,
+        accentColor,
+        onTap:
+            renderContext?.onBlockTap == null
+                ? null
+                : () => renderContext!.onBlockTap!(blockRef.value),
+      );
+    }
+    if (blockRef.block != null) {
+      final blockId = blockRef.block!;
+      if (blockRef.value.isEmpty) {
+        return _blockRefChip(
+          label,
+          blockId,
+          accentColor,
+          onTap:
+              renderContext?.onBlockTap == null
+                  ? null
+                  : () => renderContext!.onBlockTap!(blockId),
+        );
+      }
+      final resolution =
+          renderContext?.resolveLink?.call(blockRef.value) ??
+          DescriptionLinkResolution(
+            target: blockRef.value,
+            task: null,
+            candidates: const [],
+          );
+      final color = resolution.isResolved ? accentColor : Colors.orange;
+      return Semantics(
+        link: true,
+        label: label,
+        child: InkWell(
+          key: ValueKey('markdown-block-link-$blockId'),
+          onTap:
+              renderContext?.onBlockLinkTap == null
+                  ? null
+                  : () => renderContext!.onBlockLinkTap!(resolution, blockId),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.link, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style:
+                    (preferredStyle ?? parentStyle)?.copyWith(
+                      color: color,
+                      decoration:
+                          resolution.isUnresolved
+                              ? TextDecoration.underline
+                              : TextDecoration.none,
+                    ) ??
+                    TextStyle(color: color),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     final wikilinkTarget = _descriptionSchemeValue(
       href,
@@ -600,6 +716,38 @@ class DescriptionLinkBuilder extends MarkdownElementBuilder {
       ),
     );
   }
+
+  Widget _blockRefChip(
+    String label,
+    String blockId,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        key: ValueKey('markdown-block-$blockId'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 String _markdownFromNode(md.Node node) {
@@ -717,6 +865,79 @@ Widget _descriptionAttachmentEmbed(
     attachment: attachment,
     accentColor: accentColor,
     onTap: onTap,
+  );
+}
+
+Widget _taskEmbed(
+  String target,
+  String? blockId,
+  DescriptionRenderContext? renderContext,
+  int depth,
+  Color textColor,
+  List<TaskAttachment> attachments,
+  DescriptionAttachmentTap onAttachmentTap,
+  DescriptionExternalLinkTap? onExternalLinkTap,
+) {
+  if (depth >= kMaxDescriptionEmbedDepth) {
+    return Text('[[$target]]', style: TextStyle(color: textColor));
+  }
+  if (blockId != null) {
+    final block = renderContext?.resolveBlock?.call(blockId);
+    if (block == null || !block.isResolved) {
+      return _unresolvedEmbed(target.isEmpty ? blockId : '$target#^$blockId');
+    }
+    return _embedContainer(
+      target.isEmpty ? blockId : target,
+      DescriptionBody(
+        text: block.text,
+        format: DescriptionFormat.markdown,
+        attachments: const [],
+        onAttachmentTap: onAttachmentTap,
+        onExternalLinkTap: onExternalLinkTap,
+        renderContext: renderContext,
+        embedDepth: depth + 1,
+      ),
+    );
+  }
+  final content = renderContext?.resolveEmbed?.call(target);
+  if (content == null) return _unresolvedEmbed(target);
+  return _embedContainer(
+    target,
+    DescriptionBody(
+      text: content.text,
+      format: content.format,
+      attachments: content.attachments,
+      onAttachmentTap: onAttachmentTap,
+      onExternalLinkTap: onExternalLinkTap,
+      renderContext: renderContext,
+      embedDepth: depth + 1,
+    ),
+  );
+}
+
+Widget _embedContainer(String target, Widget child) {
+  return Container(
+    key: ValueKey('description-embed-$target'),
+    width: double.infinity,
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: child,
+  );
+}
+
+Widget _unresolvedEmbed(String target) {
+  return Container(
+    key: ValueKey('description-embed-missing-$target'),
+    padding: const EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: Colors.orange.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text('[[$target]]', style: const TextStyle(color: Colors.orange)),
   );
 }
 
@@ -873,6 +1094,7 @@ class DescriptionBody extends StatelessWidget {
   final DescriptionExternalLinkTap? onExternalLinkTap;
   final DescriptionRenderContext? renderContext;
   final bool selectable;
+  final int embedDepth;
 
   const DescriptionBody({
     super.key,
@@ -883,6 +1105,7 @@ class DescriptionBody extends StatelessWidget {
     required this.onExternalLinkTap,
     this.renderContext,
     this.selectable = false,
+    this.embedDepth = 0,
   });
 
   @override
@@ -915,16 +1138,48 @@ class DescriptionBody extends StatelessWidget {
             mention == null
                 ? null
                 : _findDescriptionAttachment(mention.id, attachments);
-        if (attachment == null) {
-          return Text(
-            '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}]',
+        if (attachment != null) {
+          return _descriptionAttachmentEmbed(
+            attachment,
+            alt,
+            AppColors.primary,
+            renderContext?.onAttachmentEmbedTap,
           );
         }
-        return _descriptionAttachmentEmbed(
-          attachment,
-          alt,
-          AppColors.primary,
-          renderContext?.onAttachmentEmbedTap,
+        final embedValue = _descriptionSchemeValue(
+          uri.toString(),
+          kDescriptionEmbedScheme,
+        );
+        if (embedValue != null) {
+          return _taskEmbed(
+            embedValue,
+            null,
+            renderContext,
+            embedDepth,
+            textColor,
+            attachments,
+            onAttachmentTap,
+            onExternalLinkTap,
+          );
+        }
+        final blockEmbed = _descriptionBlockValue(
+          uri.toString(),
+          kDescriptionBlockEmbedScheme,
+        );
+        if (blockEmbed.block != null) {
+          return _taskEmbed(
+            blockEmbed.value,
+            blockEmbed.block,
+            renderContext,
+            embedDepth,
+            textColor,
+            attachments,
+            onAttachmentTap,
+            onExternalLinkTap,
+          );
+        }
+        return Text(
+          '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}]',
         );
       },
       builders: {

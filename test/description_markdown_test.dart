@@ -377,6 +377,58 @@ void main() {
     expect(find.text('[remote]'), findsOneWidget);
     expect(find.byType(Image), findsNothing);
   });
+
+  test('prepares block references, block links, and task embeds', () {
+    final prepared = prepareDescriptionMarkdown(
+      '^key-point [[Read book#^intro]] [[#^same]] ![[Read book]] '
+      '![[Read book#^note]]',
+      const [],
+    );
+
+    expect(prepared, contains('asa-block://link?value=key-point'));
+    expect(prepared, contains('asa-block://link?value=Read+book&block=intro'));
+    expect(prepared, contains('asa-block://link?value=&block=same'));
+    expect(prepared, contains('asa-embed://link?value=Read+book'));
+    expect(
+      prepared,
+      contains('asa-embed-block://link?value=Read+book&block=note'),
+    );
+  });
+
+  testWidgets('renders a tappable block chip and block link', (tester) async {
+    String? tappedBlock;
+    String? tappedBlockLink;
+    final target = TaskItem(id: 'read-book', title: 'Read book');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DescriptionBody(
+            text: '^key-point and [[Read book#^intro]]',
+            format: DescriptionFormat.markdown,
+            attachments: const [],
+            onAttachmentTap: (_) {},
+            onExternalLinkTap: null,
+            renderContext: DescriptionRenderContext(
+              resolveLink:
+                  (value) => DescriptionLinkResolution(
+                    target: value,
+                    task: target,
+                    candidates: [target],
+                  ),
+              onBlockTap: (id) => tappedBlock = id,
+              onBlockLinkTap: (resolution, id) => tappedBlockLink = id,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('markdown-block-key-point')));
+    expect(tappedBlock, 'key-point');
+    await tester.tap(find.byKey(const ValueKey('markdown-block-link-intro')));
+    expect(tappedBlockLink, 'intro');
+  });
 }
 
 void _ignoreAttachment(TaskAttachment attachment) {}

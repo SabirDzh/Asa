@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/app_strings.dart';
 import '../../../core/calendar_service.dart';
+import '../../../core/description_format.dart';
 import '../../../core/home_widget_service.dart';
 import '../../../core/input_utils.dart';
 import '../../../core/logger_service.dart';
@@ -152,6 +153,21 @@ class TaskProvider with ChangeNotifier {
 
   DescriptionBlockResolution resolveDescriptionBlock(String blockId) {
     return _descriptionIndex.resolveBlock(blockId);
+  }
+
+  DescriptionEmbedContent? resolveDescriptionEmbed(String target) {
+    final resolution = _descriptionIndex.resolve(target);
+    if (!resolution.isResolved) return null;
+    final task = resolution.task!;
+    final blocks =
+        task.infoBlocks
+            .where((block) => block.type == TaskInfoBlockType.description)
+            .toList();
+    return DescriptionEmbedContent(
+      text: blocks.map((block) => block.text).join('\n\n'),
+      format: DescriptionFormat.markdown,
+      attachments: [for (final block in blocks) ...block.attachments],
+    );
   }
 
   List<DescriptionBacklinkContext> backlinkContextsForTask(String taskId) {

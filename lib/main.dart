@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-import 'core/permission_gate.dart';
 import 'core/theme.dart';
 import 'core/notification_service.dart';
 import 'core/scale_utils.dart';
@@ -48,6 +47,8 @@ class AsaApp extends StatefulWidget {
 class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   StreamSubscription<Uri?>? _widgetClickSubscription;
+  SettingsProvider? _settings;
+  TaskProvider? _tasks;
 
   @override
   void initState() {
@@ -60,11 +61,24 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       unawaited(_initializeNonCriticalServices());
     });
     final tasks = context.read<TaskProvider>();
+    _tasks = tasks;
+    final settings = context.read<SettingsProvider>();
+    _settings = settings;
+    settings.addListener(_syncTaskLanguage);
     NotificationService.onStartTimerRequested = (taskId) async {
       await tasks.ready;
       tasks.startTimer(taskId);
     };
     _consumePendingTimerAction(tasks);
+  }
+
+  /// Applies the active language to the task layer so language-dependent
+  /// content (for example the streak folder name) stays in sync at runtime.
+  void _syncTaskLanguage() {
+    final settings = _settings;
+    final tasks = _tasks;
+    if (settings == null || tasks == null) return;
+    tasks.setLanguage(settings.languageCode);
   }
 
   Future<void> _initializeNonCriticalServices() async {
@@ -92,6 +106,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       final tasks = context.read<TaskProvider>();
       await tasks.ready;
       if (!mounted) return;
+      tasks.setLanguage(settings.languageCode);
       await _consumePendingWidgetCompletion(tasks);
       final initialWidgetUri =
           await HomeWidgetService.initiallyLaunchedFromWidget();
@@ -99,12 +114,9 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
         unawaited(_handleWidgetUri(initialWidgetUri));
       }
       // Do not request the runtime notification permission automatically at
-      // launch. On first run the setup screen is the single place that asks
-      // for it; auto-requesting here raced with the setup button (the plugin
-      // rejects a second request while one is in flight), so the button could
-      // silently do nothing. For already-onboarded users the permission is
-      // already granted, and when it was revoked behind the app's back the
-      // passive sync below keeps the toggle honest without a surprise dialog.
+      // launch; the settings toggle is the single place that asks for it. For
+      // users whose permission was revoked behind the app's back, the passive
+      // sync below keeps the toggle honest without a surprise dialog.
       if (mounted) {
         await settings.syncNotificationPermission();
       }
@@ -193,6 +205,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     NotificationService.onStartTimerRequested = null;
+    _settings?.removeListener(_syncTaskLanguage);
     _widgetClickSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -263,9 +276,7 @@ class _AsaAppState extends State<AsaApp> with WidgetsBindingObserver {
       home: const SplashScreen(),
       onGenerateRoute: (settings) {
         if (settings.name == '/home') {
-          return MaterialPageRoute<void>(
-            builder: (_) => const PermissionGate(child: HomeScreen()),
-          );
+          return MaterialPageRoute<void>(builder: (_) => const HomeScreen());
         }
         return null;
       },

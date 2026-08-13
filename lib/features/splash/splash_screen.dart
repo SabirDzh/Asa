@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/device_permissions.dart';
-import '../../../core/permission_gate.dart';
 import '../../../core/sync_service.dart';
 import '../../../core/logger_service.dart';
 import '../../../core/theme.dart';
@@ -14,7 +13,7 @@ import '../tasks/providers/task_provider.dart';
 import '../tasks/screens/home_screen.dart';
 
 /// Initial loading screen.
-/// Waits for both providers to finish their async init, then fades into PermissionGate(HomeScreen).
+/// Waits for both providers to finish their async init, then fades into HomeScreen.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -25,6 +24,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   late final Future<void> _readyFuture;
   bool _updateChecked = false;
+  bool _syncStarted = false;
 
   @override
   void initState() {
@@ -110,10 +110,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
         final settings = context.read<SettingsProvider>();
         final tasks = context.read<TaskProvider>();
-        return PermissionGate(
-          onReady: () => _startSyncSafely(settings, tasks),
-          child: const HomeScreen(),
-        );
+        if (!_syncStarted) {
+          _syncStarted = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            unawaited(_startSyncSafely(settings, tasks));
+          });
+        }
+        return const HomeScreen();
       },
     );
   }

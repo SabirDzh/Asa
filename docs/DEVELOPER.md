@@ -1,7 +1,7 @@
 # ASA — Developer Documentation
 
 > **Audience:** engineers joining the project, maintainers, and anyone who wants to extend the app.  
-> **Last updated:** 2026-08-12
+> **Last updated:** 2026-08-13
 > **Project:** [`pubspec.yaml`](../pubspec.yaml)
 
 ---
@@ -333,7 +333,7 @@ if (settings.syncEnabled) {
 
 [`lib/core/version_service.dart`](../lib/core/version_service.dart)
 
-Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, or every 24 hours after the user postpones. The update dialog (`lib/core/update_dialog.dart`) can download the release APK in-app and open the system package installer via `open_filex` on Android (`UpdateChecker.downloadUpdate` / `installUpdate`). Release history is available through `fetchReleaseHistory()` (GitHub `/releases` list with a `SharedPreferences` cache fallback) and powers the "What's New" screen. The displayed app version comes from `VersionService.currentVersion`, which reads the compile-time `--dart-define=APP_VERSION` (defaulting to the `pubspec.yaml` version) so it never drifts.
+Checks GitHub releases for `SabirDzh/Asa`. Prompts at most once every 12 hours, or every 24 hours after the user postpones. The update dialog (`lib/core/update_dialog.dart`) can download the release APK in-app and open the system package installer via `open_filex` on Android (`UpdateChecker.downloadUpdate` / `installUpdate`). Release history is available through `fetchReleaseHistory()` (GitHub `/releases` list with a `SharedPreferences` cache fallback). The displayed app version comes from `VersionService.currentVersion`, which reads the compile-time `--dart-define=APP_VERSION` (defaulting to the `pubspec.yaml` version) so it never drifts.
 
 ### 7.9 LoggerService
 
@@ -533,8 +533,7 @@ release flow:
    GitHub REST API with `GITHUB_TOKEN`.
 
 In-app updates download the release's arm64 APK and open the system package
-installer (`open_filex`). The "What's New" screen shows release history from the
-GitHub `/releases` endpoint with a local cache fallback.
+installer (`open_filex`).
 
 ### 12.6 Run tests
 
@@ -542,7 +541,7 @@ GitHub `/releases` endpoint with a local cache fallback.
 flutter test
 ```
 
-For the current review evidence, the focused non-widget suite passes (144 tests). The full/widget suite currently has environment-level hangs in `folder_detail_screen_test.dart` and `task_folder_popup_menu_test.dart` after test startup; do not report the full suite as passing until those hangs are diagnosed.
+The full suite currently passes (`flutter test`, 495 tests), including the widget tests that previously hung after test startup in `folder_detail_screen_test.dart` and `task_folder_popup_menu_test.dart`.
 
 On Android, the app requests notification access at startup when notifications are enabled and synchronizes reminders only after the task provider has loaded. Exact-alarm access is requested from the explicit notification setting; if it is unavailable, scheduling falls back to an inexact alarm. If the start time has already passed today, a daily reminder is scheduled for the next day. A scheduled period such as 22:01–22:02 is the planned one-minute window; the manual elapsed timer is shown as actual time and remains 0:00 until the user starts it.
 
@@ -659,6 +658,7 @@ flutter build ios --release
 The following checks were completed during the standards remediation:
 
 * `dart analyze` — passed with no issues.
+* `flutter test` — passed (495 tests).
 * Repository-wide `dart format --output=none --set-exit-if-changed .` — passed after the formatting-only commit `3427d11`.
 * Android `:app:processDebugResources` and `:app:compileDebugKotlin` — passed.
 * Android arm64 release — passed; output is `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (approximately 21.6 MB, ignored build output).

@@ -8,8 +8,10 @@ import '../services/description_index.dart';
 import '../services/description_link_resolver.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/app_strings.dart';
 import '../../../core/calendar_service.dart';
 import '../../../core/home_widget_service.dart';
+import '../../../core/input_utils.dart';
 import '../../../core/logger_service.dart';
 import '../../../core/notification_service.dart';
 import '../../../core/task_attachment_service.dart';
@@ -78,6 +80,7 @@ class TaskProvider with ChangeNotifier {
   int _tasksVersion = 0;
   int _foldersVersion = 0;
   String? _lastViewedFolderName;
+  String _languageCode = 'ru';
 
   void _rebuildDescriptionIndex() {
     _descriptionIndex.rebuild(_tasks, _folders);
@@ -171,6 +174,28 @@ class TaskProvider with ChangeNotifier {
   void setLastViewedFolderName(String? name) {
     _lastViewedFolderName = name;
   }
+
+  /// Keeps the streak folder name in sync with the active app language.
+  ///
+  /// The name is persisted, but it is also re-derived on every startup from
+  /// the saved language, so a runtime switch only needs to rename the live
+  /// record for the current session.
+  void setLanguage(String languageCode) {
+    if (languageCode != 'ru' && languageCode != 'en') return;
+    if (languageCode == _languageCode) return;
+    _languageCode = languageCode;
+    final index = _folders.indexWhere((f) => f.isSystemStreak);
+    if (index == -1) return;
+    final folder = _folders[index];
+    final newName = _streakFolderName(_streakCount);
+    if (folder.name == newName) return;
+    _folders[index] = folder.copyWith(name: newName);
+    _notifyFoldersChanged();
+    _saveToPrefs(waitForReady: false);
+  }
+
+  String _streakFolderName(int count) =>
+      AppStrings.streakFolderName(_languageCode, count);
 
   // ── Persistence methods ─────────────────────────────────────
   /// Coalesces rapid mutations into one snapshot, then serializes writes so a
@@ -566,11 +591,11 @@ class TaskProvider with ChangeNotifier {
         final todayDate = DateTime(now.year, now.month, now.day);
         final daysDiff = todayDate.difference(lastDate).inDays;
 
+        // Consecutive day increments the streak. One missed day keeps it as a
+        // grace day; two or more missed days reset it to 1.
         if (daysDiff == 1) {
           currentStreak += 1;
-        } else if (daysDiff == 3) {
-          currentStreak = (currentStreak - 1).clamp(1, 9999);
-        } else if (daysDiff >= 4) {
+        } else if (daysDiff >= 3) {
           currentStreak = 1;
         }
       } catch (_) {
@@ -582,7 +607,7 @@ class TaskProvider with ChangeNotifier {
     await prefs.setString('lastLoginDate', todayStr);
     await prefs.setInt('streakCount', _streakCount);
 
-    final streakFolderName = 'День $_streakCount';
+    final streakFolderName = _streakFolderName(_streakCount);
     final existingIndex = _folders.indexWhere((f) => f.isSystemStreak);
 
     if (existingIndex != -1) {
@@ -975,7 +1000,7 @@ class TaskProvider with ChangeNotifier {
   }) {
     if (title.isEmpty) return;
     if (title.length > 250) {
-      throw Exception('Название длиннее 250 символов');
+      throw const TitleTooLongException();
     }
     _validateInfoBlocks(infoBlocks);
     _tasks.add(
@@ -1009,6 +1034,9 @@ class TaskProvider with ChangeNotifier {
 
   /// Upserts a task during import/sync, updating the existing record if it
   /// already exists. Returns true if the item was changed.
+  ///
+  /// Mutates in-memory state only; the bulk import/sync flow finalizes the
+  /// batch with [persist], which notifies listeners and flushes once.
   bool upsertTask(TaskItem task) {
     final normalizedTask = _normalizeImportedTask(task);
     final index = _tasks.indexWhere((t) => t.id == normalizedTask.id);
@@ -1021,14 +1049,10 @@ class TaskProvider with ChangeNotifier {
     );
     if (index == -1) {
       _tasks.add(normalizedTask);
-      _notifyTasksChanged();
-      _saveToPrefs();
       return true;
     }
     if (normalizedTask.updatedAt.isAfter(_tasks[index].updatedAt)) {
       _tasks[index] = normalizedTask;
-      _notifyTasksChanged();
-      _saveToPrefs();
       return true;
     }
     return false;
@@ -1287,7 +1311,7 @@ class TaskProvider with ChangeNotifier {
     List<TaskInfoBlock>? infoBlocks,
   }) {
     if (newTitle.length > 250) {
-      throw Exception('Название длиннее 250 символов');
+      throw const TitleTooLongException();
     }
     final index = _tasks.indexWhere((t) => t.id == id);
     if (infoBlocks != null) {
@@ -1707,7 +1731,7 @@ class TaskProvider with ChangeNotifier {
   void addFolder(String name, {String? parentFolderId, String? iconAsset}) {
     if (name.isEmpty) return;
     if (name.length > 250) {
-      throw Exception('Название длиннее 250 символов');
+      throw const TitleTooLongException();
     }
     if (parentFolderId != null &&
         (!_folders.any((f) => f.id == parentFolderId && !f.isDeleted) ||
@@ -1741,6 +1765,9 @@ class TaskProvider with ChangeNotifier {
 
   /// Upserts a folder during import/sync, updating the existing record if it
   /// already exists. Returns true if the item was changed.
+  ///
+  /// Mutates in-memory state only; the bulk import/sync flow finalizes the
+  /// batch with [persist], which notifies listeners and flushes once.
   bool upsertFolder(FolderItem folder) {
     if (folder.id == 'system_streak_folder' ||
         folder.isSystemStreak ||
@@ -1771,6 +1798,10 @@ class TaskProvider with ChangeNotifier {
     // them so a stale peer cannot keep resurrecting deleted data.
     await _purgeSoftDeletedItems();
     _notifyTasksAndFoldersChanged();
+    // Bulk upserts mutate in-memory state without marking individual saves;
+    // mark a pending write so flushPersistence serializes the whole batch
+    // (including folder-only imports that have no task upserts).
+    _saveToPrefs(waitForReady: false);
     await flushPersistence();
   }
 
@@ -1778,7 +1809,7 @@ class TaskProvider with ChangeNotifier {
     final index = _folders.indexWhere((f) => f.id == id);
     if (index != -1 && !_folders[index].isSystemStreak) {
       if (newName.length > 250) {
-        throw Exception('Название длиннее 250 символов');
+        throw const TitleTooLongException();
       }
       _folders[index] = _folders[index].copyWith(
         name: newName,

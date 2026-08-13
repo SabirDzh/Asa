@@ -726,7 +726,10 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
-        _submitError = error.toString().replaceFirst('FormatException: ', '');
+        _submitError =
+            error is TitleTooLongException
+                ? _settings.tr('error_title_too_long')
+                : error.toString().replaceFirst('FormatException: ', '');
       });
     }
   }

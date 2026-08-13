@@ -1651,33 +1651,33 @@ void main() {
     );
 
     group('upsertTask / upsertFolder', () {
-      test(
-        'upsertTask adds a new task and refreshes knowledge state',
-        () async {
-          await provider.ready;
-          final task = TaskItem(
-            id: 't1',
-            title: 'New',
-            infoBlocks: [
-              TaskInfoBlock.description(
-                id: 'details',
-                text: 'A note about #imported.',
-              ),
-            ],
-          );
-          var notifications = 0;
-          provider.addListener(() => notifications++);
+      test('upsertTask adds a new task and persists via persist()', () async {
+        await provider.ready;
+        final task = TaskItem(
+          id: 't1',
+          title: 'New',
+          infoBlocks: [
+            TaskInfoBlock.description(
+              id: 'details',
+              text: 'A note about #imported.',
+            ),
+          ],
+        );
+        var notifications = 0;
+        provider.addListener(() => notifications++);
 
-          final changed = provider.upsertTask(task);
+        final changed = provider.upsertTask(task);
 
-          expect(changed, true);
-          expect(provider.tasks.length, 1);
-          expect(provider.tasks.first.id, 't1');
-          expect(provider.searchKnowledge('imported').single.task.id, 't1');
-          expect(provider.tagsForTask('t1'), {'imported'});
-          expect(notifications, 1);
-        },
-      );
+        expect(changed, true);
+        expect(provider.tasks.length, 1);
+        expect(provider.tasks.first.id, 't1');
+        // The derived knowledge index is rebuilt once by persist(), matching
+        // the batch import/sync flow rather than per upsert.
+        await provider.persist();
+        expect(provider.searchKnowledge('imported').single.task.id, 't1');
+        expect(provider.tagsForTask('t1'), {'imported'});
+        expect(notifications, 1);
+      });
 
       test('upsertTask persists imported task state', () async {
         await provider.ready;

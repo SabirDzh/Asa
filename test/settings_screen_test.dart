@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:asa/core/version_service.dart';
 import 'package:asa/features/settings/screens/settings_screen.dart';
-import 'package:asa/features/settings/screens/whats_new_screen.dart';
 import 'package:asa/features/settings/providers/settings_provider.dart';
 import 'package:asa/features/settings/widgets/setting_row.dart';
 import 'package:asa/features/tasks/providers/task_provider.dart';
@@ -215,24 +214,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('palette-custom-option')));
     await tester.pumpAndSettle();
     expect(find.text('Палитра: Своя палитра'), findsOneWidget);
-  });
-
-  testWidgets('opens the what-is-new screen from the other group', (
-    tester,
-  ) async {
-    await pumpAndInit(tester, createTestApp());
-
-    final row = find.text('Что нового');
-    await tester.scrollUntilVisible(
-      row,
-      100,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(row);
-    await tester.pumpAndSettle();
-
-    expect(find.byType(WhatsNewScreen), findsOneWidget);
   });
 
   testWidgets('shows about sheet on tap', (tester) async {

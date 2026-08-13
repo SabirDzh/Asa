@@ -95,7 +95,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(e.toString().replaceAll('Exception: ', '')),
+                content: Text(
+                  e is TitleTooLongException
+                      ? settings.tr('error_title_too_long')
+                      : e.toString().replaceAll('Exception: ', ''),
+                ),
               ),
             );
           }

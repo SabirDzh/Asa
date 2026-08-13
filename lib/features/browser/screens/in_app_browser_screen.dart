@@ -39,7 +39,7 @@ Future<bool> openTaskLink(
 /// The screen accepts only HTTPS URLs for embedded browsing. HTTP links remain
 /// valid task links but use the platform browser, avoiding iOS ATS exceptions.
 /// It does not expose a JavaScript bridge, inject scripts, or persist browsing
-/// data in the app.
+/// data in the app, and it disables page scripts for a more private session.
 class InAppBrowserScreen extends StatefulWidget {
   final Uri url;
   final String? title;
@@ -115,7 +115,7 @@ class _InAppBrowserScreenState extends State<InAppBrowserScreen> {
       final controller =
           WebViewController()
             ..setBackgroundColor(Theme.of(context).scaffoldBackgroundColor)
-            ..setJavaScriptMode(JavaScriptMode.unrestricted)
+            ..setJavaScriptMode(JavaScriptMode.disabled)
             ..setNavigationDelegate(
               NavigationDelegate(
                 onProgress: (progress) {

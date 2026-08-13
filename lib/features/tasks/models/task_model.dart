@@ -58,37 +58,47 @@ class TaskItem {
     'isDeleted': isDeleted,
   };
 
-  factory TaskItem.fromJson(Map<String, dynamic> json) => TaskItem(
-    id: json['id'],
-    title: json['title'],
-    isCompleted: json['isCompleted'] ?? false,
-    folderId: json['folderId'],
-    dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
-    startTime:
-        json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
-    endTime: json['endTime'] != null ? DateTime.parse(json['endTime']) : null,
-    expectedDuration: json['expectedDuration'],
-    timerStartedAt:
-        json['timerStartedAt'] != null
-            ? DateTime.parse(json['timerStartedAt'])
-            : null,
-    timerElapsedSeconds:
-        json['timerElapsedSeconds'] is int
-            ? json['timerElapsedSeconds'] as int
-            : 0,
-    calendarId: json['calendarId'],
-    calendarEventId: json['calendarEventId'],
-    infoBlocks: _readInfoBlocks(json['infoBlocks']),
-    createdAt:
-        json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'])
-            : DateTime.now(),
-    updatedAt:
-        json['updatedAt'] != null
-            ? DateTime.parse(json['updatedAt'])
-            : DateTime.now(),
-    isDeleted: json['isDeleted'] ?? false,
-  );
+  factory TaskItem.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final title = json['title'];
+    if (id is! String || id.isEmpty) {
+      throw const FormatException('Task id must be a non-empty string');
+    }
+    if (title is! String) {
+      throw const FormatException('Task title must be a string');
+    }
+    return TaskItem(
+      id: id,
+      title: title,
+      isCompleted: json['isCompleted'] ?? false,
+      folderId: json['folderId'],
+      dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
+      startTime:
+          json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
+      endTime: json['endTime'] != null ? DateTime.parse(json['endTime']) : null,
+      expectedDuration: json['expectedDuration'],
+      timerStartedAt:
+          json['timerStartedAt'] != null
+              ? DateTime.parse(json['timerStartedAt'])
+              : null,
+      timerElapsedSeconds:
+          json['timerElapsedSeconds'] is int
+              ? json['timerElapsedSeconds'] as int
+              : 0,
+      calendarId: json['calendarId'],
+      calendarEventId: json['calendarEventId'],
+      infoBlocks: _readInfoBlocks(json['infoBlocks']),
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'])
+              : DateTime.now(),
+      updatedAt:
+          json['updatedAt'] != null
+              ? DateTime.parse(json['updatedAt'])
+              : DateTime.now(),
+      isDeleted: json['isDeleted'] ?? false,
+    );
+  }
 
   /// Duration derived from the selected period in minutes.
   /// A period whose end is earlier than its start crosses midnight.
@@ -212,22 +222,32 @@ class FolderItem {
     'isDeleted': isDeleted,
   };
 
-  factory FolderItem.fromJson(Map<String, dynamic> json) => FolderItem(
-    id: json['id'],
-    name: json['name'],
-    isSystemStreak: json['isSystemStreak'] ?? false,
-    parentFolderId: json['parentFolderId'],
-    iconAsset: json['iconAsset'],
-    createdAt:
-        json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'])
-            : DateTime.now(),
-    updatedAt:
-        json['updatedAt'] != null
-            ? DateTime.parse(json['updatedAt'])
-            : DateTime.now(),
-    isDeleted: json['isDeleted'] ?? false,
-  );
+  factory FolderItem.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final name = json['name'];
+    if (id is! String || id.isEmpty) {
+      throw const FormatException('Folder id must be a non-empty string');
+    }
+    if (name is! String) {
+      throw const FormatException('Folder name must be a string');
+    }
+    return FolderItem(
+      id: id,
+      name: name,
+      isSystemStreak: json['isSystemStreak'] ?? false,
+      parentFolderId: json['parentFolderId'],
+      iconAsset: json['iconAsset'],
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'])
+              : DateTime.now(),
+      updatedAt:
+          json['updatedAt'] != null
+              ? DateTime.parse(json['updatedAt'])
+              : DateTime.now(),
+      isDeleted: json['isDeleted'] ?? false,
+    );
+  }
 
   FolderItem copyWith({
     String? id,

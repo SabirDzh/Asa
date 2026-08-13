@@ -188,6 +188,7 @@ class AppStrings {
       'no_tasks_in_folder': 'В этой папке пока нет задач',
       'streak_folder_subfolder_denied':
           'В системной папке нельзя создавать подпапки',
+      'streak_folder_name': 'День {n}',
       'add_task_to_folder': 'Добавить задачу в папку',
       'back': 'Назад',
       'confirm_delete_title': 'Удаление',
@@ -195,6 +196,7 @@ class AppStrings {
       'speed_range': 'от 0.1 до 5.0',
       'speed_error': 'Значение должно быть от 0.1 до 5.0',
       'scale_error': 'Значение должно быть в пределах допустимого диапазона',
+      'error_title_too_long': 'Название длиннее 250 символов',
       'save_btn': 'Сохранить',
       'task_moved': 'Задача перенесена в',
       'folder_moved': 'Папка перенесена в',
@@ -227,7 +229,6 @@ class AppStrings {
           'Повторная проверка доступна через {seconds} сек.',
       'load_more': 'Загрузить ещё',
       'view_all_versions': 'Все версии',
-      'whats_new': 'Что нового',
       'releases_empty': 'Релизов пока нет',
       'releases_error': 'Не удалось загрузить историю версий',
       'retry': 'Повторить',
@@ -333,35 +334,6 @@ class AppStrings {
       'calendar_linked': 'Связана',
       'due_date': 'Дата',
       'calendar_not_linked': 'Не связана',
-      'setup_title': 'Быстрая настройка',
-      'setup_continue': 'Продолжить',
-      'setup_skip': 'Пропустить',
-      'setup_enable': 'Включить',
-      'setup_footer':
-          'После завершения настройки разрешения можно изменить в разделе «Уведомления и данные»',
-      'setup_battery': 'Отключить ограничение батареи',
-      'setup_battery_subtitle':
-          'Нужно чтобы напоминания приходили вовремя, даже когда приложение закрыто',
-      'setup_autostart': 'Автозапуск',
-      'setup_autostart_subtitle':
-          'Требуется на устройствах Xiaomi/HyperOS для получения уведомлений после перезагрузки',
-      'setup_autostart_confirm_title': 'Автозапуск включён?',
-      'setup_autostart_confirm_content':
-          'Проверьте, что для ASA включён автозапуск в системных настройках. Подтверждайте только после этого.',
-      'setup_autostart_confirm': 'Я включил автозапуск',
-      'setup_autostart_failed': 'Не удалось открыть настройки автозапуска',
-      'setup_exact_alarm': 'Точные будильники и напоминания',
-      'setup_exact_alarm_subtitle':
-          'Разрешение на срабатывание уведомлений секунда в секунду (Android 12+)',
-      'setup_grant_all': 'Выдайте все разрешения для продолжения',
-      'setup_permission_check_failed':
-          'Не удалось проверить разрешения. Повторите попытку или откройте настройки приложения.',
-      'setup_permission_granted': 'разрешение выдано',
-      'setup_permission_not_granted': 'разрешение не выдано',
-      'setup_notification_denied':
-          'Разрешение на уведомления не выдано — повторите попытку',
-      'setup_notification_permanently_denied':
-          'Уведомления отключены в системе. Включите их в настройках приложения',
     },
     'en': {
       'search': 'Search',
@@ -548,6 +520,7 @@ class AppStrings {
       'no_tasks_in_folder': 'No tasks in this folder yet',
       'streak_folder_subfolder_denied':
           'Cannot create subfolders in a system folder',
+      'streak_folder_name': 'Day {n}',
       'add_task_to_folder': 'Add task to folder',
       'back': 'Back',
       'confirm_delete_title': 'Delete',
@@ -555,6 +528,7 @@ class AppStrings {
       'speed_range': 'from 0.1 to 5.0',
       'speed_error': 'Value must be between 0.1 and 5.0',
       'scale_error': 'Value must be within the allowed range',
+      'error_title_too_long': 'Title is longer than 250 characters',
       'save_btn': 'Save',
       'task_moved': 'Task moved to',
       'folder_moved': 'Folder moved to',
@@ -587,7 +561,6 @@ class AppStrings {
           'Re-checking will be available in {seconds} sec.',
       'load_more': 'Load more',
       'view_all_versions': 'All versions',
-      'whats_new': "What's New",
       'releases_empty': 'No releases yet',
       'releases_error': 'Could not load release history',
       'retry': 'Retry',
@@ -692,39 +665,14 @@ class AppStrings {
       'calendar_linked': 'Linked',
       'due_date': 'Due date',
       'calendar_not_linked': 'Not linked',
-      'setup_title': 'Quick Setup',
-      'setup_continue': 'Continue',
-      'setup_skip': 'Skip',
-      'setup_enable': 'Enable',
-      'setup_footer':
-          'After setup, you can change permissions in «Notifications & Data»',
-      'setup_battery': 'Disable battery optimization',
-      'setup_battery_subtitle':
-          'Required for reminders to arrive on time, even when the app is closed',
-      'setup_autostart': 'Auto-start',
-      'setup_autostart_subtitle':
-          'Required on Xiaomi/HyperOS to receive notifications after reboot',
-      'setup_autostart_confirm_title': 'Is auto-start enabled?',
-      'setup_autostart_confirm_content':
-          'Verify that auto-start is enabled for ASA in system settings. Confirm only after doing so.',
-      'setup_autostart_confirm': 'I enabled auto-start',
-      'setup_autostart_failed': 'Could not open auto-start settings',
-      'setup_exact_alarm': 'Exact alarms & reminders',
-      'setup_exact_alarm_subtitle':
-          'Permission for notifications to trigger down to the second (Android 12+)',
-      'setup_grant_all': 'Grant all permissions to continue',
-      'setup_permission_check_failed':
-          'Could not verify permissions. Retry or open the app settings.',
-      'setup_permission_granted': 'permission granted',
-      'setup_permission_not_granted': 'permission not granted',
-      'setup_notification_denied':
-          'Notification permission was not granted — please try again',
-      'setup_notification_permanently_denied':
-          'Notifications are disabled in system settings. Enable them in the app settings',
     },
   };
 
   static String get(String key, String lang) {
     return _localizedValues[lang]?[key] ?? _localizedValues['ru']?[key] ?? key;
   }
+
+  /// Localized name for the daily streak folder, e.g. "Day 5" / "День 5".
+  static String streakFolderName(String lang, int count) =>
+      get('streak_folder_name', lang).replaceAll('{n}', '$count');
 }

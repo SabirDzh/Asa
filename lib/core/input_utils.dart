@@ -3,6 +3,18 @@ import 'package:flutter/services.dart';
 /// Default maximum length for task/folder titles and search input.
 const int kMaxTextInputLength = 250;
 
+/// Thrown when a task or folder title exceeds [kMaxTextInputLength].
+///
+/// Callers surface this with a localized message (see
+/// `AppStrings.error_title_too_long`) instead of relying on the raw exception
+/// text, which would leak the active language into the data layer.
+class TitleTooLongException implements Exception {
+  const TitleTooLongException();
+
+  @override
+  String toString() => 'TitleTooLongException';
+}
+
 TextInputFormatter numericInputFormatter() =>
     TextInputFormatter.withFunction((oldValue, newValue) {
       final text = newValue.text;

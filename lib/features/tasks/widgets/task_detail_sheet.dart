@@ -24,7 +24,11 @@ import 'description_full_sheet.dart';
 import 'quantity_counter.dart';
 
 /// Shows a read-only bottom sheet with detailed task information.
-Future<void> showTaskDetailSheet(BuildContext context, TaskItem task) async {
+Future<void> showTaskDetailSheet(
+  BuildContext context,
+  TaskItem task, {
+  String? highlightBlockId,
+}) async {
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -33,7 +37,10 @@ Future<void> showTaskDetailSheet(BuildContext context, TaskItem task) async {
     builder:
         (ctx) => DragToCloseSheet(
           trackScrollableDrag: true,
-          child: _TaskDetailSheet(task: task),
+          child: _TaskDetailSheet(
+            task: task,
+            highlightBlockId: highlightBlockId,
+          ),
         ),
   );
 }
@@ -140,8 +147,9 @@ class _LiveActualTimeLineState extends State<_LiveActualTimeLine> {
 
 class _TaskDetailSheet extends StatelessWidget {
   final TaskItem task;
+  final String? highlightBlockId;
 
-  const _TaskDetailSheet({required this.task});
+  const _TaskDetailSheet({required this.task, this.highlightBlockId});
 
   String _folderName(BuildContext context, TaskItem currentTask) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
@@ -324,6 +332,8 @@ class _TaskDetailSheet extends StatelessWidget {
     final provider = context.read<TaskProvider>();
     return DescriptionRenderContext(
       resolveLink: provider.resolveDescriptionLink,
+      resolveEmbed: provider.resolveDescriptionEmbed,
+      resolveBlock: provider.resolveDescriptionBlock,
       onWikilinkTap: (resolution) {
         if (resolution.task != null) {
           unawaited(showTaskDetailSheet(context, resolution.task!));
@@ -336,11 +346,32 @@ class _TaskDetailSheet extends StatelessWidget {
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
       },
+      onBlockTap: (blockId) => _openBlock(context, blockId),
+      onBlockLinkTap: (resolution, blockId) {
+        if (resolution.task != null) {
+          unawaited(
+            showTaskDetailSheet(
+              context,
+              resolution.task!,
+              highlightBlockId: blockId,
+            ),
+          );
+        }
+      },
       onTagTap: (tag) {
         unawaited(showKnowledgeSearchSheet(context, initialQuery: tag));
       },
       onAttachmentEmbedTap:
           (attachment) => _openAttachment(context, attachment),
+    );
+  }
+
+  void _openBlock(BuildContext context, String blockId) {
+    final provider = context.read<TaskProvider>();
+    final resolution = provider.resolveDescriptionBlock(blockId);
+    if (!resolution.isResolved) return;
+    unawaited(
+      showTaskDetailSheet(context, resolution.task!, highlightBlockId: blockId),
     );
   }
 
@@ -621,139 +652,192 @@ class _TaskDetailSheet extends StatelessWidget {
     final textSecondary =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: sheetBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+    return _HighlightOpener(
+      onOpen:
+          highlightBlockId != null &&
+                  _blockBelongsToTask(
+                    taskProvider,
+                    currentTask,
+                    highlightBlockId!,
+                  )
+              ? () => _openHighlightedFullDescription(
+                context,
+                currentTask,
+                settings,
+              )
+              : null,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: textSecondary,
-                      borderRadius: BorderRadius.circular(
-                        AppTheme.sheetHandleRadius,
+        child: Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: textSecondary,
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.sheetHandleRadius,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  settings.tr('task_details'),
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 20),
+                  Text(
+                    settings.tr('task_details'),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                _infoTile(
-                  Iconsax.clipboard_tick,
-                  currentTask.title,
-                  textColor,
-                  bold: true,
-                ),
-                _infoTile(
-                  Iconsax.folder_minus,
-                  '${settings.tr('folder')}: ${_folderName(context, currentTask)}',
-                  textColor,
-                ),
-                _infoTile(
-                  Iconsax.clock,
-                  '${settings.tr('task_status')}: ${_statusText(context, currentTask)}',
-                  textColor,
-                ),
-                _buildTimeBlock(
-                  context,
-                  currentTask,
-                  textColor,
-                  isTimerRunning,
-                  elapsed,
-                ),
-                if (currentTask.dueDate != null)
+                  const SizedBox(height: 20),
+                  _infoTile(
+                    Iconsax.clipboard_tick,
+                    currentTask.title,
+                    textColor,
+                    bold: true,
+                  ),
+                  _infoTile(
+                    Iconsax.folder_minus,
+                    '${settings.tr('folder')}: ${_folderName(context, currentTask)}',
+                    textColor,
+                  ),
+                  _infoTile(
+                    Iconsax.clock,
+                    '${settings.tr('task_status')}: ${_statusText(context, currentTask)}',
+                    textColor,
+                  ),
+                  _buildTimeBlock(
+                    context,
+                    currentTask,
+                    textColor,
+                    isTimerRunning,
+                    elapsed,
+                  ),
+                  if (currentTask.dueDate != null)
+                    _infoTile(
+                      Iconsax.calendar_1,
+                      '${settings.tr('due_date')}: ${_formatDate(currentTask.dueDate!)}',
+                      textColor,
+                    ),
+                  _buildInfoBlocks(context, textColor, currentTask),
+                  Builder(
+                    builder: (context) {
+                      final tags = taskProvider.tagsForTask(currentTask.id);
+                      final contexts = taskProvider.backlinkContextsForTask(
+                        currentTask.id,
+                      );
+                      final backlinks =
+                          contexts.map((context) => context.task).toList();
+                      final related = _relatedTasks(taskProvider, currentTask);
+                      if (tags.isEmpty &&
+                          backlinks.isEmpty &&
+                          related.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return DescriptionBacklinks(
+                        key: const ValueKey('description-backlinks-section'),
+                        tags: tags,
+                        backlinks: backlinks,
+                        relatedTasks: related,
+                        tagsLabel: settings.tr('description_tags'),
+                        backlinksLabel: settings.tr('description_backlinks'),
+                        relatedLabel: settings.tr('description_related'),
+                        taskSubtitle: (task) => _taskSubtitle(context, task),
+                        backlinkSnippet:
+                            (task) =>
+                                contexts
+                                    .firstWhere(
+                                      (context) => context.task.id == task.id,
+                                    )
+                                    .snippet,
+                        onTagTap:
+                            (tag) => unawaited(
+                              showKnowledgeSearchSheet(
+                                context,
+                                initialQuery: tag,
+                              ),
+                            ),
+                        onTaskTap: (target) {
+                          if (target.id == currentTask.id) return;
+                          unawaited(showTaskDetailSheet(context, target));
+                        },
+                      );
+                    },
+                  ),
+                  if (currentTask.folderId != 'system_streak_folder')
+                    _infoTile(
+                      currentTask.calendarEventId != null
+                          ? Iconsax.calendar
+                          : Iconsax.calendar_remove,
+                      '${settings.tr('calendar_status')}: ${currentTask.calendarEventId != null ? settings.tr('calendar_linked') : settings.tr('calendar_not_linked')}',
+                      textColor,
+                    ),
                   _infoTile(
                     Iconsax.calendar_1,
-                    '${settings.tr('due_date')}: ${_formatDate(currentTask.dueDate!)}',
-                    textColor,
+                    '${settings.tr('created_at')}: ${_formatDateTime(currentTask.createdAt)}',
+                    textSecondary,
                   ),
-                _buildInfoBlocks(context, textColor, currentTask),
-                Builder(
-                  builder: (context) {
-                    final tags = taskProvider.tagsForTask(currentTask.id);
-                    final contexts = taskProvider.backlinkContextsForTask(
-                      currentTask.id,
-                    );
-                    final backlinks =
-                        contexts.map((context) => context.task).toList();
-                    final related = _relatedTasks(taskProvider, currentTask);
-                    if (tags.isEmpty && backlinks.isEmpty && related.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return DescriptionBacklinks(
-                      key: const ValueKey('description-backlinks-section'),
-                      tags: tags,
-                      backlinks: backlinks,
-                      relatedTasks: related,
-                      tagsLabel: settings.tr('description_tags'),
-                      backlinksLabel: settings.tr('description_backlinks'),
-                      relatedLabel: settings.tr('description_related'),
-                      taskSubtitle: (task) => _taskSubtitle(context, task),
-                      backlinkSnippet:
-                          (task) =>
-                              contexts
-                                  .firstWhere(
-                                    (context) => context.task.id == task.id,
-                                  )
-                                  .snippet,
-                      onTagTap:
-                          (tag) => unawaited(
-                            showKnowledgeSearchSheet(
-                              context,
-                              initialQuery: tag,
-                            ),
-                          ),
-                      onTaskTap: (target) {
-                        if (target.id == currentTask.id) return;
-                        unawaited(showTaskDetailSheet(context, target));
-                      },
-                    );
-                  },
-                ),
-                if (currentTask.folderId != 'system_streak_folder')
                   _infoTile(
-                    currentTask.calendarEventId != null
-                        ? Iconsax.calendar
-                        : Iconsax.calendar_remove,
-                    '${settings.tr('calendar_status')}: ${currentTask.calendarEventId != null ? settings.tr('calendar_linked') : settings.tr('calendar_not_linked')}',
-                    textColor,
+                    Iconsax.refresh,
+                    '${settings.tr('updated_at')}: ${_formatDateTime(currentTask.updatedAt)}',
+                    textSecondary,
                   ),
-                _infoTile(
-                  Iconsax.calendar_1,
-                  '${settings.tr('created_at')}: ${_formatDateTime(currentTask.createdAt)}',
-                  textSecondary,
-                ),
-                _infoTile(
-                  Iconsax.refresh,
-                  '${settings.tr('updated_at')}: ${_formatDateTime(currentTask.updatedAt)}',
-                  textSecondary,
-                ),
-                const SizedBox(height: 8),
-              ],
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  bool _blockBelongsToTask(
+    TaskProvider provider,
+    TaskItem currentTask,
+    String blockId,
+  ) {
+    final block = provider.resolveDescriptionBlock(blockId);
+    return block.isResolved && block.task!.id == currentTask.id;
+  }
+
+  void _openHighlightedFullDescription(
+    BuildContext context,
+    TaskItem currentTask,
+    SettingsProvider settings,
+  ) {
+    final blockId = highlightBlockId!;
+    final description = currentTask.infoBlocks.firstWhere(
+      (block) => block.type == TaskInfoBlockType.description,
+      orElse: () => TaskInfoBlock.description(id: 'none', text: ''),
+    );
+    if (description.text.trim().isEmpty) return;
+    unawaited(
+      showFullDescriptionSheet(
+        context,
+        text: description.text,
+        format: description.descriptionFormat,
+        attachments: description.attachments,
+        title: settings.tr('full_description'),
+        onAttachmentTap: (attachment) => _openAttachment(context, attachment),
+        onExternalLinkTap:
+            (href, {title}) => _openExternalLink(context, href, title: title),
+        renderContext: _descriptionRenderContext(context),
+        highlightBlockId: blockId,
       ),
     );
   }
@@ -786,4 +870,33 @@ class _TaskDetailSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Opens [onOpen] exactly once after the first frame, so a bottom sheet can
+/// auto-open a follow-up sheet without re-opening on every rebuild.
+class _HighlightOpener extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onOpen;
+
+  const _HighlightOpener({required this.child, this.onOpen});
+
+  @override
+  State<_HighlightOpener> createState() => _HighlightOpenerState();
+}
+
+class _HighlightOpenerState extends State<_HighlightOpener> {
+  bool _opened = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_opened || widget.onOpen == null) return;
+      _opened = true;
+      widget.onOpen!();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

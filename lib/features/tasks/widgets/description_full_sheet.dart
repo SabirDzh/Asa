@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/description_document.dart';
 import '../../../core/description_markdown.dart';
 import '../../../core/description_render_context.dart';
 import '../../../core/drag_close_sheet.dart';
@@ -76,6 +77,7 @@ Future<void> showFullDescriptionSheet(
   required DescriptionAttachmentTap onAttachmentTap,
   required DescriptionExternalLinkTap? onExternalLinkTap,
   DescriptionRenderContext? renderContext,
+  String? highlightBlockId,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -93,6 +95,7 @@ Future<void> showFullDescriptionSheet(
             onAttachmentTap: onAttachmentTap,
             onExternalLinkTap: onExternalLinkTap,
             renderContext: renderContext,
+            highlightBlockId: highlightBlockId,
           ),
         ),
   );
@@ -106,6 +109,7 @@ class DescriptionFullSheet extends StatelessWidget {
   final DescriptionAttachmentTap onAttachmentTap;
   final DescriptionExternalLinkTap? onExternalLinkTap;
   final DescriptionRenderContext? renderContext;
+  final String? highlightBlockId;
 
   const DescriptionFullSheet({
     super.key,
@@ -116,6 +120,7 @@ class DescriptionFullSheet extends StatelessWidget {
     required this.onAttachmentTap,
     required this.onExternalLinkTap,
     this.renderContext,
+    this.highlightBlockId,
   });
 
   @override
@@ -173,19 +178,103 @@ class DescriptionFullSheet extends StatelessWidget {
               child: SingleChildScrollView(
                 key: const ValueKey('full-description-scroll'),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                child: DescriptionBody(
+                child: _HighlightableDescription(
                   text: text,
                   format: format,
                   attachments: attachments,
                   onAttachmentTap: onAttachmentTap,
                   onExternalLinkTap: onExternalLinkTap,
                   renderContext: renderContext,
+                  highlightBlockId: highlightBlockId,
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _HighlightableDescription extends StatefulWidget {
+  final String text;
+  final DescriptionFormat format;
+  final List<TaskAttachment> attachments;
+  final DescriptionAttachmentTap onAttachmentTap;
+  final DescriptionExternalLinkTap? onExternalLinkTap;
+  final DescriptionRenderContext? renderContext;
+  final String? highlightBlockId;
+
+  const _HighlightableDescription({
+    required this.text,
+    required this.format,
+    required this.attachments,
+    required this.onAttachmentTap,
+    required this.onExternalLinkTap,
+    this.renderContext,
+    this.highlightBlockId,
+  });
+
+  @override
+  State<_HighlightableDescription> createState() =>
+      _HighlightableDescriptionState();
+}
+
+class _HighlightableDescriptionState extends State<_HighlightableDescription> {
+  final _highlightKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _highlightKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 200),
+          alignment: 0.2,
+        );
+      }
+    });
+  }
+
+  Widget _body(String text) {
+    return DescriptionBody(
+      text: text,
+      format: widget.format,
+      attachments: widget.attachments,
+      onAttachmentTap: widget.onAttachmentTap,
+      onExternalLinkTap: widget.onExternalLinkTap,
+      renderContext: widget.renderContext,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final highlightId = widget.highlightBlockId;
+    if (highlightId == null) return _body(widget.text);
+    final parts = splitDescriptionAroundBlock(widget.text, highlightId);
+    if (parts == null) return _body(widget.text);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (parts.before.trim().isNotEmpty) _body(parts.before),
+        Container(
+          key: _highlightKey,
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Theme.of(context).colorScheme.primary),
+          ),
+          child: _body(parts.block),
+        ),
+        if (parts.after.trim().isNotEmpty) _body(parts.after),
+      ],
     );
   }
 }

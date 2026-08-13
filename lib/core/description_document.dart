@@ -58,3 +58,27 @@ class DescriptionDocument {
     required this.callouts,
   });
 }
+
+/// Splits [source] around the blank-line-delimited paragraph whose last line
+/// ends with `^blockId`. Returns null when the block is not present.
+({String before, String block, String after})? splitDescriptionAroundBlock(
+  String source,
+  String blockId,
+) {
+  final marker = RegExp.escape('^$blockId');
+  final match = RegExp(
+    r'^(.*' + marker + r'[ \t]*)$',
+    multiLine: true,
+  ).firstMatch(source);
+  if (match == null) return null;
+  final separatorStart = source.lastIndexOf('\n\n', match.start);
+  final blockStart = separatorStart == -1 ? 0 : separatorStart + 2;
+  final separatorEnd = source.indexOf('\n\n', match.end);
+  final blockEnd = separatorEnd == -1 ? source.length : separatorEnd;
+  final afterStart = separatorEnd == -1 ? source.length : separatorEnd + 2;
+  return (
+    before: source.substring(0, separatorStart == -1 ? 0 : separatorStart),
+    block: source.substring(blockStart, blockEnd),
+    after: source.substring(afterStart),
+  );
+}

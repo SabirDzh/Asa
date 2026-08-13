@@ -150,6 +150,25 @@ class TaskProvider with ChangeNotifier {
     return _descriptionIndex.resolve(target);
   }
 
+  DescriptionBlockResolution resolveDescriptionBlock(String blockId) {
+    return _descriptionIndex.resolveBlock(blockId);
+  }
+
+  List<DescriptionBacklinkContext> backlinkContextsForTask(String taskId) {
+    final snippets = _descriptionIndex.backlinkSnippets(taskId);
+    return List.unmodifiable(
+      _tasks
+          .where((task) => !task.isDeleted && snippets.containsKey(task.id))
+          .map(
+            (task) => DescriptionBacklinkContext(
+              task: task,
+              snippet: snippets[task.id] ?? '',
+            ),
+          )
+          .toList(),
+    );
+  }
+
   List<TaskItem> backlinksForTask(String taskId) {
     final ids = _descriptionIndex.backlinkTaskIds(taskId);
     return List.unmodifiable(
@@ -888,107 +907,6 @@ class TaskProvider with ChangeNotifier {
       currentId = _folders[index].parentFolderId;
     }
     return false;
-  }
-
-  void _reorderFoldersByParent(
-    String? parentFolderId,
-    int oldIndex,
-    int newIndex,
-  ) {
-    final list =
-        _folders
-            .where((f) => f.parentFolderId == parentFolderId && !f.isDeleted)
-            .toList();
-    if (oldIndex < 0 ||
-        newIndex < 0 ||
-        oldIndex >= list.length ||
-        newIndex >= list.length) {
-      return;
-    }
-
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
-
-    final ids = list.map((f) => f.id).toSet();
-    final newFolders = <FolderItem>[
-      ..._folders.where((f) => !ids.contains(f.id)),
-      ...list,
-    ];
-
-    _folders
-      ..clear()
-      ..addAll(newFolders);
-    _notifyFoldersChanged();
-    _saveToPrefs();
-  }
-
-  void reorderRootFolders(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || newIndex < 0) return;
-    // Reordering a filtered/searched list is ambiguous and can cause data
-    // loss, so only reorder when the full root list is visible.
-    if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
-    // The app-owned streak folder is always pinned at the root position.
-    if (oldIndex == 0 || newIndex == 0) return;
-    _reorderFoldersByParent(null, oldIndex, newIndex);
-  }
-
-  void reorderSubfolders(String parentFolderId, int oldIndex, int newIndex) {
-    if (_searchQuery.isNotEmpty || _filter != TaskFilter.all) return;
-    _reorderFoldersByParent(parentFolderId, oldIndex, newIndex);
-  }
-
-  /// Replaces a folder's task order with [orderedTaskIds]. This is used by the
-  /// mixed folder-detail list, where active and completed tasks are rendered
-  /// as separate visual sections but still share one persisted task order.
-  void reorderFolderTasks(
-    String folderId,
-    int oldIndex,
-    int newIndex, {
-    List<String>? orderedTaskIds,
-  }) {
-    final folderTasks =
-        _tasks.where((t) => t.folderId == folderId && !t.isDeleted).toList();
-    if (orderedTaskIds != null) {
-      final byId = {for (final task in folderTasks) task.id: task};
-      final ordered = <TaskItem>[];
-      for (final id in orderedTaskIds) {
-        final task = byId.remove(id);
-        if (task != null) ordered.add(task);
-      }
-      ordered.addAll(byId.values);
-      final taskIdsInFolder = ordered.map((task) => task.id).toSet();
-      final newTasks = <TaskItem>[
-        ..._tasks.where((task) => !taskIdsInFolder.contains(task.id)),
-        ...ordered,
-      ];
-      _tasks
-        ..clear()
-        ..addAll(newTasks);
-      _notifyTasksChanged();
-      _saveToPrefs();
-      return;
-    }
-    if (oldIndex < 0 ||
-        newIndex < 0 ||
-        oldIndex >= folderTasks.length ||
-        newIndex >= folderTasks.length) {
-      return;
-    }
-
-    final item = folderTasks.removeAt(oldIndex);
-    folderTasks.insert(newIndex, item);
-
-    final taskIdsInFolder = folderTasks.map((t) => t.id).toSet();
-    final newTasks = <TaskItem>[
-      ..._tasks.where((t) => !taskIdsInFolder.contains(t.id)),
-      ...folderTasks,
-    ];
-
-    _tasks
-      ..clear()
-      ..addAll(newTasks);
-    _notifyTasksChanged();
-    _saveToPrefs();
   }
 
   void addTask(

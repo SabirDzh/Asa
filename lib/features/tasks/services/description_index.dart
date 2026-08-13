@@ -28,12 +28,16 @@ class DescriptionIndex {
   final _folderPathsById = <String, String?>{};
   final _referencesByTaskId = <String, List<DescriptionReference>>{};
   final _tagsByTaskId = <String, Set<String>>{};
-  final _backlinksByTaskId = <String, Set<String>>{};
+  final _blocksByTaskId = <String, Map<String, String>>{};
+  final _sourceByTaskId = <String, String>{};
+  final _backlinksByTaskId = <String, Map<String, String>>{};
 
   void rebuild(Iterable<TaskItem> tasks, Iterable<FolderItem> folders) {
     _tasksById.clear();
     _referencesByTaskId.clear();
     _tagsByTaskId.clear();
+    _blocksByTaskId.clear();
+    _sourceByTaskId.clear();
     _backlinksByTaskId.clear();
     _rebuildFolderPaths(folders);
 
@@ -58,6 +62,8 @@ class DescriptionIndex {
     _tasksById.remove(taskId);
     _referencesByTaskId.remove(taskId);
     _tagsByTaskId.remove(taskId);
+    _blocksByTaskId.remove(taskId);
+    _sourceByTaskId.remove(taskId);
     _backlinksByTaskId.remove(taskId);
     for (final sources in _backlinksByTaskId.values) {
       sources.remove(taskId);
@@ -177,7 +183,31 @@ class DescriptionIndex {
   }
 
   Set<String> backlinkTaskIds(String taskId) {
-    return Set.unmodifiable(_backlinksByTaskId[taskId] ?? const <String>{});
+    return Set.unmodifiable(
+      (_backlinksByTaskId[taskId] ?? const <String, String>{}).keys,
+    );
+  }
+
+  DescriptionBlockResolution resolveBlock(String blockId) {
+    for (final entry in _blocksByTaskId.entries) {
+      final text = entry.value[blockId];
+      if (text == null) continue;
+      final task = _tasksById[entry.key];
+      if (task != null) {
+        return DescriptionBlockResolution(
+          blockId: blockId,
+          task: task,
+          text: text,
+        );
+      }
+    }
+    return DescriptionBlockResolution(blockId: blockId, task: null, text: '');
+  }
+
+  Map<String, String> backlinkSnippets(String taskId) {
+    return Map.unmodifiable(
+      _backlinksByTaskId[taskId] ?? const <String, String>{},
+    );
   }
 
   void _indexTask(TaskItem task) {
@@ -189,6 +219,8 @@ class DescriptionIndex {
     final text = _descriptionText(task);
     final document = parseDescriptionDocument(text);
     _referencesByTaskId[task.id] = document.references;
+    _sourceByTaskId[task.id] = text;
+    _blocksByTaskId[task.id] = _parseBlocks(text);
     _tagsByTaskId[task.id] = {
       for (final reference in document.references)
         if (reference.type == DescriptionReferenceType.tag)
@@ -196,20 +228,61 @@ class DescriptionIndex {
     };
   }
 
+  Map<String, String> _parseBlocks(String source) {
+    final blocks = <String, String>{};
+    final paragraphs = source.split(RegExp(r'\n\s*\n'));
+    for (final paragraph in paragraphs) {
+      final lines = paragraph.split('\n');
+      final last = lines.last.trimRight();
+      final match = RegExp(r'\^([A-Za-z0-9_-]+)\s*$').firstMatch(last);
+      if (match == null) continue;
+      final blockId = match.group(1)!;
+      final cleanedLines = <String>[
+        ...lines.sublist(0, lines.length - 1),
+        last.substring(0, match.start),
+      ];
+      blocks[blockId] = cleanedLines.join('\n').trim();
+    }
+    return blocks;
+  }
+
   void _rebuildBacklinks() {
     _backlinksByTaskId.clear();
     for (final entry in _referencesByTaskId.entries) {
+      final sourceId = entry.key;
+      final source = _sourceByTaskId[sourceId] ?? '';
       for (final reference in entry.value) {
         if (reference.type != DescriptionReferenceType.wikilink) continue;
         final resolution = resolve(reference.target);
-        if (!resolution.isResolved || resolution.task!.id == entry.key) {
+        if (!resolution.isResolved || resolution.task!.id == sourceId) {
           continue;
         }
+        final snippet = _referenceSnippet(
+          source,
+          reference.start,
+          reference.end,
+        );
         _backlinksByTaskId
-            .putIfAbsent(resolution.task!.id, () => <String>{})
-            .add(entry.key);
+            .putIfAbsent(resolution.task!.id, () => <String, String>{})
+            .putIfAbsent(sourceId, () => snippet);
       }
     }
+  }
+
+  String _referenceSnippet(String source, int start, int end) {
+    if (source.isEmpty) return '';
+    final lineStart = source.lastIndexOf('\n', start) + 1;
+    var lineEnd = source.indexOf('\n', end);
+    if (lineEnd == -1) lineEnd = source.length;
+    final line = source.substring(lineStart, lineEnd).trim();
+    final cleaned = line.replaceAll(RegExp(r'[\[\]|]'), '');
+    return _truncateCodePoints(cleaned.replaceAll(RegExp(r'\s+'), ' '), 120);
+  }
+
+  String _truncateCodePoints(String value, int maxCodePoints) {
+    final codePoints = value.runes.toList();
+    if (codePoints.length <= maxCodePoints) return value;
+    return '${String.fromCharCodes(codePoints.take(maxCodePoints))}…';
   }
 
   void _rebuildFolderPaths(Iterable<FolderItem> folders) {

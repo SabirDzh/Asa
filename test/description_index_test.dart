@@ -128,4 +128,39 @@ void main() {
     index.removeTask('read-book');
     expect(index.resolve('Read book').isUnresolved, isTrue);
   });
+
+  test('resolves a block definition to its task and paragraph text', () {
+    final blockTask = TaskItem(
+      id: 'block-owner',
+      title: 'Block owner',
+      infoBlocks: [
+        TaskInfoBlock.description(
+          id: 'details',
+          text: 'Intro sentence.\n\nDeep paragraph ^key-point',
+        ),
+      ],
+    );
+    index.rebuild([readBook, writeReport, blockTask], [projects]);
+
+    final resolution = index.resolveBlock('key-point');
+
+    expect(resolution.isResolved, isTrue);
+    expect(resolution.task?.id, 'block-owner');
+    expect(resolution.text, 'Deep paragraph');
+  });
+
+  test('returns an unresolved block resolution for an unknown id', () {
+    final resolution = index.resolveBlock('missing-block');
+
+    expect(resolution.isResolved, isFalse);
+    expect(resolution.task, isNull);
+  });
+
+  test('returns a backlink snippet around the linking reference', () {
+    // writeReport already links [[Projects/Read book|the book]].
+    final snippets = index.backlinkSnippets('read-book');
+
+    expect(snippets.keys, contains('write-report'));
+    expect(snippets['write-report'], contains('Depends on'));
+  });
 }

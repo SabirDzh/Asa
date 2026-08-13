@@ -99,4 +99,38 @@ void main() {
     expect(document.references, isEmpty);
     expect(document.source, source);
   });
+
+  test('parses block links with a task target', () {
+    const source = '[[Read book#^intro]] and ![[Read book#^summary]]';
+
+    final refs = parseDescriptionDocument(source).references;
+
+    expect(refs, hasLength(2));
+    expect(refs[0].type, DescriptionReferenceType.wikilink);
+    expect(refs[0].target, 'Read book');
+    expect(refs[0].blockId, 'intro');
+    expect(refs[1].type, DescriptionReferenceType.embed);
+    expect(refs[1].target, 'Read book');
+    expect(refs[1].blockId, 'summary');
+  });
+
+  test('parses a same-document block link with an empty target', () {
+    const source = 'See [[#^details]] here';
+
+    final ref = parseDescriptionDocument(source).references.single;
+
+    expect(ref.type, DescriptionReferenceType.wikilink);
+    expect(ref.target, '');
+    expect(ref.blockId, 'details');
+  });
+
+  test('keeps standalone ^id as a blockReference without a blockId', () {
+    const source = 'A paragraph ^block-id';
+
+    final ref = parseDescriptionDocument(source).references.single;
+
+    expect(ref.type, DescriptionReferenceType.blockReference);
+    expect(ref.target, 'block-id');
+    expect(ref.blockId, isNull);
+  });
 }

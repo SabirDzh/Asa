@@ -10,6 +10,7 @@ class DescriptionReference {
   final String raw;
   final String target;
   final String? alias;
+  final String? blockId;
   final int start;
   final int end;
 
@@ -18,6 +19,7 @@ class DescriptionReference {
     required this.raw,
     required this.target,
     required this.alias,
+    this.blockId,
     required this.start,
     required this.end,
   });

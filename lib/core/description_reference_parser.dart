@@ -112,11 +112,22 @@ DescriptionDocument parseDescriptionDocument(String source) {
       if (close != -1) {
         final content = source.substring(linkStart + 2, close);
         final parts = content.split('|');
-        final target = parts.first.trim();
-        if (target.isNotEmpty &&
-            !target.contains('\n') &&
-            !target.contains('[[') &&
-            !target.contains('`')) {
+        final rawTarget = parts.first.trim();
+        final hashIndex = rawTarget.indexOf('#^');
+        final target =
+            hashIndex == -1
+                ? rawTarget
+                : rawTarget.substring(0, hashIndex).trim();
+        final blockId =
+            hashIndex == -1 ? null : rawTarget.substring(hashIndex + 2).trim();
+        final hasValidBlockId =
+            blockId != null &&
+            blockId.isNotEmpty &&
+            RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(blockId);
+        if ((target.isNotEmpty || hasValidBlockId) &&
+            !rawTarget.contains('\n') &&
+            !rawTarget.contains('[[') &&
+            !rawTarget.contains('`')) {
           final rawStart = isEmbed ? index : linkStart;
           references.add(
             DescriptionReference(
@@ -130,6 +141,7 @@ DescriptionDocument parseDescriptionDocument(String source) {
                   parts.length > 1 && parts[1].trim().isNotEmpty
                       ? parts.sublist(1).join('|').trim()
                       : null,
+              blockId: hasValidBlockId ? blockId : null,
               start: rawStart,
               end: close + 2,
             ),

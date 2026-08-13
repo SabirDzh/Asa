@@ -104,6 +104,7 @@ class DescriptionEditor extends StatefulWidget {
 
 class _DescriptionEditorState extends State<DescriptionEditor> {
   bool _preview = false;
+  bool _live = false;
   bool _focused = false;
 
   @override
@@ -155,7 +156,8 @@ class _DescriptionEditorState extends State<DescriptionEditor> {
     if (mounted) setState(() => _focused = widget.focusNode?.hasFocus ?? false);
   }
 
-  bool get _showControls => widget.focusNode == null || _focused || _preview;
+  bool get _showControls =>
+      widget.focusNode == null || _focused || _preview || _live;
 
   void _apply(TextEditingValue Function(TextEditingValue) transform) {
     widget.controller.value = transform(widget.controller.value);
@@ -180,33 +182,42 @@ class _DescriptionEditorState extends State<DescriptionEditor> {
         if (_showControls) ...[
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: SegmentedButton<bool>(
+            child: SegmentedButton<int>(
               key: const ValueKey('description-editor-mode'),
               segments: [
-                ButtonSegment<bool>(
-                  value: false,
+                ButtonSegment<int>(
+                  value: 0,
                   label: Text(
                     AppStrings.get('description_source', languageCode),
                   ),
                   icon: const Icon(Icons.code),
                 ),
-                ButtonSegment<bool>(
-                  value: true,
+                ButtonSegment<int>(
+                  value: 1,
+                  label: Text(AppStrings.get('description_live', languageCode)),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                ButtonSegment<int>(
+                  value: 2,
                   label: Text(
                     AppStrings.get('description_preview', languageCode),
                   ),
                   icon: const Icon(Icons.visibility_outlined),
                 ),
               ],
-              selected: {_preview},
+              selected: {_preview ? 2 : (_live ? 1 : 0)},
               onSelectionChanged: (selection) {
-                setState(() => _preview = selection.first);
+                final value = selection.first;
+                setState(() {
+                  _live = value == 1;
+                  _preview = value == 2;
+                });
               },
             ),
           ),
           const SizedBox(height: 4),
         ],
-        if (!_preview) ...[
+        if (!_preview && !_live) ...[
           if (_showControls)
             DescriptionToolbar(
               onBold: () => _wrap('**', '**'),
@@ -234,6 +245,18 @@ class _DescriptionEditorState extends State<DescriptionEditor> {
               alignLabelWithHint: true,
             ),
           ),
+        ] else if (_live) ...[
+          _LiveDescriptionField(
+            controller: widget.controller,
+            focusNode: widget.focusNode,
+            fieldKey: widget.fieldKey,
+            maxLength: widget.maxLength,
+            attachments: widget.attachments,
+            renderContext: widget.renderContext,
+            onAttachmentTap: attachmentTap,
+            onExternalLinkTap: linkTap,
+            onChanged: widget.onChanged,
+          ),
         ] else
           Container(
             key: const ValueKey('description-editor-preview'),
@@ -255,6 +278,117 @@ class _DescriptionEditorState extends State<DescriptionEditor> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _LiveDescriptionField extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final Key? fieldKey;
+  final int maxLength;
+  final List<TaskAttachment> attachments;
+  final DescriptionRenderContext? renderContext;
+  final DescriptionAttachmentTap onAttachmentTap;
+  final DescriptionExternalLinkTap? onExternalLinkTap;
+  final ValueChanged<String>? onChanged;
+
+  const _LiveDescriptionField({
+    required this.controller,
+    this.focusNode,
+    this.fieldKey,
+    required this.maxLength,
+    required this.attachments,
+    this.renderContext,
+    required this.onAttachmentTap,
+    this.onExternalLinkTap,
+    this.onChanged,
+  });
+
+  @override
+  State<_LiveDescriptionField> createState() => _LiveDescriptionFieldState();
+}
+
+class _LiveDescriptionFieldState extends State<_LiveDescriptionField> {
+  late FocusNode _focusNode;
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = widget.focusNode ?? FocusNode();
+    _focused = _focusNode.hasFocus;
+    _focusNode.addListener(_handleFocus);
+  }
+
+  @override
+  void didUpdateWidget(_LiveDescriptionField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_handleFocus);
+      _focusNode = widget.focusNode ?? FocusNode();
+      _focused = _focusNode.hasFocus;
+      _focusNode.addListener(_handleFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocus);
+    if (widget.focusNode == null) _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleFocus() {
+    if (mounted) setState(() => _focused = _focusNode.hasFocus);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Container(
+      key: const ValueKey('description-editor-live'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color:
+              _focused
+                  ? Theme.of(context).colorScheme.primary
+                  : textColor.withValues(alpha: 0.18),
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        children: [
+          IgnorePointer(
+            child: DescriptionBody(
+              text: widget.controller.text,
+              format: DescriptionFormat.markdown,
+              attachments: widget.attachments,
+              onAttachmentTap: widget.onAttachmentTap,
+              onExternalLinkTap: widget.onExternalLinkTap,
+              renderContext: widget.renderContext,
+            ),
+          ),
+          TextField(
+            key: widget.fieldKey,
+            controller: widget.controller,
+            focusNode: _focusNode,
+            maxLength: widget.maxLength,
+            maxLines: null,
+            minLines: 1,
+            keyboardType: TextInputType.multiline,
+            inputFormatters: [textInputFormatter(maxLength: widget.maxLength)],
+            onChanged: widget.onChanged,
+            style: const TextStyle(color: Colors.transparent),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              counterText: '',
+              isCollapsed: true,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

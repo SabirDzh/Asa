@@ -128,4 +128,60 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('description-field')), findsOneWidget);
   });
+
+  testWidgets('live preview edits rendered markdown in place', (tester) async {
+    final controller = TextEditingController(text: '**hello**');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DescriptionEditor(
+            controller: controller,
+            fieldKey: const ValueKey('description-live-field'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('description-live-field')),
+      findsOneWidget,
+    );
+    expect(find.text('hello'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('description-live-field')),
+      '**changed**',
+    );
+    await tester.pump();
+    expect(controller.text, '**changed**');
+    expect(find.text('changed'), findsOneWidget);
+  });
+
+  testWidgets('switches from live back to source mode', (tester) async {
+    final controller = TextEditingController(text: '**hello**');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DescriptionEditor(
+            controller: controller,
+            fieldKey: const ValueKey('description-field'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('description-editor-live')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byIcon(Icons.code));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('description-field')), findsOneWidget);
+  });
 }
